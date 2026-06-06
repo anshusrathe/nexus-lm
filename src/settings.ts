@@ -175,6 +175,8 @@ export interface AISettings {
   chatWallpaperHeaderOpacity: number; // Opacity of header/input with liquid glass (0-1)
   chatWallpaperEnabled: boolean; // Whether wallpaper is enabled
   customProviders: CustomProviderConfig[]; // New setting for custom providers
+  savedConceptMaps: any[];
+  savedSlideshows: any[];
 }
 
 export const DEFAULT_SETTINGS: AISettings = {
@@ -216,6 +218,8 @@ export const DEFAULT_SETTINGS: AISettings = {
   feedFolders: [],
   visitedEntries: [],
   bookmarkedEntries: [], // Default value for bookmarked entries
+  savedConceptMaps: [],
+  savedSlideshows: [],
 customModels: [
     // Gemini models
     { provider: 'gemini', id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', tokenLimit: 2500000, requestLimit: 10, enabled: true },

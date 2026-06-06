@@ -20,7 +20,7 @@ export interface CodeExecutionResult {
     markdownContent?: string;
 }
 
-const EXECUTABLE_LANGS = new Set(['javascript', 'js', 'typescript', 'ts', 'html', 'css', 'svg', 'python', 'py']);
+const EXECUTABLE_LANGS = new Set(['javascript', 'js', 'typescript', 'ts', 'html', 'css', 'svg']);
 const RENDERABLE_LANGS  = new Set(['mermaid', 'markdown', 'md', 'json', 'dataview', 'dataviewjs']);
 
 // ---------------------------------------------------------------------------
@@ -67,7 +67,11 @@ export async function executeCode(code: string, language: string): Promise<CodeE
         return executeJavaScript(exec);
     }
     if (['python', 'py'].includes(lang)) {
-        return executePython(code);
+        return {
+            success: false, output: '',
+            error: "Python execution is not supported due to Obsidian security policies (dynamic script injection is blocked).",
+            language: 'python'
+        };
     }
     if (isRenderable(lang)) {
         return {
@@ -135,144 +139,8 @@ ${code}
 }
 
 // ---------------------------------------------------------------------------
-// Python execution via Pyodide
+// Python execution via Pyodide (REMOVED due to Obsidian security policy)
 // ---------------------------------------------------------------------------
-
-let pyodideInstance: any = null;
-let pyodideLoading: Promise<any> | null = null;
-const loadedPyPackages: Set<string> = new Set();
-
-const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full';
-
-const PYODIDE_COMMON_PACKAGES = ['numpy', 'pandas', 'matplotlib', 'scipy', 'sklearn', 'scikit-learn', 'pillow', 'openpyxl', 'xlrd', 'cycler', 'fonttools', 'kiwisolver', 'matplotlib-inline'];
-
-const PYODIDE_STDLIB = new Set([
-    'sys', 'os', 're', 'json', 'math', 'time', 'datetime', 'collections', 'itertools', 'functools',
-    'random', 'statistics', 'copy', 'pprint', 'string', 'io', 'csv', 'urllib', 'base64', 'hashlib',
-    'pickle', 'warnings', 'abc', 'types', 'operator', 'enum', 'pathlib', 'zipfile', 'gc',
-    'traceback', 'textwrap', 'argparse', 'shutil', 'glob', 'fnmatch', 'tempfile', 'struct',
-    'codecs', 'unicodedata', 'locale', 'getopt', 'optparse', ' threading', 'multiprocessing',
-    'subprocess', 'socket', 'ssl', 'signal', 'platform', 'errno', 'ctypes', 'weakref',
-    'doctest', 'unittest', 'inspect', 'dis', 'ast', 'optimize', 'compile', 'pdb',
-    'profile', 'timeit', 'trace', 'linecache', 'tokenize', 'keyword', 'token', 'parser',
-    'symbol', 'node', 'importlib', 'builtins', '__future__', 'atexit', 'fractions', 'logging',
-    'msilib', 'zipimport', 'modulefinder', 'LZFile', 'cmd', 'code', 'codeop', 'filecmp',
-    'imghdr', 'dircmp', 'dist', 'fileinput', 'shlex', 'quopri', 'uu', 'xxsubinterpreter'
-]);
-
-function detectRequiredPackages(code: string): string[] {
-    const packages: Set<string> = new Set();
-    const importRegex = /(?:^|\n)\s*(?:from\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+import|import\s+([a-zA-Z_][a-zA-Z0-9_]*))/gm;
-    let match;
-    while ((match = importRegex.exec(code)) !== null) {
-        const pkg = match[1] || match[2];
-        const lowerPkg = pkg.toLowerCase();
-        if (!PYODIDE_STDLIB.has(lowerPkg) && !loadedPyPackages.has(lowerPkg)) {
-            packages.add(pkg);
-        }
-    }
-    return Array.from(packages);
-}
-
-async function loadPyodidePackages(packages: string[], pyodide: any): Promise<string[]> {
-    const toLoad: string[] = [];
-    for (const pkg of packages) {
-        if (!loadedPyPackages.has(pkg.toLowerCase())) {
-            toLoad.push(pkg);
-        }
-    }
-    if (toLoad.length === 0) return [];
-    for (const pkg of toLoad) {
-        try {
-            await pyodide.loadPackage(pkg);
-            loadedPyPackages.add(pkg.toLowerCase());
-        } catch (err) {
-            throw new Error(`Failed to load package '${pkg}': ${err}`);
-        }
-    }
-    return toLoad;
-}
-
-async function loadPyodide(): Promise<any> {
-    if (pyodideInstance) return pyodideInstance;
-    if (pyodideLoading) return pyodideLoading;
-
-    pyodideLoading = new Promise(async (resolve, reject) => {
-        try {
-            if (!(window as any).loadPyodide) {
-                await new Promise((resolveScript, rejectScript) => {
-                    const script = document.createElement('script');
-                    script.src = `${PYODIDE_CDN}/pyodide.js`;
-                    script.onload = () => resolveScript(true);
-                    script.onerror = () => rejectScript(new Error('Failed to load Pyodide script'));
-                    document.head.appendChild(script);
-                });
-            }
-            pyodideInstance = await (window as any).loadPyodide({
-                indexURL: PYODIDE_CDN
-            });
-            resolve(pyodideInstance);
-        } catch (err) {
-            pyodideLoading = null;
-            reject(err);
-        }
-    });
-
-    return pyodideLoading;
-}
-
-export interface PythonExecutionResult extends CodeExecutionResult {
-    packagesLoading?: string[];
-}
-
-async function executePython(code: string): Promise<PythonExecutionResult> {
-    const logs: string[] = [];
-    let pyodide: any;
-
-    try {
-        pyodide = await loadPyodide();
-    } catch (err: any) {
-        return { success: false, output: '', error: `Failed to load Pyodide: ${err?.message || String(err)}`, language: 'python' };
-    }
-
-    const requiredPackages = detectRequiredPackages(code);
-    let packagesLoading: string[] = [];
-    if (requiredPackages.length > 0) {
-        logs.push(`Installing packages: ${requiredPackages.join(', ')}...`);
-        try {
-            packagesLoading = await loadPyodidePackages(requiredPackages, pyodide);
-        } catch (err: any) {
-            logs.push(`Failed to install packages: ${err?.message}`);
-            return { success: false, output: logs.join('\n'), error: `Package installation failed: ${err?.message || String(err)}`, language: 'python' };
-        }
-    }
-
-    try {
-        pyodide.runPython(`
-import sys
-from io import StringIO
-sys.stdout = StringIO()
-sys.stderr = StringIO()
-`);
-        await pyodide.runPythonAsync(code);
-
-        const stdout = pyodide.runPython('sys.stdout.getvalue()');
-        const stderr = pyodide.runPython('sys.stderr.getvalue()');
-
-        if (packagesLoading.length > 0) {
-            logs.push(`[Installed: ${packagesLoading.join(', ')}]`);
-        }
-        if (stdout) logs.push(stdout);
-        if (stderr) logs.push(stderr);
-
-        return { success: true, output: logs.join('\n') || '(no output)', language: 'python', packagesLoading };
-    } catch (err: any) {
-        const errorStr = err?.message || String(err);
-        const tracebackMatch = errorStr.match(/Traceback \(most recent call last\):[\s\S]*?(?:(\w+Error?):|$)/);
-        const cleanError = tracebackMatch ? tracebackMatch[1] || errorStr : errorStr;
-        return { success: false, output: logs.join('\n'), error: cleanError, language: 'python', packagesLoading };
-    }
-}
 
 // ---------------------------------------------------------------------------
 // JSON smart rendering

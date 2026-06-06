@@ -1886,33 +1886,21 @@ export class AITutorView extends ItemView {
 
   
   private loadSavedConceptMaps() {
-    const saved = localStorage.getItem('ai-tutor-saved-concept-maps');
-    if (saved) {
-      try {
-        this.state.savedConceptMaps = JSON.parse(saved);
-      } catch (e) {
-        this.state.savedConceptMaps = [];
-      }
-    }
+    this.state.savedConceptMaps = this.plugin.settings.savedConceptMaps || [];
   }
 
-  private saveSavedConceptMaps() {
-    localStorage.setItem('ai-tutor-saved-concept-maps', JSON.stringify(this.state.savedConceptMaps));
+  private async saveSavedConceptMaps() {
+    this.plugin.settings.savedConceptMaps = this.state.savedConceptMaps;
+    await this.plugin.saveSettings();
   }
 
   private loadSavedSlideshows() {
-    const saved = localStorage.getItem('ai-tutor-saved-slideshows');
-    if (saved) {
-      try {
-        this.state.savedSlideshows = JSON.parse(saved);
-      } catch (e) {
-        this.state.savedSlideshows = [];
-      }
-    }
+    this.state.savedSlideshows = this.plugin.settings.savedSlideshows || [];
   }
 
-  private saveSavedSlideshows() {
-    localStorage.setItem('ai-tutor-saved-slideshows', JSON.stringify(this.state.savedSlideshows));
+  private async saveSavedSlideshows() {
+    this.plugin.settings.savedSlideshows = this.state.savedSlideshows;
+    await this.plugin.saveSettings();
   }
 
   private renderSavedVisuals(container: HTMLElement, searchQuery: string = '') {
