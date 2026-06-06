@@ -1,0 +1,429 @@
+/**
+ * Code Executor for Nexus-LM
+ * Handles in-plugin code execution and rendering for multiple languages.
+ *
+ * Execution (run + error-repair):  JavaScript, TypeScript, HTML, CSS, SVG, Python
+ * Render-only (canvas preview):    Mermaid, Markdown, Dataview
+ * Smart render:                    JSON (detects Vega-Lite / Chart.js schemas)
+ */
+
+export interface CodeExecutionResult {
+    success: boolean;
+    output: string;
+    error?: string;
+    language: string;
+    /** Render as interactive HTML in an iframe */
+    isHtml?: boolean;
+    htmlContent?: string;
+    /** Render via Obsidian's MarkdownRenderer */
+    isMarkdown?: boolean;
+    markdownContent?: string;
+}
+
+const EXECUTABLE_LANGS = new Set(['javascript', 'js', 'typescript', 'ts', 'html', 'css', 'svg', 'python', 'py']);
+const RENDERABLE_LANGS  = new Set(['mermaid', 'markdown', 'md', 'json', 'dataview', 'dataviewjs']);
+
+// ---------------------------------------------------------------------------
+// Public helpers
+// ---------------------------------------------------------------------------
+
+export function detectLanguage(preEl: HTMLElement): string {
+    const codeEl = preEl.querySelector('code');
+    if (!codeEl) return 'unknown';
+    for (const cls of Array.from(codeEl.classList)) {
+        if (cls.startsWith('language-')) return cls.replace('language-', '').toLowerCase();
+    }
+    return 'unknown';
+}
+
+export function isExecutable(language: string): boolean {
+    return EXECUTABLE_LANGS.has(language.toLowerCase());
+}
+
+export function isRenderable(language: string): boolean {
+    return RENDERABLE_LANGS.has(language.toLowerCase());
+}
+
+export function isEnhanceable(language: string): boolean {
+    return isExecutable(language) || isRenderable(language);
+}
+
+export function wrapInMarkdownFence(code: string, language: string): string {
+    return `\`\`\`${language}\n${code}\n\`\`\``;
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point
+// ---------------------------------------------------------------------------
+
+export async function executeCode(code: string, language: string): Promise<CodeExecutionResult> {
+    const lang = language.toLowerCase();
+    if (lang === 'html')  return executeHtml(code);
+    if (lang === 'css')   return executeCss(code);
+    if (lang === 'svg')   return executeSvg(code);
+    if (lang === 'json')  return executeJson(code);
+    if (['javascript', 'js', 'typescript', 'ts'].includes(lang)) {
+        const exec = (lang === 'typescript' || lang === 'ts') ? stripTypeAnnotations(code) : code;
+        return executeJavaScript(exec);
+    }
+    if (['python', 'py'].includes(lang)) {
+        return executePython(code);
+    }
+    if (isRenderable(lang)) {
+        return {
+            success: true, output: '', language: lang,
+            isMarkdown: true,
+            markdownContent: wrapInMarkdownFence(code, lang === 'md' ? 'markdown' : lang),
+        };
+    }
+    return {
+        success: false, output: '',
+        error: `"${language}" is not supported for in-plugin execution. Supported: JavaScript, TypeScript, HTML, CSS, Python.`,
+        language,
+    };
+}
+
+// ---------------------------------------------------------------------------
+// JS / TS execution
+// ---------------------------------------------------------------------------
+
+async function executeJavaScript(code: string): Promise<CodeExecutionResult> {
+    const logs: string[] = [];
+    try {
+        const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
+        const result = await new AsyncFn(code)();
+        if (result !== undefined)
+            logs.push(`→ ${typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)}`);
+        return { success: true, output: logs.join('\n') || '(no output)', language: 'javascript' };
+    } catch (err: any) {
+        return { success: false, output: logs.join('\n'), error: err?.message || String(err), language: 'javascript' };
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HTML / CSS execution
+// ---------------------------------------------------------------------------
+
+function executeHtml(code: string): CodeExecutionResult {
+    return { success: true, output: '', language: 'html', isHtml: true, htmlContent: code };
+}
+
+function executeSvg(code: string): CodeExecutionResult {
+    // Wrap bare SVG in a minimal HTML page so it renders in the iframe correctly.
+    // If the code already starts with <!DOCTYPE or <html, pass through as-is.
+    const trimmed = code.trim();
+    const isFullHtml = /^<!DOCTYPE|^<html/i.test(trimmed);
+    const html = isFullHtml ? trimmed : `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;padding:8px;background:transparent;display:flex;align-items:flex-start;justify-content:center;}
+svg{max-width:100%;height:auto;}</style>
+</head><body>${trimmed}
+<script>parent.postMessage({iframeHeight:document.body.scrollHeight},'*');</script>
+</body></html>`;
+    return { success: true, output: '', language: 'svg', isHtml: true, htmlContent: html };
+}
+
+function executeCss(code: string): CodeExecutionResult {
+    const html = `<!DOCTYPE html><html><head><style>
+body{font-family:sans-serif;padding:16px;}
+${code}
+</style></head><body>
+<p class="preview-text">Paragraph text</p>
+<div class="preview-box">Box element</div>
+<button class="preview-btn">Button</button>
+</body></html>`;
+    return { success: true, output: '', language: 'css', isHtml: true, htmlContent: html };
+}
+
+// ---------------------------------------------------------------------------
+// Python execution via Pyodide
+// ---------------------------------------------------------------------------
+
+let pyodideInstance: any = null;
+let pyodideLoading: Promise<any> | null = null;
+const loadedPyPackages: Set<string> = new Set();
+
+const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full';
+
+const PYODIDE_COMMON_PACKAGES = ['numpy', 'pandas', 'matplotlib', 'scipy', 'sklearn', 'scikit-learn', 'pillow', 'openpyxl', 'xlrd', 'cycler', 'fonttools', 'kiwisolver', 'matplotlib-inline'];
+
+const PYODIDE_STDLIB = new Set([
+    'sys', 'os', 're', 'json', 'math', 'time', 'datetime', 'collections', 'itertools', 'functools',
+    'random', 'statistics', 'copy', 'pprint', 'string', 'io', 'csv', 'urllib', 'base64', 'hashlib',
+    'pickle', 'warnings', 'abc', 'types', 'operator', 'enum', 'pathlib', 'zipfile', 'gc',
+    'traceback', 'textwrap', 'argparse', 'shutil', 'glob', 'fnmatch', 'tempfile', 'struct',
+    'codecs', 'unicodedata', 'locale', 'getopt', 'optparse', ' threading', 'multiprocessing',
+    'subprocess', 'socket', 'ssl', 'signal', 'platform', 'errno', 'ctypes', 'weakref',
+    'doctest', 'unittest', 'inspect', 'dis', 'ast', 'optimize', 'compile', 'pdb',
+    'profile', 'timeit', 'trace', 'linecache', 'tokenize', 'keyword', 'token', 'parser',
+    'symbol', 'node', 'importlib', 'builtins', '__future__', 'atexit', 'fractions', 'logging',
+    'msilib', 'zipimport', 'modulefinder', 'LZFile', 'cmd', 'code', 'codeop', 'filecmp',
+    'imghdr', 'dircmp', 'dist', 'fileinput', 'shlex', 'quopri', 'uu', 'xxsubinterpreter'
+]);
+
+function detectRequiredPackages(code: string): string[] {
+    const packages: Set<string> = new Set();
+    const importRegex = /(?:^|\n)\s*(?:from\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+import|import\s+([a-zA-Z_][a-zA-Z0-9_]*))/gm;
+    let match;
+    while ((match = importRegex.exec(code)) !== null) {
+        const pkg = match[1] || match[2];
+        const lowerPkg = pkg.toLowerCase();
+        if (!PYODIDE_STDLIB.has(lowerPkg) && !loadedPyPackages.has(lowerPkg)) {
+            packages.add(pkg);
+        }
+    }
+    return Array.from(packages);
+}
+
+async function loadPyodidePackages(packages: string[], pyodide: any): Promise<string[]> {
+    const toLoad: string[] = [];
+    for (const pkg of packages) {
+        if (!loadedPyPackages.has(pkg.toLowerCase())) {
+            toLoad.push(pkg);
+        }
+    }
+    if (toLoad.length === 0) return [];
+    for (const pkg of toLoad) {
+        try {
+            await pyodide.loadPackage(pkg);
+            loadedPyPackages.add(pkg.toLowerCase());
+        } catch (err) {
+            throw new Error(`Failed to load package '${pkg}': ${err}`);
+        }
+    }
+    return toLoad;
+}
+
+async function loadPyodide(): Promise<any> {
+    if (pyodideInstance) return pyodideInstance;
+    if (pyodideLoading) return pyodideLoading;
+
+    pyodideLoading = new Promise(async (resolve, reject) => {
+        try {
+            if (!(window as any).loadPyodide) {
+                await new Promise((resolveScript, rejectScript) => {
+                    const script = document.createElement('script');
+                    script.src = `${PYODIDE_CDN}/pyodide.js`;
+                    script.onload = () => resolveScript(true);
+                    script.onerror = () => rejectScript(new Error('Failed to load Pyodide script'));
+                    document.head.appendChild(script);
+                });
+            }
+            pyodideInstance = await (window as any).loadPyodide({
+                indexURL: PYODIDE_CDN
+            });
+            resolve(pyodideInstance);
+        } catch (err) {
+            pyodideLoading = null;
+            reject(err);
+        }
+    });
+
+    return pyodideLoading;
+}
+
+export interface PythonExecutionResult extends CodeExecutionResult {
+    packagesLoading?: string[];
+}
+
+async function executePython(code: string): Promise<PythonExecutionResult> {
+    const logs: string[] = [];
+    let pyodide: any;
+
+    try {
+        pyodide = await loadPyodide();
+    } catch (err: any) {
+        return { success: false, output: '', error: `Failed to load Pyodide: ${err?.message || String(err)}`, language: 'python' };
+    }
+
+    const requiredPackages = detectRequiredPackages(code);
+    let packagesLoading: string[] = [];
+    if (requiredPackages.length > 0) {
+        logs.push(`Installing packages: ${requiredPackages.join(', ')}...`);
+        try {
+            packagesLoading = await loadPyodidePackages(requiredPackages, pyodide);
+        } catch (err: any) {
+            logs.push(`Failed to install packages: ${err?.message}`);
+            return { success: false, output: logs.join('\n'), error: `Package installation failed: ${err?.message || String(err)}`, language: 'python' };
+        }
+    }
+
+    try {
+        pyodide.runPython(`
+import sys
+from io import StringIO
+sys.stdout = StringIO()
+sys.stderr = StringIO()
+`);
+        await pyodide.runPythonAsync(code);
+
+        const stdout = pyodide.runPython('sys.stdout.getvalue()');
+        const stderr = pyodide.runPython('sys.stderr.getvalue()');
+
+        if (packagesLoading.length > 0) {
+            logs.push(`[Installed: ${packagesLoading.join(', ')}]`);
+        }
+        if (stdout) logs.push(stdout);
+        if (stderr) logs.push(stderr);
+
+        return { success: true, output: logs.join('\n') || '(no output)', language: 'python', packagesLoading };
+    } catch (err: any) {
+        const errorStr = err?.message || String(err);
+        const tracebackMatch = errorStr.match(/Traceback \(most recent call last\):[\s\S]*?(?:(\w+Error?):|$)/);
+        const cleanError = tracebackMatch ? tracebackMatch[1] || errorStr : errorStr;
+        return { success: false, output: logs.join('\n'), error: cleanError, language: 'python', packagesLoading };
+    }
+}
+
+// ---------------------------------------------------------------------------
+// JSON smart rendering
+// ---------------------------------------------------------------------------
+
+type JsonVizType = 'vega-lite' | 'chartjs' | 'chartjs-simple' | 'card-list' | 'plain';
+
+// Chart.js native types — any of these in obj.type triggers chartjs-simple
+const CHARTJS_SIMPLE_TYPES = new Set([
+    'bar','line','pie','doughnut','radar','polarArea','bubble','scatter','sparkline',
+    'treemap','horizontalBar'
+]);
+
+function detectJsonVizType(obj: any): JsonVizType {
+    if (!obj || typeof obj !== 'object') return 'plain';
+    // Vega-Lite spec
+    if (typeof obj.$schema === 'string' && obj.$schema.includes('vega-lite')) return 'vega-lite';
+    // Full Chart.js spec: has type + data.datasets or data.labels
+    if (obj.type && obj.data && (obj.data.datasets || obj.data.labels)) return 'chartjs';
+    // Sparkline shorthand: { type:'sparkline', data:[numbers] }
+    if (obj.type === 'sparkline' && Array.isArray(obj.data)
+        && obj.data.every((v: any) => typeof v === 'number')) return 'chartjs-simple';
+    // Simple chart: { type, title, data:[{label,value},...] } — any chart type
+    if (obj.type && CHARTJS_SIMPLE_TYPES.has(obj.type) && Array.isArray(obj.data)
+        && obj.data.length > 0 && typeof obj.data[0] === 'object'
+        && 'label' in obj.data[0] && 'value' in obj.data[0]) return 'chartjs-simple';
+    // Card list: { type:'auto'|'cards', title, data:[{...}] }
+    if ((obj.type === 'auto' || obj.type === 'cards') && obj.title && Array.isArray(obj.data)
+        && obj.data.length > 0 && typeof obj.data[0] === 'object') return 'card-list';
+    return 'plain';
+}
+
+function buildVegaLiteHtml(spec: string): string {
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<style>html,body{margin:0;padding:8px;background:transparent;}</style>
+</head><body><div id="vis"></div>
+<script>
+vegaEmbed('#vis',${spec},{renderer:'svg',actions:false}).then(()=>{
+  parent.postMessage({iframeHeight:document.body.scrollHeight},'*');
+}).catch(() => {});
+</script>
+</body></html>`;
+}
+
+function buildChartJsHtml(spec: string): string {
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>html,body{margin:0;padding:8px;background:transparent;}canvas{max-width:100%;display:block;}</style>
+</head><body><canvas id="c"></canvas>
+<script>
+try{
+  const chart=new Chart(document.getElementById('c'),${spec});
+  setTimeout(()=>parent.postMessage({iframeHeight:document.body.scrollHeight},'*'),200);
+}catch(e){const p=document.createElement('pre');p.style.color='red';p.style.padding='8px';p.textContent=e.message;document.body.empty();document.body.appendChild(p);
+  parent.postMessage({iframeHeight:document.body.scrollHeight},'*');}
+</script>
+</body></html>`;
+}
+
+/** Convert simple {type, title, data:[{label,value}]} to a Chart.js spec and render */
+function buildSimpleChartHtml(obj: any): string {
+    // Map unsupported types to nearest Chart.js equivalent
+    const typeMap: Record<string, string> = { treemap: 'pie', sparkline: 'line', horizontalBar: 'bar' };
+    const rawType = (obj.type || 'bar').toLowerCase();
+    const chartType = typeMap[rawType] ?? rawType;
+
+    const PALETTE = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6','#f97316','#84cc16'];
+
+    let spec: any;
+    if (rawType === 'sparkline') {
+        // Sparkline: minimal line chart, no axes, no legend
+        spec = {
+            type: 'line',
+            data: { labels: obj.data.map((_: any, i: number) => i + 1),
+                    datasets: [{ label: obj.title || '', data: obj.data,
+                        borderColor: PALETTE[0], backgroundColor: PALETTE[0] + '33',
+                        fill: true, tension: 0.4, pointRadius: 2 }] },
+            options: { responsive: true, plugins: { legend: { display: false },
+                title: { display: !!obj.title, text: obj.title || '' } },
+                scales: { x: { display: false }, y: { display: false } } }
+        };
+    } else {
+        const labels = obj.data.map((d: any) => d.label);
+        const values = obj.data.map((d: any) => d.value);
+        const isCircular = ['pie','doughnut','polarArea'].includes(chartType);
+        spec = {
+            type: chartType,
+            data: {
+                labels,
+                datasets: [{ label: obj.title || 'Value', data: values,
+                    backgroundColor: isCircular ? PALETTE : PALETTE[0],
+                    borderColor: isCircular ? PALETTE.map(c => c) : PALETTE[1],
+                    borderWidth: 1 }]
+            },
+            options: { responsive: true,
+                plugins: { legend: { position: 'bottom' },
+                    title: { display: !!obj.title, text: obj.title || '' } },
+                ...(chartType === 'bar' && obj.horizontal ? { indexAxis: 'y' } : {})
+            }
+        };
+    }
+    return buildChartJsHtml(JSON.stringify(spec));
+}
+
+/** Render a card list for {type:'auto'|'cards', title, data:[{key:val,...}]} */
+function buildCardListHtml(obj: any): string {
+    const keys = Object.keys(obj.data[0] || {});
+    const [titleKey, ...descKeys] = keys;
+    const cards = obj.data.map((item: any) => {
+        const title = item[titleKey] || '';
+        const desc = descKeys.map((k: string) => `<p style="margin:4px 0 0;font-size:0.85em;opacity:0.8">${item[k]}</p>`).join('');
+        return `<div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:8px;padding:12px 16px;margin-bottom:8px">
+            <strong style="font-size:0.95em">${title}</strong>${desc}</div>`;
+    }).join('');
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;padding:12px;font-family:sans-serif;color:inherit;background:transparent;}
+h3{margin:0 0 12px;font-size:0.8em;opacity:0.6;text-transform:uppercase;letter-spacing:.08em}</style>
+</head><body><h3>${obj.title || ''}</h3>${cards}
+<script>parent.postMessage({iframeHeight:document.body.scrollHeight},'*');</script>
+</body></html>`;
+}
+
+function executeJson(code: string): CodeExecutionResult {
+    let parsed: any;
+    try { parsed = JSON.parse(code); }
+    catch (err: any) {
+        return { success: false, output: '', error: `Invalid JSON: ${err?.message}`, language: 'json' };
+    }
+    const pretty = JSON.stringify(parsed, null, 2);
+    const viz = detectJsonVizType(parsed);
+    if (viz === 'vega-lite')      return { success: true, output: '', language: 'json', isHtml: true, htmlContent: buildVegaLiteHtml(pretty) };
+    if (viz === 'chartjs')        return { success: true, output: '', language: 'json', isHtml: true, htmlContent: buildChartJsHtml(pretty) };
+    if (viz === 'chartjs-simple') return { success: true, output: '', language: 'json', isHtml: true, htmlContent: buildSimpleChartHtml(parsed) };
+    if (viz === 'card-list')      return { success: true, output: '', language: 'json', isHtml: true, htmlContent: buildCardListHtml(parsed) };
+    // Plain JSON — pretty-print via MarkdownRenderer fenced block
+    return { success: true, output: '', language: 'json', isMarkdown: true, markdownContent: '```json\n' + pretty + '\n```' };
+}
+
+// ---------------------------------------------------------------------------
+// TypeScript type stripper (minimal)
+// ---------------------------------------------------------------------------
+
+function stripTypeAnnotations(code: string): string {
+    return code
+        .replace(/\binterface\s+\w+\s*\{[^}]*\}/gs, '')
+        .replace(/\btype\s+\w+\s*=\s*[^;]+;/g, '')
+        .replace(/:\s*[\w<>\[\]|&,\s]+(?=\s*[=,);{])/g, '')
+        .replace(/\)\s*:\s*[\w<>\[\]|&,\s]+(?=\s*\{)/g, ')')
+        .replace(/<[^>()]*>/g, '')
+        .replace(/\bas\s+[\w<>\[\]|&,\s]+/g, '');
+}

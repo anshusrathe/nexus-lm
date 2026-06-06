@@ -1,0 +1,12 @@
+{
+    "id": "nexus-lm",
+    "name": "Nexus-LM",
+    "version": "1.0.0",
+    "minAppVersion": "0.15.0",
+    "main": "main.js",
+    "description": "AI powered concept maps, slideshow, notebooks, vault chat, web search, MCP and to have a personal feed all inside of Obsidian.",
+    "author": "Ansh Usrathe",
+    "authorUrl": "https://github.com/anshusrathe",
+    "fundingUrl": "https://ko-fi.com/anshusrathe",
+    "isDesktopOnly": false
+}
