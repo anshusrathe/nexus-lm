@@ -2,7 +2,7 @@
 
 ![Main Wallpaper](Assets/Main%20wallpaper%20of%20the%20plugin.png)
 
-> **Supercharge your workspace.** Chat with your notes, auto-generate interactive study tools, run local or cloud LLMs, manage RSS feeds, and execute code—all without ever leaving Obsidian.
+> **Supercharge your workspace with 100+ free models:** Chat with your notes, auto-generate interactive study tools, run local or cloud LLMs, manage RSS feeds, and execute code—all without ever leaving Obsidian.
 
 Nexus-LM is the ultimate AI-powered workspace designed exclusively for Obsidian. Instead of just storing your notes, Nexus-LM turns them into an active, conversational partner. Whether you are a researcher, student, developer, or power-user, Nexus-LM bridges the gap between your local knowledge base and state-of-the-art artificial intelligence.
 
