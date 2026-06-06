@@ -3024,7 +3024,9 @@ export class ConceptMapVisualizationModal extends Modal {
 > - <span style="color: var(--text-accent);">Hover over the node on the connecting lines to explore the why.</span>
     `.trim();
 
-    MarkdownRenderer.renderMarkdown(helpContent, this.helpContainer, '', new Component());
+    { const _comp = new Component();
+    MarkdownRenderer.renderMarkdown(helpContent, this.helpContainer, '', _comp);
+    _comp.load(); }
   }
 
   private setupMobileTouchControls(wrapper: HTMLElement) {

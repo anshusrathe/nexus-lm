@@ -3501,7 +3501,9 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
   }
 
   private async renderMarkdown(content: string, container: HTMLElement) {
-    await MarkdownRenderer.renderMarkdown(content, container, this.app.vault.adapter.getResourcePath(''), new Component());
+    { const _comp = new Component();
+    await MarkdownRenderer.renderMarkdown(content, container, this.app.vault.adapter.getResourcePath(''), _comp);
+    _comp.load(); }
 
     
     const tables = container.querySelectorAll('table');

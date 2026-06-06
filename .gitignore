@@ -5,3 +5,4 @@ data.json
 *.js.map
 line_debug.txt
 main.js
+error logs/

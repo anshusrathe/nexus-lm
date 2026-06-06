@@ -628,7 +628,9 @@ ${mcqSettings.customPrompt ? `Additional context: ${mcqSettings.customPrompt}` :
   }
 
   async renderMarkdown(content: string, container: HTMLElement) {
-    await MarkdownRenderer.renderMarkdown(content, container, '.', new Component());
+    { const _comp = new Component();
+    await MarkdownRenderer.renderMarkdown(content, container, '.', _comp);
+    _comp.load(); }
   }
 }
 

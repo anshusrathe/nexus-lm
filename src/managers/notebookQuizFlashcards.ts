@@ -677,7 +677,9 @@ export class QuizRenderer {
       questionText.createEl('span', { text: `${qIndex + 1}. `, cls: 'quiz-question-number' });
       const questionContent = questionText.createEl('span', { cls: 'quiz-question-content' });
       
-      MarkdownRenderer.render(this.app, mcq.question, questionContent, '', new Component());
+      { const _comp = new Component();
+      MarkdownRenderer.render(this.app, mcq.question, questionContent, '', _comp);
+      _comp.load(); }
       
       
       const optionsDiv = questionDiv.createDiv({ cls: 'quiz-options' });
@@ -704,7 +706,9 @@ export class QuizRenderer {
         optionText.createEl('span', { text: `${String.fromCharCode(65 + optIndex)}. `, cls: 'quiz-option-letter' });
         
         const optionContent = optionText.createEl('span', { cls: 'quiz-option-content' });
-        MarkdownRenderer.render(this.app, option.text, optionContent, '', new Component());
+        { const _comp = new Component();
+        MarkdownRenderer.render(this.app, option.text, optionContent, '', _comp);
+        _comp.load(); }
         
         if (!mcq.isAnswered) {
           checkbox.onchange = () => {
@@ -843,7 +847,9 @@ export class QuizRenderer {
     
     
     const contentDiv = container.createDiv({ cls: 'quiz-explanation-content' });
-    MarkdownRenderer.render(this.app, explanation, contentDiv, '', new Component());
+    { const _comp = new Component();
+    MarkdownRenderer.render(this.app, explanation, contentDiv, '', _comp);
+    _comp.load(); }
   }
 }
 
@@ -954,7 +960,9 @@ export class FlashcardRenderer {
       frontSide.createDiv({ cls: 'flashcard-label', text: 'Question' });
       const frontContent = frontSide.createDiv({ cls: 'flashcard-content' });
       
-      MarkdownRenderer.render(this.app, currentCard.front, frontContent, '', new Component());
+      { const _comp = new Component();
+      MarkdownRenderer.render(this.app, currentCard.front, frontContent, '', _comp);
+      _comp.load(); }
       frontSide.createDiv({ cls: 'flashcard-hint', text: 'Click to flip' });
       
       
@@ -962,7 +970,9 @@ export class FlashcardRenderer {
       backSide.createDiv({ cls: 'flashcard-label', text: 'Answer' });
       const backContent = backSide.createDiv({ cls: 'flashcard-content' });
       
-      MarkdownRenderer.render(this.app, currentCard.back, backContent, '', new Component());
+      { const _comp = new Component();
+      MarkdownRenderer.render(this.app, currentCard.back, backContent, '', _comp);
+      _comp.load(); }
       backSide.createDiv({ cls: 'flashcard-hint', text: 'Click to flip' });
       
       

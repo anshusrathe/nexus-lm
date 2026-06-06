@@ -17247,3 +17247,129 @@
   margin: 8px 0;
   padding-left: 20px;
 }
+
+/* ─── Landing View Hub Styles ──────────────────────────── */
+.nexus-hub-container {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    background-color: var(--background-primary);
+}
+
+.nexus-hub-wrapper {
+    width: 100%;
+    max-width: 1000px;
+    padding: 4rem 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3rem;
+}
+
+/* Hero Section */
+.nexus-hero {
+    width: 100%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.nexus-logo-container {
+    width: 100%;
+    max-width: 450px;
+    margin-bottom: 1rem;
+}
+
+.nexus-hub-logo {
+    width: 100%;
+    height: auto;
+    max-height: 200px;
+    object-fit: contain;
+}
+
+/* Features Section */
+.features-section {
+    width: 100%;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.feature-card {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+    border-color: var(--interactive-accent);
+    background: var(--background-primary-alt);
+}
+
+.feature-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    padding: 10px;
+    background: rgba(147, 51, 234, 0.1);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-color, #9333ea);
+}
+
+.feature-icon-wrapper svg {
+    width: 24px;
+    height: 24px;
+}
+
+.feature-content {
+    flex: 1;
+}
+
+.feature-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-normal);
+    margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    .nexus-hub-wrapper {
+        padding: 2rem 1rem;
+        gap: 2rem;
+    }
+
+    .nexus-hub-logo {
+        max-height: 150px;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .feature-card {
+        padding: 1.25rem;
+    }
+}

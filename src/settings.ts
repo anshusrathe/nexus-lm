@@ -1533,9 +1533,9 @@ await this.plugin.saveSettings();
     const headerSetting = new Setting(headerEl).setName(type === 'embedding' ? 'Embedding indexes' : 'BM25 indexes').setHeading();
     
     // Ensure the setting item takes full width and has no extra padding
-    headerSetting.settingEl.style.width = '100%';
-    headerSetting.settingEl.style.borderTop = 'none';
-    headerSetting.settingEl.style.padding = '0';
+    headerSetting.settingEl.setCssStyles({ width: '100%' });
+    headerSetting.settingEl.setCssStyles({ borderTop: 'none' });
+    headerSetting.settingEl.setCssStyles({ padding: '0' });
 
     if (type === 'embedding') {
       headerSetting.addButton(btn => {
@@ -1544,7 +1544,7 @@ await this.plugin.saveSettings();
            .onClick(() => this.showAddIndexDialog('embedding'));
         btn.buttonEl.addClass('mod-cta');
         // Add some horizontal padding to make the plus look better
-        btn.buttonEl.style.padding = '0 10px';
+        btn.buttonEl.setCssStyles({ padding: '0 10px' });
       });
     }
 
@@ -1975,16 +1975,16 @@ await this.plugin.saveSettings();
     });
     // Results rendered inline (not absolute) to avoid clipping inside scrollable modal
     const searchResults = pickerEl.createDiv({ cls: 'index-excl-search-results' });
-    searchResults.style.display = 'none';
+    searchResults.setCssStyles({ display: 'none' });
 
     const allMdFiles = this.app.vault.getMarkdownFiles().map(f => f.path).sort();
 
     const renderSearchResults = (query: string) => {
       searchResults.empty();
-      if (!query.trim()) { searchResults.style.display = 'none'; return; }
+      if (!query.trim()) { searchResults.setCssStyles({ display: 'none' }); return; }
       const matches = allMdFiles.filter(p => p.toLowerCase().includes(query.toLowerCase())).slice(0, 20);
-      if (matches.length === 0) { searchResults.style.display = 'none'; return; }
-      searchResults.style.display = 'block';
+      if (matches.length === 0) { searchResults.setCssStyles({ display: 'none' }); return; }
+      searchResults.setCssStyles({ display: 'block' });
       for (const path of matches) {
         const item = searchResults.createDiv({ cls: 'index-excl-search-item' });
         const cb = item.createEl('input', { type: 'checkbox' });
@@ -2029,7 +2029,7 @@ await this.plugin.saveSettings();
         const selectAllCb = selectAllItem.createEl('input', { type: 'checkbox' });
         selectAllCb.checked = allPaths.every(p => pendingFolders.includes(p));
         const selectAllLabel = selectAllItem.createEl('span', { cls: 'index-excl-folder-label', text: 'Select All' });
-        selectAllLabel.style.fontWeight = 'bold';
+        selectAllLabel.setCssStyles({ fontWeight: 'bold' });
 
         selectAllCb.addEventListener('change', () => {
           if (selectAllCb.checked) {
@@ -2423,13 +2423,13 @@ await this.plugin.saveSettings();
              this.plugin.settings.saveYoutubeTranscripts = val;
              await this.plugin.saveSettings();
              // Show/hide folder setting based on toggle
-             folderSetting.settingEl.style.display = val ? '' : 'none';
+             folderSetting.settingEl.setCssStyles({ display: val ? '' : 'none' });
              new Notice(`YouTube transcripts will ${val ? 'be saved as files' : 'be used internally only'}`);
            })
       );
 
     // Initially hide/show folder setting based on current toggle value
-    folderSetting.settingEl.style.display = (this.plugin.settings.saveYoutubeTranscripts ?? true) ? '' : 'none';
+    folderSetting.settingEl.setCssStyles({ display: (this.plugin.settings.saveYoutubeTranscripts ?? true) ? '' : 'none' });
 
     // Add PDF output directory setting
     new Setting(containerEl).setName('File output').setHeading();
@@ -2610,7 +2610,7 @@ if (this.validatePath(normalizedPath)) {
       { id: 'nvidia', name: 'NVIDIA' },
       ...this.plugin.settings.customProviders.map((p: any) => ({ id: p.id as Provider, name: p.name }))
     ];
-    containerEl.createEl('h3', { text: 'Custom AI models' });
+    new Setting(containerEl).setName('Custom AI models' ).setHeading();
     
     // Top-level description and Reset button
     const headerControls = containerEl.createDiv({ cls: 'model-table-header-controls' });
@@ -2641,8 +2641,8 @@ if (this.validatePath(normalizedPath)) {
         cls: 'provider-model-count', 
         text: `${providerModels.length} models` 
       });
-      modelCount.style.color = 'var(--text-muted)';
-      modelCount.style.fontSize = '0.85em';
+      modelCount.setCssStyles({ color: 'var(--text-muted)' });
+      modelCount.setCssStyles({ fontSize: '0.85em' });
 
       // Header Right: Verification Button / Spinner / Status
       const headerRight = header.createDiv({ cls: 'provider-header-right' });
@@ -2724,7 +2724,7 @@ if (this.validatePath(normalizedPath)) {
         emptyRow.createEl('td', { 
           text: 'No models added for this provider.',
           attr: { colspan: '5' }
-        }).style.textAlign = 'center';
+        }).setCssStyles({ textAlign: 'center' });
       }
 
       const addBtnContainer = content.createDiv({ cls: 'provider-add-button-container' });
@@ -2999,7 +2999,7 @@ if (this.validatePath(normalizedPath)) {
         .map((p: any) => ({ id: p.id as Provider, name: p.name }))
     ];
 
-    containerEl.createEl('h3', { text: 'Custom embedding models' });
+    new Setting(containerEl).setName('Custom embedding models' ).setHeading();
     
     containerEl.createEl('p', { 
       text: 'Configure custom embedding models for each provider.',
@@ -3028,8 +3028,8 @@ if (this.validatePath(normalizedPath)) {
         cls: 'provider-model-count', 
         text: `${providerModels.length} models` 
       });
-      modelCount.style.color = 'var(--text-muted)';
-      modelCount.style.fontSize = '0.85em';
+      modelCount.setCssStyles({ color: 'var(--text-muted)' });
+      modelCount.setCssStyles({ fontSize: '0.85em' });
 
       // Header Right: Verification Button / Spinner / Status
       const headerRight = header.createDiv({ cls: 'provider-header-right' });
@@ -3099,7 +3099,7 @@ if (this.validatePath(normalizedPath)) {
         emptyRow.createEl('td', { 
           text: 'No embedding models added for this provider.',
           attr: { colspan: '4' }
-        }).style.textAlign = 'center';
+        }).setCssStyles({ textAlign: 'center' });
       }
 
       const addBtnContainer = content.createDiv({ cls: 'provider-add-button-container' });
@@ -3367,7 +3367,7 @@ if (this.validatePath(normalizedPath)) {
       selectedIndex = -1;
 
       if (query.length === 0) {
-        suggestionsEl.style.display = 'none';
+        suggestionsEl.setCssStyles({ display: 'none' });
         return;
       }
 
@@ -3376,18 +3376,18 @@ if (this.validatePath(normalizedPath)) {
         .slice(0, 10); // Limit to 10 suggestions
 
       if (matches.length === 0) {
-        suggestionsEl.style.display = 'none';
+        suggestionsEl.setCssStyles({ display: 'none' });
         return;
       }
 
-      suggestionsEl.style.display = 'block';
+      suggestionsEl.setCssStyles({ display: 'block' });
       matches.forEach((match, idx) => {
         const suggestion = suggestionsEl.createDiv({ cls: 'autocomplete-suggestion' });
         suggestion.textContent = match;
         suggestion.addEventListener('click', () => {
           onSelect(match);
           input.value = '';
-          suggestionsEl.style.display = 'none';
+          suggestionsEl.setCssStyles({ display: 'none' });
         });
         suggestion.addEventListener('mouseenter', () => {
           selectedIndex = idx;
@@ -3413,16 +3413,16 @@ if (this.validatePath(normalizedPath)) {
         const selected = suggestions[selectedIndex] as HTMLElement;
         onSelect(selected.textContent || '');
         input.value = '';
-        suggestionsEl.style.display = 'none';
+        suggestionsEl.setCssStyles({ display: 'none' });
       } else if (e.key === 'Escape') {
-        suggestionsEl.style.display = 'none';
+        suggestionsEl.setCssStyles({ display: 'none' });
       }
     });
 
     input.addEventListener('blur', () => {
       // Delay to allow click on suggestion
       setTimeout(() => {
-        suggestionsEl.style.display = 'none';
+        suggestionsEl.setCssStyles({ display: 'none' });
       }, 200);
     });
   }
@@ -3538,8 +3538,8 @@ if (this.validatePath(normalizedPath)) {
 
           // Fade out and remove the card after a short delay
           setTimeout(() => {
-            card.style.transition = 'opacity 0.4s';
-            card.style.opacity = '0';
+            card.setCssStyles({ transition: 'opacity 0.4s' });
+            card.setCssStyles({ opacity: '0' });
             setTimeout(() => {
               card.remove();
               // If all cards gone, remove the whole wrapper
@@ -3602,9 +3602,9 @@ if (this.validatePath(normalizedPath)) {
         text: 'No MCP servers configured. Click "Add MCP Server" to get started.',
         attr: { colspan: '6' }
       });
-      emptyCell.style.textAlign = 'center';
-      emptyCell.style.fontStyle = 'italic';
-      emptyCell.style.color = 'var(--text-muted)';
+      emptyCell.setCssStyles({ textAlign: 'center' });
+      emptyCell.setCssStyles({ fontStyle: 'italic' });
+      emptyCell.setCssStyles({ color: 'var(--text-muted)' });
     }
     
     // Add new server button
@@ -3626,8 +3626,8 @@ if (this.validatePath(normalizedPath)) {
     // Transport cell
     const transportCell = row.createEl('td');
     transportCell.setText(server.transport.toUpperCase());
-    transportCell.style.fontWeight = '600';
-    transportCell.style.fontSize = '0.85em';
+    transportCell.setCssStyles({ fontWeight: '600' });
+    transportCell.setCssStyles({ fontSize: '0.85em' });
     
     // Command/URL cell
     const commandCell = row.createEl('td');
@@ -3636,10 +3636,10 @@ if (this.validatePath(normalizedPath)) {
     } else {
       commandCell.setText(server.url || '');
     }
-    commandCell.style.fontFamily = 'monospace';
-    commandCell.style.fontSize = '0.9em';
-    commandCell.style.wordBreak = 'break-all';
-    commandCell.style.whiteSpace = 'normal';
+    commandCell.setCssStyles({ fontFamily: 'monospace' });
+    commandCell.setCssStyles({ fontSize: '0.9em' });
+    commandCell.setCssStyles({ wordBreak: 'break-all' });
+    commandCell.setCssStyles({ whiteSpace: 'normal' });
     
     // Arguments cell
     const argsCell = row.createEl('td');
@@ -3648,10 +3648,10 @@ if (this.validatePath(normalizedPath)) {
     } else {
       argsCell.setText(server.apiKey ? '🔑 API Key Set' : '-');
     }
-    argsCell.style.fontFamily = 'monospace';
-    argsCell.style.fontSize = '0.9em';
-    argsCell.style.wordBreak = 'break-all';
-    argsCell.style.whiteSpace = 'normal';
+    argsCell.setCssStyles({ fontFamily: 'monospace' });
+    argsCell.setCssStyles({ fontSize: '0.9em' });
+    argsCell.setCssStyles({ wordBreak: 'break-all' });
+    argsCell.setCssStyles({ whiteSpace: 'normal' });
     
     // Status cell
     const statusCell = row.createEl('td');
@@ -3662,8 +3662,8 @@ if (this.validatePath(normalizedPath)) {
     
     // Actions cell
     const actionsCell = row.createEl('td');
-    actionsCell.style.display = 'flex';
-    actionsCell.style.gap = '8px';
+    actionsCell.setCssStyles({ display: 'flex' });
+    actionsCell.setCssStyles({ gap: '8px' });
     
     // Edit button
     const editBtn = actionsCell.createEl('button', { 
@@ -3980,10 +3980,10 @@ class MCPServerModal extends Modal {
     
     // Buttons
     const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
-    buttonContainer.style.display = 'flex';
-    buttonContainer.style.justifyContent = 'flex-end';
-    buttonContainer.style.gap = '8px';
-    buttonContainer.style.marginTop = '16px';
+    buttonContainer.setCssStyles({ display: 'flex' });
+    buttonContainer.setCssStyles({ justifyContent: 'flex-end' });
+    buttonContainer.setCssStyles({ gap: '8px' });
+    buttonContainer.setCssStyles({ marginTop: '16px' });
     
     const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
     cancelBtn.addEventListener('click', () => this.close());
@@ -3994,8 +3994,8 @@ class MCPServerModal extends Modal {
 
   private updateViewMode(): void {
     if (this.isSchemaView) {
-      this.fieldsContainer.style.display = 'none';
-      this.schemaContainer.style.display = 'block';
+      this.fieldsContainer.setCssStyles({ display: 'none' });
+      this.schemaContainer.setCssStyles({ display: 'block' });
       
       // Try to populate schema from fields if empty or just switched
       const currentConfig = this.getCurrentConfigFromFields();
@@ -4005,8 +4005,8 @@ class MCPServerModal extends Modal {
         this.schemaInput.value = JSON.stringify(schemaFields, null, 2);
       }
     } else {
-      this.fieldsContainer.style.display = 'block';
-      this.schemaContainer.style.display = 'none';
+      this.fieldsContainer.setCssStyles({ display: 'block' });
+      this.schemaContainer.setCssStyles({ display: 'none' });
       
       // Try to populate fields from schema if schema was edited
       this.syncFieldsFromSchema();
@@ -4089,11 +4089,11 @@ class MCPServerModal extends Modal {
 
   private updateTransportFields(transport: 'stdio' | 'sse'): void {
     if (transport === 'stdio') {
-      this.stdioContainer.style.display = 'block';
-      this.sseContainer.style.display = 'none';
+      this.stdioContainer.setCssStyles({ display: 'block' });
+      this.sseContainer.setCssStyles({ display: 'none' });
     } else {
-      this.stdioContainer.style.display = 'none';
-      this.sseContainer.style.display = 'block';
+      this.stdioContainer.setCssStyles({ display: 'none' });
+      this.sseContainer.setCssStyles({ display: 'block' });
     }
   }
 

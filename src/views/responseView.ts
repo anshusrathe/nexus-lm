@@ -11058,7 +11058,9 @@ class CodeCanvasModal extends Modal {
                     window.addEventListener('message', onMsg);
                 } else if (result.isMarkdown && result.markdownContent) {
                     previewArea.style.padding = '';
-                    await MarkdownRenderer.render(this.app, result.markdownContent, previewArea, '', new Component());
+                    { const _comp = new Component();
+                    await MarkdownRenderer.render(this.app, result.markdownContent, previewArea, '', _comp);
+                    _comp.load(); }
                 } else if (!result.success) {
                     previewArea.createEl('pre', { cls: 'code-exec-output-text', text: `Error: ${result.error}` });
                 }
@@ -11068,7 +11070,9 @@ class CodeCanvasModal extends Modal {
             const fenced = lang === 'markdown' || lang === 'md'
                 ? code
                 : wrapInMarkdownFence(code, lang);
-            await MarkdownRenderer.render(this.app, fenced, previewArea, '', new Component());
+            { const _comp = new Component();
+            await MarkdownRenderer.render(this.app, fenced, previewArea, '', _comp);
+            _comp.load(); }
         };
 
         refreshBtn.addEventListener('click', render);
@@ -11180,7 +11184,9 @@ class CodeCanvasModal extends Modal {
                 window.addEventListener('message', onMsg);
             } else if (result.isMarkdown && result.markdownContent) {
                 outputArea.classList.add('code-canvas-render-area');
-                await MarkdownRenderer.render(this.app, result.markdownContent, outputArea, '', new Component());
+                { const _comp = new Component();
+                await MarkdownRenderer.render(this.app, result.markdownContent, outputArea, '', _comp);
+                _comp.load(); }
             } else if (result.success) {
                 const pre = outputArea.createEl('pre', { cls: 'code-exec-output-text' });
                 pre.textContent = result.output;
