@@ -17,6 +17,13 @@ Nexus-LM is the ultimate AI-powered workspace designed exclusively for Obsidian.
 
 ---
 
+## 🛠️ Custom Model Configuration
+Take full control over which models are active in your selector. Enable, disable, and configure custom model endpoints in settings.
+
+![Settings Page](Assets/Settings%20page%20custom%20model%20screenshot.png)
+
+---
+
 ## 🗺️ Visual Walkthrough & Core Views
 
 The **Nexus-LM Hub** is your central command center. From here, you can jump directly into specialized views tailored to your workflow.
@@ -144,11 +151,6 @@ Nexus-LM is highly flexible, supporting both local offline models and industry-l
 | **NVIDIA NIM**              | ✅   | ✅    | ✅       | ✅         | ❌       | ❌            | ✅ (Transcript) |
 | **OpenCode Zen**            | ✅   | ✅    | ✅       | ❌         | ❌       | ❌            | ✅ (Transcript) |
 | **Custom OpenAI-Compatible**| ✅   | ✅    | ✅       | ✅         | ❌       | ❌            | ✅ (Transcript) |
-
-### 🛠️ Custom Model Configuration
-Take full control over which models are active in your selector. Enable, disable, and configure custom model endpoints in settings.
-
-![Settings Page](Assets/Settings%20page%20custom%20model%20screenshot.png)
 
 ---
 
