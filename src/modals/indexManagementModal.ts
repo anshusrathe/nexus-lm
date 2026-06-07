@@ -157,7 +157,7 @@ export class IndexManagementModal extends Modal {
                 const progressContainer = statusCell.createDiv({ cls: 'index-progress-container' });
                 const progressBar = progressContainer.createDiv({ cls: 'index-progress-bar' });
                 const progressFill = progressBar.createDiv({ cls: 'index-progress-fill' });
-                progressFill.setCssStyles({ 'width': `${index.buildProgress || 0}%` });
+                progressFill.setCssProps({ 'width':  `${index.buildProgress || 0}%` });
                 const progressText = progressContainer.createDiv({ cls: 'index-progress-text' });
                 progressText.setText(`${index.buildProgress || 0}%`);
             } else {
@@ -212,7 +212,7 @@ export class IndexManagementModal extends Modal {
                             const progressFill = row.querySelector('.index-progress-fill') as HTMLElement;
                             const progressText = row.querySelector('.index-progress-text') as HTMLElement;
                             if (progressFill && progressText) {
-                                                                progressFill.setCssStyles({ 'width': `${progress}%` });
+                                                                progressFill.setCssProps({ 'width':  `${progress}%` });
                                 progressText.setText(`${progress}%`);
                             } else {
                                                             }

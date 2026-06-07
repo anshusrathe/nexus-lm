@@ -38,6 +38,7 @@ export default class AIPlugin extends Plugin {
     public mcpToolCallingService!: MCPToolCallingService;
     public verifyingProviders: Set<Provider> = new Set();
     public verifyingEmbeddingProviders: Set<Provider> = new Set();
+    private currentViewMode: string = 'landing';
 
     async onload() {
         await this.loadSettings();
@@ -435,7 +436,7 @@ export default class AIPlugin extends Plugin {
                 }
             })
             );
-            }
+        }
 
     
     async searchVault(query: string, limit: number = 5, hybridEnabled: boolean = true): Promise<{results: Array<{path: string, content: string, similarity: number}>, temporalContext?: {startDate: number | null, endDate: number | null, cleanQuery: string}}> {
@@ -447,9 +448,10 @@ export default class AIPlugin extends Plugin {
         return this.embeddingsManager.findSimilarContentBM25Only(query, limit);
     }
 
-    async activateView(mode: 'landing' | 'tutor' | 'chat' | 'feed' | 'feed-entries' | 'combined-feed' | 'bookmarks', subMode?: 'qa' | 'mcq', data?: any): Promise<void> {
+    async activateView(mode: 'landing' | 'tutor' | 'chat' | 'feed' | 'feed-entries' | 'combined-feed' | 'bookmarks', subMode?: 'qa' | 'mcq', data?: unknown): Promise<void> {
+        this.currentViewMode = mode;
         let viewType: string;
-        let state: any = {};
+        let state: Record<string, unknown> = {};
         
         
         const isMobile = Platform.isMobile;

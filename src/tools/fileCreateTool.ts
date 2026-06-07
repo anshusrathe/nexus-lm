@@ -82,12 +82,12 @@ export class FileCreationReviewModal extends Modal {
     header.createEl('h2', { text: `Create ${type}: ${folderName}` });
 
     const messageContainer = contentEl.createDiv({ cls: 'file-preview-scroll-container' });
-    messageContainer.setCssStyles({ 'display': 'flex' });
-    messageContainer.setCssStyles({ 'flexDirection': 'column' });
-    messageContainer.setCssStyles({ 'alignItems': 'center' });
-    messageContainer.setCssStyles({ 'justifyContent': 'center' });
-    messageContainer.setCssStyles({ 'padding': '40px 20px' });
-    messageContainer.setCssStyles({ 'textAlign': 'center' });
+    messageContainer.setCssProps({ 'display':  'flex' });
+    messageContainer.setCssProps({ 'flex-direction':  'column' });
+    messageContainer.setCssProps({ 'align-items':  'center' });
+    messageContainer.setCssProps({ 'justify-content':  'center' });
+    messageContainer.setCssProps({ 'padding':  '40px 20px' });
+    messageContainer.setCssProps({ 'text-align':  'center' });
 
     messageContainer.createEl('div', {
       text: '📄',
@@ -102,8 +102,8 @@ export class FileCreationReviewModal extends Modal {
 
     if (targetPath) {
         const pathInfo = messageContainer.createEl('p', { cls: 'file-preview-path-info' });
-        pathInfo.setCssStyles({ 'marginTop': '15px' });
-        pathInfo.setCssStyles({ 'fontWeight': 'bold' });
+        pathInfo.setCssProps({ 'margin-top':  '15px' });
+        pathInfo.setCssProps({ 'font-weight':  'bold' });
         pathInfo.createSpan({ text: 'Target Path: ' });
         const linkSpan = pathInfo.createSpan();
         MarkdownRenderer.render(this.app, `[[${targetPath}]]`, linkSpan, '', this as any);
@@ -123,7 +123,7 @@ export class FileCreationReviewModal extends Modal {
       .onClick(() => {
         this.close();
       });
-    cancelBtn.buttonEl.setCssStyles({ 'marginLeft': '10px' });
+    cancelBtn.buttonEl.setCssProps({ 'margin-left':  '10px' });
   }
 
   private renderPlan() {
@@ -305,10 +305,10 @@ export async function handleFileCreationPrompt(
     const workspace = document.querySelector('.workspace') || document.body;
     spinner = document.createElement('div');
     spinner.className = 'loading-spinner visible';
-    spinner.setCssStyles({ 'position': 'fixed' });
-    spinner.setCssStyles({ 'top': '18px' });
-    spinner.setCssStyles({ 'right': '32px' });
-    spinner.setCssStyles({ 'zIndex': '9999' });
+    spinner.setCssProps({ 'position':  'fixed' });
+    spinner.setCssProps({ 'top':  '18px' });
+    spinner.setCssProps({ 'right':  '32px' });
+    spinner.setCssProps({ 'z-index':  '9999' });
     workspace.appendChild(spinner);
 
     // Create enhanced context for file creation

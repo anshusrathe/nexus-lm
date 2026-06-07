@@ -21,9 +21,9 @@ export interface GeminiGenerationOptions {
 }
 
 export interface GeminiChatConfig {
-  history?: any[];
+  history?: Record<string, unknown>[];
   generationConfig?: GeminiGenerationOptions;
-  tools?: any[];
+  tools?: Record<string, unknown>[];
 }
 
 /**
@@ -56,7 +56,7 @@ export class GeminiService {
     tools?: any[],
     abortSignal?: AbortSignal
   ): Promise<{ response: any; headers: Headers }> {
-    const apiKey = (this.genAI as any)._apiKey;
+    const apiKey = (this.genAI as unknown as any)._apiKey;
     const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
     
     const requestBody: any = {
@@ -126,8 +126,8 @@ export class GeminiService {
     });
     
     const chat = modelInstance.startChat({
-      history: config.history || [],
-      generationConfig: config.generationConfig
+      history: (config.history as unknown as any) || [],
+      generationConfig: config.generationConfig as unknown as any
     });
     
     // Provide a method to capture headers on next API call
@@ -214,8 +214,8 @@ export class GeminiService {
       const response = result.response;
 
       // Track tokens
-      if ((response as any).usageMetadata) {
-        const usage = (response as any).usageMetadata;
+      if ((response as unknown as any).usageMetadata) {
+        const usage = (response as unknown as any).usageMetadata;
         totalTokens = (usage.promptTokenCount || 0) + (usage.candidatesTokenCount || 0);
       }
 

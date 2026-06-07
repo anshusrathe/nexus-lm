@@ -47,7 +47,7 @@ export class CustomOpenAIProvider extends BaseProvider {
             if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
                 if (msg.content === '' || msg.content === null) {
                     const newMsg = { ...msg };
-                    delete (newMsg as any).content;
+                    delete (newMsg as unknown as any).content;
                     return newMsg;
                 }
             }
@@ -205,7 +205,7 @@ export class CustomOpenAIProvider extends BaseProvider {
         streamCallback?: (chunk: string) => void
     ): Promise<{ content: string; totalTokens?: number }> {
         let fullContent = '';
-        let conversationMessages = [...messages] as any[];
+        let conversationMessages = [...messages] as unknown as any[];
         let totalTokens = 0;
         let toolRoundsExecuted = 0;
         const MAX_CONTINUATION_NUDGES = 3;

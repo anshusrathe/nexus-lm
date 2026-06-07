@@ -218,7 +218,8 @@ class MCPEnvVarWizard extends Modal {
     if (pathSpecs.length > 0) {
       contentEl.createEl('h3', { text: 'Paths', cls: 'mcp-wizard-section-title' });
 
-      const vaultPath = (this.app.vault.adapter as any).basePath as string | undefined;
+      const adapter = this.app.vault.adapter;
+      const vaultPath = ('basePath' in adapter) ? (adapter as any).basePath as string : undefined;
 
       pathSpecs.forEach((spec: MCPPathSpec) => {
         const fieldGroup = contentEl.createDiv({ cls: 'mcp-wizard-field' });

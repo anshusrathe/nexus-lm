@@ -1,17 +1,18 @@
 import { App, Notice } from 'obsidian';
 import { requestUrl } from 'obsidian';
 import { AISettings, getProviderForModel, getModelTemperature, getModelTopP, getGeminiThinkingConfig, Provider } from '../settings';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, Part, GenerateContentCandidate, GroundingMetadata } from '@google/generative-ai';
 import { WebSearchService, SearchResult as WebSearchResult } from './webSearch';
 import { MultimodalInput } from '../utils/multimodalUtils';
-import { GroqService, ChatMessage as GroqChatMessage, GroqApiError, convertChatHistoryForGroq, isGroqWebSearchCapable, isGroqGptOssModel, WebSource, GroqStreamEvent, GROQ_VISION_MODEL, GroqContentPart } from './groqService';
+import { GroqService, ChatMessage as GroqChatMessage, GroqApiError, convertChatHistoryForGroq, isGroqWebSearchCapable, isGroqGptOssModel, WebSource, GroqStreamEvent, GROQ_VISION_MODEL, GroqContentPart, GeminiHistoryMessage } from './groqService';
 import { OpenRouterService, ChatMessage as OpenRouterChatMessage, OpenRouterApiError } from './openRouterService';
 import { OllamaService, OllamaApiError } from './ollamaService';
 import { NvidiaService, NvidiaApiError } from './nvidiaService';
 import { RateLimitManager } from '../utils/rateLimitManager';
 import { GeminiService } from './geminiService';
 import { ModelSelection } from '../modelSelector';
-import { UnifiedProviderManager } from './unifiedProviderManager';
+import { UnifiedProviderManager, UnifiedMessage } from './unifiedProviderManager';
+import { sanitizeServerName } from '../mcp/mcpToolCalling';
 import { TaskType } from '../utils/tokenEstimator';
 import {
     MCPExecutionLedger,
@@ -76,15 +77,16 @@ export class BasicChatService {
     }
 
     private processGeminiStreamingCandidate(
-        candidate: any,
+        candidate: GenerateContentCandidate,
         updateSnippetUI: SnippetUpdateCallback
     ): string {
-        if (!candidate?.content?.parts || !Array.isArray(candidate.content.parts)) return '';
+        const content = candidate?.content;
+        if (!content?.parts || !Array.isArray(content.parts)) return '';
         let answerText = '';
-        for (const part of candidate.content.parts) {
-            const text = typeof part?.text === 'string' ? part.text : '';
+        for (const part of content.parts) {
+            const text = part?.text || '';
             if (!text) continue;
-            if (part?.thought === true) {
+            if ((part as any).thought === true) {
                 updateSnippetUI('Thinking...', text);
                 continue;
             }
@@ -142,7 +144,7 @@ export class BasicChatService {
         query: string,
         enhancedQuery: string,
         vaultContext: string,
-        chatHistory: any[],
+        chatHistory: GeminiHistoryMessage[],
         webEnabled: boolean,
         updateProcessingUI: ProgressCallback,
         isQuickSearchFollowUp: boolean = false,
@@ -229,7 +231,7 @@ Instructions:
                 const generationStep = 0; 
                 updateProcessingUI(generationStep, totalSteps, 'Generating response...', `Input query: ${enhancedQuery}`); 
 
-                const chatConfig: any = {
+                const chatConfig: Record<string, any> = {
                     history: isQuickSearchFollowUp ? [] : chatHistory,
                     generationConfig: {
                         temperature: getModelTemperature(this.settings.model, this.settings),
@@ -247,18 +249,18 @@ Instructions:
                 const geminiThinkingConfig = getGeminiThinkingConfig(this.settings.model, this.settings);
                 if (geminiThinkingConfig) {
                     if (!chatConfig.generationConfig) chatConfig.generationConfig = {};
-                    chatConfig.generationConfig.thinkingConfig = geminiThinkingConfig.thinkingConfig;
+                    (chatConfig.generationConfig as Record<string, any>).thinkingConfig = geminiThinkingConfig.thinkingConfig;
                     
                     if (!chatConfig.tools) {
                         chatConfig.tools = [];
                     }
-                    if (!chatConfig.tools.some((tool: any) => tool.urlContext !== undefined)) {
-                        chatConfig.tools.push({ urlContext: {} });
+                    if (!(chatConfig.tools as Record<string, any>[]).some((tool: any) => tool.urlContext !== undefined)) {
+                        (chatConfig.tools as Record<string, any>[]).push({ urlContext: {} });
                     }
                 }
 
                 
-                const messageParts: any[] = [];
+                const messageParts: Record<string, unknown>[] = [];
                 
                 
                 const inlineInputs = multimodalInputs.filter(input => input.type === 'inline' && input.data);
@@ -310,13 +312,13 @@ Instructions:
                     });
                 }
                 
-                const streamResult = await model.startChat(chatConfig).sendMessageStream(messageParts, { signal: abortSignal });
+                const streamResult = await model.startChat(chatConfig as unknown as any).sendMessageStream(messageParts as unknown as any, { signal: abortSignal });
 
                 for await (const chunk of streamResult.stream) {
                     if (abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
                     const candidate = chunk.candidates?.[0];
                     if (candidate) {
-                        responseText += this.processGeminiStreamingCandidate(candidate, updateSnippetUI);
+                        responseText += this.processGeminiStreamingCandidate(candidate as unknown as GenerateContentCandidate, updateSnippetUI);
                     }
                 }
                 
@@ -328,7 +330,7 @@ Instructions:
                     if (candidate.groundingMetadata) {
                         responseText = this.addCitations(responseText, candidate.groundingMetadata);
                         
-                        webResults = candidate.groundingMetadata.groundingChunks?.map((chunk: any) => ({
+                        webResults = (candidate.groundingMetadata as any).groundingChunks?.map((chunk: { web?: { title?: string, uri?: string } }) => ({
                             title: chunk.web?.title || 'Unknown Source',
                             link: chunk.web?.uri || '#',
                             snippet: '', 
@@ -337,8 +339,9 @@ Instructions:
                 }
                 
                 
-                if ((finalResponse as any).usageMetadata) {
-                    const usage = (finalResponse as any).usageMetadata;
+                const responseWithUsage = finalResponse as { usageMetadata?: { promptTokenCount?: number, candidatesTokenCount?: number } };
+                if (responseWithUsage.usageMetadata) {
+                    const usage = responseWithUsage.usageMetadata;
                     totalTokens = (usage.promptTokenCount || 0) + (usage.candidatesTokenCount || 0);
                 }
                 
@@ -596,7 +599,7 @@ Instructions:
                             const genAI = new GoogleGenerativeAI(this.settings.geminiApiKey || this.settings.apiKey);
                             const model = genAI.getGenerativeModel({ model: geminiModel });
                             
-                            const chatConfig: any = {
+                            const chatConfig: Record<string, any> = {
                                 history: isQuickSearchFollowUp ? [] : chatHistory,
                                 generationConfig: {
                                     temperature: getModelTemperature(this.settings.model, this.settings),
@@ -607,11 +610,11 @@ Instructions:
                                 tools: [this.webSearchService.getGoogleSearchToolConfig()]
                             };
                             
-                            const messageParts: any[] = [{
+                            const messageParts: Record<string, unknown>[] = [{
                                 text: `${systemPrompt}\n\n${context.length > 0 ? context.join('\n\n') + '\n\n' : ''}Question: ${enhancedQuery}`
                             }];
                             
-                            const streamResult = await model.startChat(chatConfig).sendMessageStream(messageParts, { signal: abortSignal });
+                            const streamResult = await model.startChat(chatConfig as unknown as any).sendMessageStream(messageParts as unknown as any, { signal: abortSignal });
                             
                             for await (const chunk of streamResult.stream) {
                                 if (abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -1133,9 +1136,9 @@ Instructions:
      * @param groundingMetadata The grounding metadata from the Gemini response.
      * @returns The text with footnote citations and definitions appended.
      */
-    private addCitations(text: string, groundingMetadata: any): string {
-        const supports = groundingMetadata.groundingSupports;
-        const chunks = groundingMetadata.groundingChunks;
+    private addCitations(text: string, groundingMetadata: GroundingMetadata): string {
+        const supports = (groundingMetadata as any).groundingSupports as Record<string, unknown>[];
+        const chunks = (groundingMetadata as any).groundingChunks as Record<string, unknown>[];
 
         if (!supports || !chunks || supports.length === 0 || chunks.length === 0) {
             return text;
@@ -1147,21 +1150,25 @@ Instructions:
 
         
         const sortedSupports = [...supports].sort(
-            (a: any, b: any) => (b.segment?.endIndex ?? 0) - (a.segment?.endIndex ?? 0),
+            (a, b) => {
+                const aEnd = (a.segment as Record<string, unknown>)?.endIndex as number || 0;
+                const bEnd = (b.segment as Record<string, unknown>)?.endIndex as number || 0;
+                return bEnd - aEnd;
+            },
         );
 
         for (const support of sortedSupports) {
-            const endIndex = support.segment?.endIndex;
-            if (endIndex === undefined || !support.groundingChunkIndices?.length) {
+            const endIndex = (support.segment as Record<string, unknown>)?.endIndex as number;
+            if (endIndex === undefined || !(support.groundingChunkIndices as number[])?.length) {
                 continue;
             }
 
             
             const footnoteNumbers: number[] = [];
             
-            for (const chunkIndex of support.groundingChunkIndices) {
+            for (const chunkIndex of (support.groundingChunkIndices as number[])) {
                 const chunk = chunks[chunkIndex];
-                const uri = chunk?.web?.uri;
+                const uri = (chunk?.web as Record<string, unknown>)?.uri as string;
                 
                 if (uri) {
                     
@@ -1191,8 +1198,8 @@ Instructions:
             
             for (const [uri, num] of sortedSources) {
                 
-                const chunk = chunks.find((c: any) => c?.web?.uri === uri);
-                const title = chunk?.web?.title || 'Web Source';
+                const chunk = chunks.find((c) => (c?.web as Record<string, unknown>)?.uri === uri);
+                const title = (chunk?.web as Record<string, unknown>)?.title as string || 'Web Source';
                 
                 footnoteDefinitions.push(`[^${num}]: [${title}](${uri})`);
             }
@@ -1336,17 +1343,17 @@ Instructions:
         query: string,
         enhancedQuery: string,
         mcpContext: string,
-        chatHistory: any[],
+        chatHistory: GeminiHistoryMessage[],
         updateProcessingUI: ProgressCallback,
         updateSnippetUI: SnippetUpdateCallback,
-        mcpTools: any[],
-        executeToolCallback: (toolCall: any) => Promise<any>,
+        mcpTools: Record<string, unknown>[],
+        executeToolCallback: (toolCall: Record<string, any>) => Promise<Record<string, any>>,
         autoSelection: ModelSelection | null = null,
         isAutoToolMode: boolean = false,
         
         
         
-        serverGroups: Map<string, any[]> = new Map(),
+        serverGroups: Map<string, Record<string, unknown>[]> = new Map(),
         
         enableRateLimit: boolean = true,
         multimodalInputs: MultimodalInput[] = [],
@@ -1467,8 +1474,8 @@ Instructions:
                             if (srvTools.length === 0) continue;
                             lines.push(`### Server: ${srvName}`);
                             for (const t of srvTools) {
-                                const n = t.function?.name || 'unknown';
-                                const d = t.function?.description || 'No description';
+                                const n = (t as unknown as any).function?.name || 'unknown';
+                                const d = (t as unknown as any).function?.description || 'No description';
                                 lines.push(`- ${n}: ${d}`);
                             }
                         }
@@ -1751,7 +1758,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                 if (currBaseTokens > modelTPM * 0.7) {
                                         const trimmedMessages = [{ role: 'system', content: systemPrompt }];
                     if (chatHistory.length > 2) {
-                        trimmedMessages.push(...chatHistory.slice(-2));
+                        trimmedMessages.push(...chatHistory.slice(-2).map(m => ({ role: m.role, content: m.content || '' })));
                     }
                     trimmedMessages.push({ role: 'user', content: enhancedQuery });
                     messages.length = 0;
@@ -2147,7 +2154,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                 if (singleBaseTokens > modelTPM * 0.7) {
                                         const trimmedMessages = [{ role: 'system', content: systemPrompt }];
                     if (chatHistory.length > 2) {
-                        trimmedMessages.push(...chatHistory.slice(-2));
+                        trimmedMessages.push(...chatHistory.slice(-2).map(m => ({ role: m.role, content: m.content || '' })));
                     }
                     trimmedMessages.push({ role: 'user', content: enhancedQuery });
                     messages.length = 0;
@@ -2519,8 +2526,8 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                         if (srvTools.length === 0) continue;
                         lines.push(`### Server: ${srvName}`);
                         for (const t of srvTools) {
-                            const n = t.function?.name || 'unknown';
-                            const d = t.function?.description || 'No description';
+                            const n = (t as unknown as any).function?.name || 'unknown';
+                            const d = (t as unknown as any).function?.description || 'No description';
                             lines.push(`- ${n}: ${d}`);
                         }
                     }

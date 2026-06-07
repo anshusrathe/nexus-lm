@@ -24,34 +24,17 @@ export interface AIChatSession {
     fileActionIds?: string[];
     context?: string[];
     sources?: Array<{ path: string; relevance: number; }>;
-    webResults?: any[];
-    quickSearchResults?: any[];
+    webResults?: Record<string, unknown>[];
+    quickSearchResults?: Record<string, unknown>[];
+    modelName?: string;
+    totalTokens?: number;
+    responseTimeMs?: number;
+    mcpTools?: Record<string, unknown>[];
+    searchMode?: string;
+    vaultIndexName?: string;
+    isQuickSearch?: boolean;
     // File action data for persistence
-    fileActionData?: {
-      [actionId: string]: {
-        type: 'edit' | 'create';
-        fileName: string;
-        status: 'processing' | 'completed' | 'failed' | 'accepted' | 'rejected';
-        isApplied: boolean;
-        // For edit actions
-        editData?: {
-          filePath: string;
-          originalContent: string;
-          editedContent: string;
-          editPrompt: string;
-        };
-        // For create actions
-        createData?: {
-          folderName: string;
-          creationPrompt: string;
-          files: Array<{
-            name: string;
-            extension: string;
-            content: string;
-          }>;
-        };
-      };
-    };
+    fileActionData?: Record<string, unknown>;
   }[];
 }
 
@@ -134,7 +117,7 @@ export class AIChatSessionManager {
               
               // If not found in name/id, search through all messages
               if (!matchFound && session.messages && Array.isArray(session.messages)) {
-                matchFound = session.messages.some((msg: any) => {
+                matchFound = session.messages.some((msg: { question: string, answer: string }) => {
                   const questionMatch = msg.question && msg.question.toLowerCase().includes(query);
                   const answerMatch = msg.answer && msg.answer.toLowerCase().includes(query);
                   if (questionMatch || answerMatch) {
@@ -150,7 +133,7 @@ export class AIChatSessionManager {
               
               // Count all matching messages for display
               if (matchFound && matchCount === 0 && session.messages && Array.isArray(session.messages)) {
-                matchCount = session.messages.filter((msg: any) => {
+                matchCount = session.messages.filter((msg: { question: string, answer: string }) => {
                   const questionMatch = msg.question && msg.question.toLowerCase().includes(query);
                   const answerMatch = msg.answer && msg.answer.toLowerCase().includes(query);
                   return questionMatch || answerMatch;

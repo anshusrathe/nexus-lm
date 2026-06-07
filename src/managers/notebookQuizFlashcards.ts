@@ -1,4 +1,4 @@
-import { Notice, MarkdownRenderer, Component, setIcon } from 'obsidian';
+import { App, Notice, MarkdownRenderer, Component, setIcon } from 'obsidian';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AISettings, getModelTemperature, getModelTopP } from '../settings';
 import { GroqService, ChatMessage } from '../services/groqService';
@@ -50,12 +50,12 @@ export interface FlashcardState {
 
 export class NotebookQuizGenerator {
   private settings: AISettings;
-  private app: any;
+  private app: App;
   private rateLimitManager: RateLimitManager;
   private provider: string;
   private model: string;
 
-  constructor(app: any, settings: AISettings, rateLimitManager: RateLimitManager, provider?: string, model?: string) {
+  constructor(app: App, settings: AISettings, rateLimitManager: RateLimitManager, provider?: string, model?: string) {
     this.app = app;
     this.settings = settings;
     this.rateLimitManager = rateLimitManager;
@@ -224,12 +224,12 @@ Generate the MCQs now:`;
 
 export class NotebookFlashcardGenerator {
   private settings: AISettings;
-  private app: any;
+  private app: App;
   private rateLimitManager: RateLimitManager;
   private provider: string;
   private model: string;
 
-  constructor(app: any, settings: AISettings, rateLimitManager: RateLimitManager, provider?: string, model?: string) {
+  constructor(app: App, settings: AISettings, rateLimitManager: RateLimitManager, provider?: string, model?: string) {
     this.app = app;
     this.settings = settings;
     this.rateLimitManager = rateLimitManager;
@@ -395,7 +395,7 @@ export function triggerConfetti(element: HTMLElement) {
   for (let i = 0; i < confettiCount; i++) {
     const confetti = document.createElement('div');
     confetti.className = 'quiz-confetti';
-    confetti.setCssStyles({ 'cssText': `
+    confetti.setCssProps({ 'css-text':  `
       position: fixed;
       width: 10px;
       height: 10px;
@@ -424,8 +424,8 @@ export function triggerConfetti(element: HTMLElement) {
       y = vy * elapsed + 0.5 * gravity * elapsed * elapsed;
       rotation = elapsed * 360;
       
-      confetti.setCssStyles({ 'transform': `translate(${x}px, ${y}px) rotate(${rotation}deg)` });
-      confetti.setCssStyles({ 'opacity': String(Math.max(0, 1 - elapsed / 1.5)) });
+      confetti.setCssProps({ 'transform':  `translate(${x}px, ${y}px) rotate(${rotation}deg)` });
+      confetti.setCssProps({ 'opacity':  String(Math.max(0, 1 - elapsed / 1.5)) });
       
       if (elapsed < 1.5) {
         requestAnimationFrame(animate);
@@ -616,7 +616,7 @@ Provide the explanation:`;
 
 
 export class QuizRenderer {
-  private app: any;
+  private app: App;
   private container: HTMLElement;
   private state: QuizState;
   private onStateChange: (state: QuizState) => void;
@@ -626,7 +626,7 @@ export class QuizRenderer {
   private rateLimitManager?: RateLimitManager;
 
   constructor(
-    app: any, 
+    app: App, 
     container: HTMLElement, 
     state: QuizState, 
     onStateChange: (state: QuizState) => void,
@@ -856,13 +856,13 @@ export class QuizRenderer {
 
 
 export class FlashcardRenderer {
-  private app: any;
+  private app: App;
   private container: HTMLElement;
   private state: FlashcardState;
   private onStateChange: (state: FlashcardState) => void;
   private isFlipped: boolean = false;
 
-  constructor(app: any, container: HTMLElement, state: FlashcardState, onStateChange: (state: FlashcardState) => void) {
+  constructor(app: App, container: HTMLElement, state: FlashcardState, onStateChange: (state: FlashcardState) => void) {
     this.app = app;
     this.container = container;
     this.state = state;
@@ -897,7 +897,7 @@ export class FlashcardRenderer {
     });
 
     filterDropdown.onchange = () => {
-      this.state.filter = filterDropdown.value as any;
+      this.state.filter = filterDropdown.value as FlashcardState['filter'];
       this.state.currentIndex = 0; 
       this.onStateChange(this.state);
       this.render();
@@ -944,8 +944,8 @@ export class FlashcardRenderer {
     for (let i = stackCount - 1; i >= 0; i--) {
       if (i > 0) {
         const stackCard = stackContainer.createDiv({ cls: 'flashcard-stack-card' });
-        stackCard.setCssStyles({ 'transform': `translateY(${i * 4}px) scale(${1 - i * 0.02})` });
-        stackCard.setCssStyles({ 'zIndex': String(stackCount - i) });
+        stackCard.setCssProps({ 'transform':  `translateY(${i * 4}px) scale(${1 - i * 0.02})` });
+        stackCard.setCssProps({ 'z-index':  String(stackCount - i) });
       }
     }
     
@@ -998,7 +998,7 @@ export class FlashcardRenderer {
       btn.appendText(` ${status.label}`);
       btn.onclick = () => {
         if (!this.state.recallMap) this.state.recallMap = {};
-        this.state.recallMap[currentCard.id] = status.id as any;
+        this.state.recallMap[currentCard.id] = status.id as 'red' | 'orange' | 'green';
         this.onStateChange(this.state);
         this.render(); 
       };

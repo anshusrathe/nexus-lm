@@ -25,6 +25,15 @@ import { MCPToolCallingService, sanitizeServerName } from '../mcp/mcpToolCalling
 import { executeCode, detectLanguage, isExecutable, isRenderable, isEnhanceable, wrapInMarkdownFence } from '../tools/codeExecutor';
 import { SaveNoteModal } from '../modals/saveNoteModal';
 
+interface MCPResourceReadResult {
+    contents: Array<{
+        uri: string;
+        mimeType?: string;
+        text?: string;
+        blob?: string;
+    }>;
+}
+
 export const VIEW_TYPE_NEXUS_CHAT = 'NEXUS_CHAT_VIEW';
 
 interface Response {
@@ -231,7 +240,7 @@ class YouTubeURLModal extends Modal {
                     .onChange(value => {
                         this.youtubeUrl = value;
                     });
-                text.inputEl.setCssStyles({ 'width': '100%' });
+                text.inputEl.setCssProps({ 'width':  '100%' });
                 
                 setTimeout(() => text.inputEl.focus(), 50);
             });
@@ -1026,13 +1035,13 @@ export class ResponseView extends ItemView {
         }
 
         if (this.contextCollapsed) {
-            fileTagsScrollWrapper.setCssStyles({ 'display': 'none' });
+            fileTagsScrollWrapper.setCssProps({ 'display':  'none' });
             if (toggleBtn) {
                 toggleBtn.empty();
                 toggleBtn.createSpan({ text: '▶', attr: { style: 'font-size:18px;user-select:none;' } });
             }
         } else {
-            fileTagsScrollWrapper.setCssStyles({ 'display': '' });
+            fileTagsScrollWrapper.setCssProps({ 'display':  '' });
             if (toggleBtn) {
                 toggleBtn.empty();
                 toggleBtn.createSpan({ text: '▼', attr: { style: 'font-size:18px;user-select:none;' } });
@@ -1065,7 +1074,7 @@ export class ResponseView extends ItemView {
         if (this.settings.aiChatHistoryEnabled) {
             const historyBtn = headerLeftControls.createDiv({ cls: 'header-history-btn' });
             setIcon(historyBtn, 'history');
-            historyBtn.setCssStyles({ 'cursor': 'pointer' });
+            historyBtn.setCssProps({ 'cursor':  'pointer' });
             historyBtn.setAttr('aria-label', 'View chat history');
             historyBtn.setAttr('tabindex', '0');
             historyBtn.addEventListener('click', (e) => {
@@ -1087,7 +1096,7 @@ export class ResponseView extends ItemView {
         
         const systemInstructionsBtn = headerLeftControls.createDiv({ cls: 'header-system-instructions-btn' });
         setIcon(systemInstructionsBtn, 'wrench');
-        systemInstructionsBtn.setCssStyles({ 'cursor': 'pointer' });
+        systemInstructionsBtn.setCssProps({ 'cursor':  'pointer' });
         systemInstructionsBtn.setAttr('aria-label', 'System Instructions');
         systemInstructionsBtn.setAttr('tabindex', '0');
         
@@ -1102,7 +1111,7 @@ export class ResponseView extends ItemView {
         
         const newChatBtn = headerLeftControls.createDiv({ cls: 'header-new-chat-btn' });
         setIcon(newChatBtn, 'plus');
-        newChatBtn.setCssStyles({ 'cursor': 'pointer' });
+        newChatBtn.setCssProps({ 'cursor':  'pointer' });
         newChatBtn.setAttr('aria-label', 'Start new chat');
         newChatBtn.setAttr('tabindex', '0');
         newChatBtn.addEventListener('click', (e) => {
@@ -1125,7 +1134,7 @@ export class ResponseView extends ItemView {
         
         const ellipsisBtn = headerRightControls.createDiv({ cls: 'header-ellipsis-btn' });
         setIcon(ellipsisBtn, 'more-vertical');
-        ellipsisBtn.setCssStyles({ 'cursor': 'pointer' });
+        ellipsisBtn.setCssProps({ 'cursor':  'pointer' });
         ellipsisBtn.setAttr('aria-label', 'Menu options');
         ellipsisBtn.setAttr('tabindex', '0');
         ellipsisBtn.addEventListener('click', (e) => {
@@ -1184,7 +1193,7 @@ export class ResponseView extends ItemView {
         
         const capsuleBtn = leftControls.createDiv({ cls: 'context-menu-btn' });
         setIcon(capsuleBtn, 'plus');
-        capsuleBtn.setCssStyles({ 'cursor': 'pointer' });
+        capsuleBtn.setCssProps({ 'cursor':  'pointer' });
         capsuleBtn.setAttr('aria-label', 'Add context');
         capsuleBtn.setAttr('tabindex', '0');
         capsuleBtn.addEventListener('click', (e) => {
@@ -1207,7 +1216,7 @@ export class ResponseView extends ItemView {
         
         const sendBtn = inputRow.createDiv({ cls: 'send-button-new' });
         setIcon(sendBtn, 'arrow-up');
-        sendBtn.setCssStyles({ 'cursor': 'pointer' });
+        sendBtn.setCssProps({ 'cursor':  'pointer' });
         sendBtn.setAttr('aria-label', 'Send message');
         sendBtn.setAttr('tabindex', '0');
         sendBtn.setAttr('data-state', 'send'); 
@@ -1487,15 +1496,15 @@ export class ResponseView extends ItemView {
         
         const parent = textarea.parentElement;
         if (parent) {
-            parent.setCssStyles({ 'minHeight': parent.clientHeight + 'px' });
+            parent.setCssProps({ 'min-height':  parent.clientHeight + 'px' });
         }
 
-        textarea.setCssStyles({ 'height': 'auto' });
-        textarea.setCssStyles({ 'height': textarea.scrollHeight + 'px' });
+        textarea.setCssProps({ 'height':  'auto' });
+        textarea.setCssProps({ 'height':  textarea.scrollHeight + 'px' });
 
         
         if (parent) {
-            parent.setCssStyles({ 'minHeight': '' });
+            parent.setCssProps({ 'min-height':  '' });
         }
     }
 
@@ -1539,14 +1548,14 @@ export class ResponseView extends ItemView {
 
             if (currentWidth > maxAllowedWidth) {
                 const ratio = maxAllowedWidth / currentWidth;
-                nameSpan.setCssStyles({ 'transform': `scale(${ratio})` });
-                nameSpan.setCssStyles({ 'width': `${currentWidth}px` }); // Force span to maintain its natural width so scale works
-                nameSpan.setCssStyles({ 'marginLeft': `${(maxAllowedWidth - currentWidth) / 2}px` }); // Center the scaled text
-                nameSpan.setCssStyles({ 'marginRight': `${(maxAllowedWidth - currentWidth) / 2}px` });
+                nameSpan.setCssProps({ 'transform':  `scale(${ratio})` });
+                nameSpan.setCssProps({ 'width':  `${currentWidth}px` }); // Force span to maintain its natural width so scale works
+                nameSpan.setCssProps({ 'margin-left':  `${(maxAllowedWidth - currentWidth) / 2}px` }); // Center the scaled text
+                nameSpan.setCssProps({ 'margin-right':  `${(maxAllowedWidth - currentWidth) / 2}px` });
             } else {
-                nameSpan.setCssStyles({ 'transform': 'none' });
-                nameSpan.setCssStyles({ 'width': 'auto' });
-                nameSpan.setCssStyles({ 'margin': '0' });
+                nameSpan.setCssProps({ 'transform':  'none' });
+                nameSpan.setCssProps({ 'width':  'auto' });
+                nameSpan.setCssProps({ 'margin':  '0' });
             }
         });
     }
@@ -1596,7 +1605,7 @@ export class ResponseView extends ItemView {
         const brainBtn = container.createDiv({ cls: 'header-ollama-thinking-btn' });
         this.thinkingBtnEl = brainBtn;
         setIcon(brainBtn, 'brain');
-        brainBtn.setCssStyles({ 'cursor': 'pointer' });
+        brainBtn.setCssProps({ 'cursor':  'pointer' });
         brainBtn.setAttr('aria-label', `${activeProvider === 'gemini' ? 'Gemini' : activeProvider === 'groq' ? 'Groq' : 'Ollama'} thinking controls`);
         brainBtn.setAttr('tabindex', '0');
         if (isActive) {
@@ -1683,9 +1692,9 @@ export class ResponseView extends ItemView {
 
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.setCssStyles({ 'position': 'absolute' });
-        menuEl.setCssStyles({ 'top': `${btnRect.bottom - containerRect.top + 4}px` });
-        menuEl.setCssStyles({ 'right': `${containerRect.right - btnRect.right}px` });
+        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
 
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
@@ -1730,9 +1739,9 @@ export class ResponseView extends ItemView {
 
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.setCssStyles({ 'position': 'absolute' });
-        menuEl.setCssStyles({ 'top': `${btnRect.bottom - containerRect.top + 4}px` });
-        menuEl.setCssStyles({ 'right': `${containerRect.right - btnRect.right}px` });
+        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-ollama-thinking-btn')) {
@@ -1780,9 +1789,9 @@ export class ResponseView extends ItemView {
 
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.setCssStyles({ 'position': 'absolute' });
-        menuEl.setCssStyles({ 'top': `${btnRect.bottom - containerRect.top + 4}px` });
-        menuEl.setCssStyles({ 'right': `${containerRect.right - btnRect.right}px` });
+        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-ollama-thinking-btn')) {
@@ -1821,18 +1830,18 @@ export class ResponseView extends ItemView {
         
         const rect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.setCssStyles({ 'position': 'absolute' });
-        menuEl.setCssStyles({ 'top': `${rect.bottom - containerRect.top + 5}px` });
-        menuEl.setCssStyles({ 'left': `${rect.left - containerRect.left}px` });
-        menuEl.setCssStyles({ 'zIndex': '1000' });
-        menuEl.setCssStyles({ 'minWidth': '250px' });
-        menuEl.setCssStyles({ 'maxHeight': '400px' });
-        menuEl.setCssStyles({ 'overflowY': 'auto' });
-        menuEl.setCssStyles({ 'backgroundColor': 'var(--background-primary)' });
-        menuEl.setCssStyles({ 'border': '1px solid var(--background-modifier-border)' });
-        menuEl.setCssStyles({ 'borderRadius': '6px' });
-        menuEl.setCssStyles({ 'boxShadow': 'var(--shadow-s)' });
-        menuEl.setCssStyles({ 'padding': '4px' });
+        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.setCssProps({ 'top':  `${rect.bottom - containerRect.top + 5}px` });
+        menuEl.setCssProps({ 'left':  `${rect.left - containerRect.left}px` });
+        menuEl.setCssProps({ 'z-index':  '1000' });
+        menuEl.setCssProps({ 'min-width':  '250px' });
+        menuEl.setCssProps({ 'max-height':  '400px' });
+        menuEl.setCssProps({ 'overflow-y':  'auto' });
+        menuEl.setCssProps({ 'background-color':  'var(--background-primary)' });
+        menuEl.setCssProps({ 'border':  '1px solid var(--background-modifier-border)' });
+        menuEl.setCssProps({ 'border-radius':  '6px' });
+        menuEl.setCssProps({ 'box-shadow':  'var(--shadow-s)' });
+        menuEl.setCssProps({ 'padding':  '4px' });
 
         const indexConfigs = this.settings.indexConfigurations || [];
         const embeddingIndexes = indexConfigs.filter(config => config.type === 'embedding');
@@ -1840,14 +1849,14 @@ export class ResponseView extends ItemView {
         if (embeddingIndexes.length === 0) {
             const emptyMsg = menuEl.createDiv({ cls: 'model-select-menu-item' });
             emptyMsg.createSpan({ text: 'No embedding indexes found' });
-            emptyMsg.setCssStyles({ 'cursor': 'default' });
+            emptyMsg.setCssProps({ 'cursor':  'default' });
         } else {
             embeddingIndexes.forEach((index, idx) => {
                 const itemEl = menuEl.createDiv({ cls: 'model-select-menu-item' });
-                itemEl.setCssStyles({ 'display': 'flex' });
-                itemEl.setCssStyles({ 'flexDirection': 'column' });
-                itemEl.setCssStyles({ 'padding': '8px 12px' });
-                itemEl.setCssStyles({ 'gap': '2px' });
+                itemEl.setCssProps({ 'display':  'flex' });
+                itemEl.setCssProps({ 'flex-direction':  'column' });
+                itemEl.setCssProps({ 'padding':  '8px 12px' });
+                itemEl.setCssProps({ 'gap':  '2px' });
 
                 if (this.settings.selectedEmbeddingIndexId === index.id) {
                     itemEl.classList.add('selected');
@@ -1855,35 +1864,35 @@ export class ResponseView extends ItemView {
 
                 
                 const topRow = itemEl.createDiv();
-                topRow.setCssStyles({ 'display': 'flex' });
-                topRow.setCssStyles({ 'justifyContent': 'space-between' });
-                topRow.setCssStyles({ 'alignItems': 'center' });
-                topRow.setCssStyles({ 'width': '100%' });
+                topRow.setCssProps({ 'display':  'flex' });
+                topRow.setCssProps({ 'justify-content':  'space-between' });
+                topRow.setCssProps({ 'align-items':  'center' });
+                topRow.setCssProps({ 'width':  '100%' });
 
                 const leftInfo = topRow.createDiv();
-                leftInfo.setCssStyles({ 'display': 'flex' });
-                leftInfo.setCssStyles({ 'alignItems': 'center' });
-                leftInfo.setCssStyles({ 'gap': '8px' });
+                leftInfo.setCssProps({ 'display':  'flex' });
+                leftInfo.setCssProps({ 'align-items':  'center' });
+                leftInfo.setCssProps({ 'gap':  '8px' });
 
                 const nameSpan = leftInfo.createSpan();
                 nameSpan.textContent = index.name;
-                nameSpan.setCssStyles({ 'fontWeight': 'var(--font-semibold)' });
+                nameSpan.setCssProps({ 'font-weight':  'var(--font-semibold)' });
 
                 const countSpan = leftInfo.createSpan();
                 countSpan.textContent = `(${index.fileCount || 0} files)`;
-                countSpan.setCssStyles({ 'fontSize': '0.8em' });
-                countSpan.setCssStyles({ 'color': 'var(--text-muted)' });
+                countSpan.setCssProps({ 'font-size':  '0.8em' });
+                countSpan.setCssProps({ 'color':  'var(--text-muted)' });
 
                 const checkbox = topRow.createEl('input', { type: 'checkbox' });
                 checkbox.checked = this.settings.selectedEmbeddingIndexId === index.id;
-                checkbox.setCssStyles({ 'pointerEvents': 'none' }); 
+                checkbox.setCssProps({ 'pointer-events':  'none' }); 
 
                 
                 const bottomRow = itemEl.createDiv();
                 const modelSpan = bottomRow.createSpan();
                 modelSpan.textContent = index.model || 'Unknown model';
-                modelSpan.setCssStyles({ 'fontSize': '0.85em' });
-                modelSpan.setCssStyles({ 'color': 'var(--text-muted)' });
+                modelSpan.setCssProps({ 'font-size':  '0.85em' });
+                modelSpan.setCssProps({ 'color':  'var(--text-muted)' });
 
                 itemEl.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -2003,26 +2012,26 @@ export class ResponseView extends ItemView {
         modelGroups.forEach((group, groupIndex) => {
             
             const headerEl = modelList.createDiv({ cls: 'model-select-menu-header' });
-            headerEl.setCssStyles({ 'display': 'flex' });
-            headerEl.setCssStyles({ 'justifyContent': 'space-between' });
-            headerEl.setCssStyles({ 'alignItems': 'center' });
-            headerEl.setCssStyles({ 'paddingRight': '8px' });
+            headerEl.setCssProps({ 'display':  'flex' });
+            headerEl.setCssProps({ 'justify-content':  'space-between' });
+            headerEl.setCssProps({ 'align-items':  'center' });
+            headerEl.setCssProps({ 'padding-right':  '8px' });
 
             const headerTitle = headerEl.createSpan();
             headerTitle.textContent = group.label === 'Google Gemini' ? 'Gemini' : group.label;
 
             
             const modalitiesContainer = headerEl.createSpan({ cls: 'provider-modalities' });
-            modalitiesContainer.setCssStyles({ 'display': 'flex' });
-            modalitiesContainer.setCssStyles({ 'gap': '4px' });
-            modalitiesContainer.setCssStyles({ 'alignItems': 'center' });
+            modalitiesContainer.setCssProps({ 'display':  'flex' });
+            modalitiesContainer.setCssProps({ 'gap':  '4px' });
+            modalitiesContainer.setCssProps({ 'align-items':  'center' });
 
             const addModalityIcon = (iconName: string) => {
                 const iconEl = modalitiesContainer.createSpan();
                 setIcon(iconEl, iconName);
                 const svg = iconEl.querySelector('svg');
                 if (svg) {
-                    svg.setCssStyles({ 'opacity': '0.7' });
+                    svg.setCssProps({ 'opacity':  '0.7' });
                 }
             };
 
@@ -2076,9 +2085,9 @@ export class ResponseView extends ItemView {
                 
                 
                 const iconsContainer = option.createSpan({ cls: 'model-icons-container' });
-                iconsContainer.setCssStyles({ 'display': 'flex' });
-                iconsContainer.setCssStyles({ 'gap': '4px' });
-                iconsContainer.setCssStyles({ 'alignItems': 'center' });
+                iconsContainer.setCssProps({ 'display':  'flex' });
+                iconsContainer.setCssProps({ 'gap':  '4px' });
+                iconsContainer.setCssProps({ 'align-items':  'center' });
 
                 
                 if ((isOllama || isGemini) && model.capabilities?.includes('thinking')) {
@@ -2125,12 +2134,12 @@ export class ResponseView extends ItemView {
         searchInput.addEventListener('input', (e) => {
             const query = (e.target as HTMLInputElement).value.toLowerCase();
             itemsToFilter.forEach(obj => {
-                obj.itemEl.setCssStyles({ 'display': obj.name.includes(query) ? '' : 'none' });
+                obj.itemEl.setCssProps({ 'display':  obj.name.includes(query) ? '' : 'none' });
             });
             headersToFilter.forEach(headerObj => {
                 const hasVisibleItems = headerObj.items.some(item => item.style.display !== 'none');
-                headerObj.headerEl.setCssStyles({ 'display': hasVisibleItems ? '' : 'none' });
-                if (headerObj.separatorEl) headerObj.separatorEl.setCssStyles({ 'display': hasVisibleItems ? '' : 'none' });
+                headerObj.headerEl.setCssProps({ 'display':  hasVisibleItems ? '' : 'none' });
+                if (headerObj.separatorEl) headerObj.separatorEl.setCssProps({ 'display':  hasVisibleItems ? '' : 'none' });
             });
         });
 
@@ -2138,9 +2147,9 @@ export class ResponseView extends ItemView {
         const containerRect = this.containerEl.getBoundingClientRect();
 
         
-        menuEl.setCssStyles({ 'position': 'absolute' });
-        menuEl.setCssStyles({ 'top': `${btnRect.bottom - containerRect.top + 4}px` });
-        menuEl.setCssStyles({ 'right': `${containerRect.right - btnRect.right}px` });
+        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
 
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
@@ -2174,7 +2183,7 @@ export class ResponseView extends ItemView {
 
         
         setTimeout(() => {
-            indicator.setCssStyles({ 'opacity': '0' });
+            indicator.setCssProps({ 'opacity':  '0' });
             setTimeout(() => indicator.remove(), 300);
         }, 5000);
     }
@@ -2539,9 +2548,9 @@ export class ResponseView extends ItemView {
         });
 
         const btnRect = ellipsisBtn.getBoundingClientRect();
-        menuEl.setCssStyles({ 'position': 'absolute' });
-        menuEl.setCssStyles({ 'top': `${btnRect.bottom + 4}px` });
-        menuEl.setCssStyles({ 'right': '10px' });
+        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.setCssProps({ 'top':  `${btnRect.bottom + 4}px` });
+        menuEl.setCssProps({ 'right':  '10px' });
 
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
@@ -2570,44 +2579,44 @@ export class ResponseView extends ItemView {
 
         const pickerEl = document.createElement('div');
         pickerEl.className = 'wallpaper-picker';
-        pickerEl.setCssStyles({ 'position': 'absolute' });
-        pickerEl.setCssStyles({ 'zIndex': '1000' });
-        pickerEl.setCssStyles({ 'background': 'var(--background-primary, #ffffff)' });
-        pickerEl.setCssStyles({ 'border': '1px solid var(--border-color, #e0e0e0)' });
-        pickerEl.setCssStyles({ 'borderRadius': '8px' });
-        pickerEl.setCssStyles({ 'padding': '8px' });
-        pickerEl.setCssStyles({ 'maxHeight': '300px' });
-        pickerEl.setCssStyles({ 'overflowY': 'auto' });
-        pickerEl.setCssStyles({ 'minWidth': '250px' });
+        pickerEl.setCssProps({ 'position':  'absolute' });
+        pickerEl.setCssProps({ 'z-index':  '1000' });
+        pickerEl.setCssProps({ 'background':  'var(--background-primary, #ffffff)' });
+        pickerEl.setCssProps({ 'border':  '1px solid var(--border-color, #e0e0e0)' });
+        pickerEl.setCssProps({ 'border-radius':  '8px' });
+        pickerEl.setCssProps({ 'padding':  '8px' });
+        pickerEl.setCssProps({ 'max-height':  '300px' });
+        pickerEl.setCssProps({ 'overflow-y':  'auto' });
+        pickerEl.setCssProps({ 'min-width':  '250px' });
         pickerEl.classList.add('wallpaper-picker-shadow');
-        pickerEl.setCssStyles({ 'color': 'var(--text-normal, #000000)' });
+        pickerEl.setCssProps({ 'color':  'var(--text-normal, #000000)' });
 
         const btnRect = this.containerEl.querySelector('.header-ellipsis-btn')?.getBoundingClientRect();
         if (btnRect) {
-            pickerEl.setCssStyles({ 'top': `${btnRect.bottom + 4}px` });
-            pickerEl.setCssStyles({ 'right': '10px' });
+            pickerEl.setCssProps({ 'top':  `${btnRect.bottom + 4}px` });
+            pickerEl.setCssProps({ 'right':  '10px' });
         }
 
         const titleEl = pickerEl.createDiv({ cls: 'wallpaper-picker-title' });
         titleEl.textContent = 'Select Wallpaper Image';
-        titleEl.setCssStyles({ 'fontWeight': 'bold' });
-        titleEl.setCssStyles({ 'marginBottom': '8px' });
-        titleEl.setCssStyles({ 'padding': '4px' });
-        titleEl.setCssStyles({ 'color': 'var(--text-normal, #000000)' });
+        titleEl.setCssProps({ 'font-weight':  'bold' });
+        titleEl.setCssProps({ 'margin-bottom':  '8px' });
+        titleEl.setCssProps({ 'padding':  '4px' });
+        titleEl.setCssProps({ 'color':  'var(--text-normal, #000000)' });
 
         for (const file of images) {
             const itemEl = pickerEl.createDiv({ cls: 'wallpaper-picker-item' });
             itemEl.textContent = file.path;
-            itemEl.setCssStyles({ 'padding': '6px 8px' });
-            itemEl.setCssStyles({ 'cursor': 'pointer' });
-            itemEl.setCssStyles({ 'borderRadius': '4px' });
-            itemEl.setCssStyles({ 'color': 'var(--text-normal, #000000)' });
-            itemEl.setCssStyles({ 'background': 'transparent' });
+            itemEl.setCssProps({ 'padding':  '6px 8px' });
+            itemEl.setCssProps({ 'cursor':  'pointer' });
+            itemEl.setCssProps({ 'border-radius':  '4px' });
+            itemEl.setCssProps({ 'color':  'var(--text-normal, #000000)' });
+            itemEl.setCssProps({ 'background':  'transparent' });
             itemEl.addEventListener('mouseenter', () => {
-                itemEl.setCssStyles({ 'background': 'var(--hover-bg, #e0e0e0)' });
+                itemEl.setCssProps({ 'background':  'var(--hover-bg, #e0e0e0)' });
             });
             itemEl.addEventListener('mouseleave', () => {
-                itemEl.setCssStyles({ 'background': 'transparent' });
+                itemEl.setCssProps({ 'background':  'transparent' });
             });
             itemEl.addEventListener('click', () => {
                 pickerEl.remove();
@@ -2684,25 +2693,25 @@ export class ResponseView extends ItemView {
         
         container.insertBefore(this.wallpaperEl, container.firstChild);
         
-        this.wallpaperEl.setCssStyles({ 'position': 'absolute' });
-        this.wallpaperEl.setCssStyles({ 'top': '0' });
-        this.wallpaperEl.setCssStyles({ 'left': '0' });
-        this.wallpaperEl.setCssStyles({ 'width': '100%' });
-        this.wallpaperEl.setCssStyles({ 'height': '100%' });
-        this.wallpaperEl.setCssStyles({ 'zIndex': '0' });
-        this.wallpaperEl.setCssStyles({ 'pointerEvents': 'none' });
-        this.wallpaperEl.setCssStyles({ 'display': 'block' });
-        this.wallpaperEl.setCssStyles({ 'overflow': 'hidden' });
+        this.wallpaperEl.setCssProps({ 'position':  'absolute' });
+        this.wallpaperEl.setCssProps({ 'top':  '0' });
+        this.wallpaperEl.setCssProps({ 'left':  '0' });
+        this.wallpaperEl.setCssProps({ 'width':  '100%' });
+        this.wallpaperEl.setCssProps({ 'height':  '100%' });
+        this.wallpaperEl.setCssProps({ 'z-index':  '0' });
+        this.wallpaperEl.setCssProps({ 'pointer-events':  'none' });
+        this.wallpaperEl.setCssProps({ 'display':  'block' });
+        this.wallpaperEl.setCssProps({ 'overflow':  'hidden' });
 
         const wallpaperOpacity = this.settings.chatWallpaperOpacity ?? 0.5;
-        this.wallpaperEl.setCssStyles({ 'opacity': wallpaperOpacity.toString() });
+        this.wallpaperEl.setCssProps({ 'opacity':  wallpaperOpacity.toString() });
         
         
         const imgEl = this.wallpaperEl.createEl('img');
-        imgEl.setCssStyles({ 'width': '100%' });
-        imgEl.setCssStyles({ 'height': '100%' });
-        imgEl.setCssStyles({ 'objectFit': 'cover' });
-        imgEl.setCssStyles({ 'pointerEvents': 'none' });
+        imgEl.setCssProps({ 'width':  '100%' });
+        imgEl.setCssProps({ 'height':  '100%' });
+        imgEl.setCssProps({ 'object-fit':  'cover' });
+        imgEl.setCssProps({ 'pointer-events':  'none' });
         
 
         const resourcePath = this.app.vault.adapter.getResourcePath(wpPath);
@@ -2729,18 +2738,18 @@ export class ResponseView extends ItemView {
             
             if (headerSection && headerGlassFactor > 0) {
                 headerSection.classList.add('liquid-glass-active');
-                (headerSection as HTMLElement).setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
+                (headerSection as HTMLElement).setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             } else if (headerSection) {
                 headerSection.classList.remove('liquid-glass-active');
-                (headerSection as HTMLElement).setCssStyles({ 'background': '' });
+                (headerSection as HTMLElement).setCssProps({ 'background':  '' });
             }
             
             if (inputContainer && headerGlassFactor > 0) {
                 inputContainer.classList.add('liquid-glass-active');
-                (inputContainer as HTMLElement).setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
+                (inputContainer as HTMLElement).setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             } else if (inputContainer) {
                 inputContainer.classList.remove('liquid-glass-active');
-                (inputContainer as HTMLElement).setCssStyles({ 'background': '' });
+                (inputContainer as HTMLElement).setCssProps({ 'background':  '' });
             }
             
             if (responsesContainer && responseGlassFactor > 0) {
@@ -2751,19 +2760,19 @@ export class ResponseView extends ItemView {
             responseItems.forEach((item) => {
                 if (responseGlassFactor > 0) {
                     item.classList.add('liquid-glass-active');
-                    (item as HTMLElement).setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, responseGlassFactor)})` });
-                    (item as HTMLElement).setCssStyles({ 'borderColor': `rgba(255, 255, 255, ${Math.min(0.5, responseGlassFactor)})` });
+                    (item as HTMLElement).setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, responseGlassFactor)})` });
+                    (item as HTMLElement).setCssProps({ 'border-color':  `rgba(255, 255, 255, ${Math.min(0.5, responseGlassFactor)})` });
                 } else {
                     item.classList.remove('liquid-glass-active');
-                    (item as HTMLElement).setCssStyles({ 'background': '' });
-                    (item as HTMLElement).setCssStyles({ 'borderColor': '' });
+                    (item as HTMLElement).setCssProps({ 'background':  '' });
+                    (item as HTMLElement).setCssProps({ 'border-color':  '' });
                 }
             });
 
             
             if (queryInput && headerGlassFactor > 0) {
                 queryInput.classList.add('liquid-glass-active');
-queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
+queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             }
         } else {
             
@@ -2805,7 +2814,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
         if (this.settings.aiChatHistoryEnabled) {
             const historyBtn = headerLeftControls.createDiv({ cls: 'header-history-btn' });
             setIcon(historyBtn, 'history');
-            historyBtn.setCssStyles({ 'cursor': 'pointer' });
+            historyBtn.setCssProps({ 'cursor':  'pointer' });
             historyBtn.setAttr('aria-label', 'View chat history');
             historyBtn.setAttr('tabindex', '0');
             historyBtn.addEventListener('click', (e) => {
@@ -2827,7 +2836,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
         
         const systemInstructionsBtn = headerLeftControls.createDiv({ cls: 'header-system-instructions-btn' });
         setIcon(systemInstructionsBtn, 'wrench');
-        systemInstructionsBtn.setCssStyles({ 'cursor': 'pointer' });
+        systemInstructionsBtn.setCssProps({ 'cursor':  'pointer' });
         systemInstructionsBtn.setAttr('aria-label', 'System Instructions');
         systemInstructionsBtn.setAttr('tabindex', '0');
         
@@ -2842,7 +2851,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
         
         const newChatBtn = headerLeftControls.createDiv({ cls: 'header-new-chat-btn' });
         setIcon(newChatBtn, 'plus');
-        newChatBtn.setCssStyles({ 'cursor': 'pointer' });
+        newChatBtn.setCssProps({ 'cursor':  'pointer' });
         newChatBtn.setAttr('aria-label', 'Start new chat');
         newChatBtn.setAttr('tabindex', '0');
         newChatBtn.addEventListener('click', (e) => {
@@ -2865,7 +2874,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
         
         const ellipsisBtn = headerRightControls.createDiv({ cls: 'header-ellipsis-btn' });
         setIcon(ellipsisBtn, 'more-vertical');
-        ellipsisBtn.setCssStyles({ 'cursor': 'pointer' });
+        ellipsisBtn.setCssProps({ 'cursor':  'pointer' });
         ellipsisBtn.setAttr('aria-label', 'Menu options');
         ellipsisBtn.setAttr('tabindex', '0');
         ellipsisBtn.addEventListener('click', (e) => {
@@ -4854,30 +4863,30 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                     targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
                     
-                    targetEl.setCssStyles({ 'backgroundColor': 'var(--text-accent)' });
-                    targetEl.setCssStyles({ 'opacity': '0.3' });
+                    targetEl.setCssProps({ 'background-color':  'var(--text-accent)' });
+                    targetEl.setCssProps({ 'opacity':  '0.3' });
 
                     
                     const backArrow = targetEl.querySelector('.footnote-backref') as HTMLElement;
                     if (backArrow) {
-                        backArrow.setCssStyles({ 'color': 'var(--text-accent)' });
-                        backArrow.setCssStyles({ 'fontWeight': 'bold' });
-                        backArrow.setCssStyles({ 'transform': 'scale(1.3)' });
-                        backArrow.setCssStyles({ 'display': 'inline-block' });
-                        backArrow.setCssStyles({ 'transition': 'all 0.3s ease' });
-                        backArrow.setCssStyles({ 'textShadow': '0 0 8px var(--text-accent)' });
+                        backArrow.setCssProps({ 'color':  'var(--text-accent)' });
+                        backArrow.setCssProps({ 'font-weight':  'bold' });
+                        backArrow.setCssProps({ 'transform':  'scale(1.3)' });
+                        backArrow.setCssProps({ 'display':  'inline-block' });
+                        backArrow.setCssProps({ 'transition':  'all 0.3s ease' });
+                        backArrow.setCssProps({ 'text-shadow':  '0 0 8px var(--text-accent)' });
 
                         setTimeout(() => {
-                            backArrow.setCssStyles({ 'color': '' });
-                            backArrow.setCssStyles({ 'fontWeight': '' });
-                            backArrow.setCssStyles({ 'transform': '' });
-                            backArrow.setCssStyles({ 'textShadow': '' });
+                            backArrow.setCssProps({ 'color':  '' });
+                            backArrow.setCssProps({ 'font-weight':  '' });
+                            backArrow.setCssProps({ 'transform':  '' });
+                            backArrow.setCssProps({ 'text-shadow':  '' });
                         }, 5000);
                     }
 
                     setTimeout(() => {
-                        targetEl.setCssStyles({ 'backgroundColor': '' });
-                        targetEl.setCssStyles({ 'opacity': '' });
+                        targetEl.setCssProps({ 'background-color':  '' });
+                        targetEl.setCssProps({ 'opacity':  '' });
                     }, 1000);
                 }
             });
@@ -4897,7 +4906,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                 if (targetEl) {
                     const tooltip = document.createElement('div');
                     tooltip.classList.add('footnote-tooltip');
-                    tooltip.setCssStyles({ 'cssText': `
+                    tooltip.setCssProps({ 'css-text':  `
                         position: fixed;
                         background-color: var(--background-primary);
                         border: 1px solid var(--background-modifier-border);
@@ -4915,8 +4924,8 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                     tooltip.textContent = text;
 
                     const rect = refLink.getBoundingClientRect();
-                    tooltip.setCssStyles({ 'left': rect.left + 'px' });
-                    tooltip.setCssStyles({ 'top': (rect.bottom + 5) + 'px' });
+                    tooltip.setCssProps({ 'left':  rect.left + 'px' });
+                    tooltip.setCssProps({ 'top':  (rect.bottom + 5) + 'px' });
 
                     document.body.appendChild(tooltip);
 
@@ -4951,7 +4960,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                     backArrow.classList.add('footnote-backref');
                     backArrow.textContent = ' ↩';
                     backArrow.setAttribute('aria-label', 'Back to content');
-                    backArrow.setCssStyles({ 'cssText': 'margin-left: 0.25em; cursor: pointer; text-decoration: none;' });
+                    backArrow.setCssProps({ 'css-text':  'margin-left: 0.25em; cursor: pointer; text-decoration: none;' });
 
                     this.registerDomEvent(backArrow, 'click', (e: MouseEvent) => {
                         e.preventDefault();
@@ -4968,11 +4977,11 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
                         if (refEl) {
                             refEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            refEl.setCssStyles({ 'backgroundColor': 'var(--text-accent)' });
-                            refEl.setCssStyles({ 'opacity': '0.3' });
+                            refEl.setCssProps({ 'background-color':  'var(--text-accent)' });
+                            refEl.setCssProps({ 'opacity':  '0.3' });
                             setTimeout(() => {
-                                refEl.setCssStyles({ 'backgroundColor': '' });
-                                refEl.setCssStyles({ 'opacity': '' });
+                                refEl.setCssProps({ 'background-color':  '' });
+                                refEl.setCssProps({ 'opacity':  '' });
                             }, 500);
                         }
                     });
@@ -5018,7 +5027,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
             
             const sourcesContent = sourcesEl.createDiv({ cls: 'sources-content' });
-            sourcesContent.setCssStyles({ 'display': 'none' }); 
+            sourcesContent.setCssProps({ 'display':  'none' }); 
 
             
             const extractYouTubeId = (url: string): string | null => {
@@ -5166,12 +5175,12 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
             
             sourcesHeader.addEventListener('click', () => {
                 const isCollapsed = sourcesContent.style.display === 'none';
-                sourcesContent.setCssStyles({ 'display': isCollapsed ? 'block' : 'none' });
+                sourcesContent.setCssProps({ 'display':  isCollapsed ? 'block':  'none' });
                 toggleIcon.setText(isCollapsed ? '▼' : '▶'); 
             });
 
             
-            sourcesHeader.setCssStyles({ 'cursor': 'pointer' });
+            sourcesHeader.setCssProps({ 'cursor':  'pointer' });
         }
     }
 
@@ -5189,7 +5198,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
             
             const toolsContent = toolsEl.createDiv({ cls: 'sources-content' });
-            toolsContent.setCssStyles({ 'display': 'none' }); 
+            toolsContent.setCssProps({ 'display':  'none' }); 
 
             
             const toolsByServer = new Map<string, string[]>();
@@ -5213,12 +5222,12 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
             
             toolsHeader.addEventListener('click', () => {
                 const isCollapsed = toolsContent.style.display === 'none';
-                toolsContent.setCssStyles({ 'display': isCollapsed ? 'block' : 'none' });
+                toolsContent.setCssProps({ 'display':  isCollapsed ? 'block':  'none' });
                 toggleIcon.setText(isCollapsed ? '▼' : '▶'); 
             });
 
             
-            toolsHeader.setCssStyles({ 'cursor': 'pointer' });
+            toolsHeader.setCssProps({ 'cursor':  'pointer' });
         }
     }
 
@@ -5234,7 +5243,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
             
             const sourcesContent = webSourcesEl.createDiv({ cls: 'sources-content' });
-            sourcesContent.setCssStyles({ 'display': 'none' }); 
+            sourcesContent.setCssProps({ 'display':  'none' }); 
 
             const sourcesList = sourcesContent.createEl('ul');
             webResults.forEach(result => {
@@ -5253,12 +5262,12 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
             
             sourcesHeader.addEventListener('click', () => {
                 const isCollapsed = sourcesContent.style.display === 'none';
-                sourcesContent.setCssStyles({ 'display': isCollapsed ? 'block' : 'none' });
+                sourcesContent.setCssProps({ 'display':  isCollapsed ? 'block':  'none' });
                 toggleIcon.setText(isCollapsed ? '▼' : '▶');
             });
 
             
-            sourcesHeader.setCssStyles({ 'cursor': 'pointer' });
+            sourcesHeader.setCssProps({ 'cursor':  'pointer' });
         }
     }
 
@@ -5283,7 +5292,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
         
         const sourcesContent = sourcesEl.createDiv({ cls: 'sources-content' });
-        sourcesContent.setCssStyles({ 'display': 'none' }); 
+        sourcesContent.setCssProps({ 'display':  'none' }); 
 
         
         const answerEl = responseEl.querySelector('.agent-final-answer-content') || responseEl.querySelector('.response-answer');
@@ -5373,12 +5382,12 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
         
         sourcesHeader.addEventListener('click', () => {
             const isCollapsed = sourcesContent.style.display === 'none';
-            sourcesContent.setCssStyles({ 'display': isCollapsed ? 'block' : 'none' });
+            sourcesContent.setCssProps({ 'display':  isCollapsed ? 'block':  'none' });
             toggleIcon.setText(isCollapsed ? '▼' : '▶');
         });
 
         
-        sourcesHeader.setCssStyles({ 'cursor': 'pointer' });
+        sourcesHeader.setCssProps({ 'cursor':  'pointer' });
     }
 
 
@@ -5687,7 +5696,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
             const thinkingChevron = thinkingHeader.createDiv({ cls: 'thinking-chevron', text: '▾' });
             thinkingChevron.setAttr('aria-label', 'Collapse reasoning');
             thinkingChevron.setAttr('tabindex', '0');
-            thinkingChevron.setCssStyles({ 'cursor': 'pointer' });
+            thinkingChevron.setCssProps({ 'cursor':  'pointer' });
             thinkingChevron.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const isCollapsed = thinkingContainer.classList.contains('collapsed');
@@ -6038,7 +6047,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                 const autoMode = this.plugin.settings.codeExecutionAutoMode ?? false;
 
                 if (autoMode) {
-                    (pre as HTMLElement).setCssStyles({ 'display': 'none' });
+                    (pre as HTMLElement).setCssProps({ 'display':  'none' });
                     outputEl.classList.remove('hidden');
                     this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
                     return;
@@ -6060,25 +6069,25 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                 const backBtn = document.createElement('button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
-                backBtn.setCssStyles({ 'display': 'none' });
+                backBtn.setCssProps({ 'display':  'none' });
                 setIcon(backBtn, 'code-2');
                 backBtn.addEventListener('click', () => {
-                    (pre as HTMLElement).setCssStyles({ 'display': '' });
+                    (pre as HTMLElement).setCssProps({ 'display':  '' });
                     outputEl.classList.add('hidden');
                     outputEl.empty();
                     outputEl.className = 'code-exec-output hidden';
                     renderToggle.classList.remove('is-enabled');
                     renderToggle.setAttribute('aria-checked', 'false');
-                    backBtn.setCssStyles({ 'display': 'none' });
+                    backBtn.setCssProps({ 'display':  'none' });
                 });
 
                 renderToggle.addEventListener('click', async () => {
                     if (renderToggle.classList.contains('is-enabled')) return;
                     renderToggle.classList.add('is-enabled');
                     renderToggle.setAttribute('aria-checked', 'true');
-                    (pre as HTMLElement).setCssStyles({ 'display': 'none' });
+                    (pre as HTMLElement).setCssProps({ 'display':  'none' });
                     outputEl.classList.remove('hidden');
-                    backBtn.setCssStyles({ 'display': '' });
+                    backBtn.setCssProps({ 'display':  '' });
                     await this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
                 });
 
@@ -6102,7 +6111,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
             if (autoMode) {
                 
-                (pre as HTMLElement).setCssStyles({ 'display': 'none' });
+                (pre as HTMLElement).setCssProps({ 'display':  'none' });
                 outputEl.classList.remove('hidden');
                 this.runCode(pre as HTMLElement, lang, outputEl, wrapper, true, question);
             } else {
@@ -6124,18 +6133,18 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                 const backBtn = document.createElement('button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
-                backBtn.setCssStyles({ 'display': 'none' });
+                backBtn.setCssProps({ 'display':  'none' });
                 setIcon(backBtn, 'code-2');
                 backBtn.addEventListener('click', () => {
                     
-                    (pre as HTMLElement).setCssStyles({ 'display': '' });
+                    (pre as HTMLElement).setCssProps({ 'display':  '' });
                     outputEl.classList.add('hidden');
                     outputEl.empty();
                     outputEl.className = 'code-exec-output hidden';
                     
                     runToggle.classList.remove('is-enabled');
                     runToggle.setAttribute('aria-checked', 'false');
-                    backBtn.setCssStyles({ 'display': 'none' });
+                    backBtn.setCssProps({ 'display':  'none' });
                     
                     wrapper.querySelector('.code-repair-toggle-row')?.remove();
                 });
@@ -6145,9 +6154,9 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                     runToggle.classList.add('is-enabled');
                     runToggle.setAttribute('aria-checked', 'true');
                     
-                    (pre as HTMLElement).setCssStyles({ 'display': 'none' });
+                    (pre as HTMLElement).setCssProps({ 'display':  'none' });
                     outputEl.classList.remove('hidden');
-                    backBtn.setCssStyles({ 'display': '' });
+                    backBtn.setCssProps({ 'display':  '' });
                     await this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
                 });
 
@@ -6196,15 +6205,15 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
             
             const onMsg = (e: MessageEvent) => {
                 if (e.data?.iframeHeight && iframe.isConnected) {
-                    iframe.setCssStyles({ 'height': e.data.iframeHeight + 'px' });
+                    iframe.setCssProps({ 'height':  e.data.iframeHeight + 'px' });
                     window.removeEventListener('message', onMsg);
                 }
             };
             window.addEventListener('message', onMsg);
         } else if (result.isMarkdown && result.markdownContent) {
             outputEl.classList.add('code-exec-success');
-            outputEl.setCssStyles({ 'fontFamily': 'var(--font-text)' });
-            outputEl.setCssStyles({ 'padding': '12px' });
+            outputEl.setCssProps({ 'font-family':  'var(--font-text)' });
+            outputEl.setCssProps({ 'padding':  '12px' });
             MarkdownRenderer.render(this.app, result.markdownContent, outputEl, '', this);
         } else if (result.success) {
             outputEl.classList.add('code-exec-success');
@@ -6379,7 +6388,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
             errRow.className = 'code-exec-toggle-row mermaid-repair-row';
             const errLabel = document.createElement('span');
             errLabel.className = 'code-exec-label';
-            errLabel.setCssStyles({ 'color': 'var(--text-error, #f44336)' });
+            errLabel.setCssProps({ 'color':  'var(--text-error, #f44336)' });
             errLabel.textContent = `Repair failed: ${err?.message || String(err)}`;
             const retryBtn = document.createElement('button');
             retryBtn.className = 'code-block-btn';
@@ -6981,7 +6990,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                 this.currentSessionId = now.toString();
             }
 
-            const session = {
+            const session: AIChatSession = {
                 id: this.currentSessionId,
                 name: sessionName,
                 createdAt: now, 
@@ -6997,16 +7006,16 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                     fileActionIds: r.fileActionIds,
                     context: r.context,
                     sources: r.sources,
-                    webResults: r.webResults,
+                    webResults: r.webResults as unknown as Record<string, unknown>[],
                     
 
-                    fileActionData: r.fileActionIds ? this.getFileActionDataForSave(r.fileActionIds) : undefined,
+                    fileActionData: r.fileActionIds ? this.getFileActionDataForSave(r.fileActionIds) as unknown as Record<string, unknown> : undefined,
                     
                     modelName: r.modelName,
                     totalTokens: r.totalTokens,
                     responseTimeMs: r.responseTimeMs,
                     
-                    mcpTools: r.mcpTools,
+                    mcpTools: r.mcpTools as Record<string, unknown>[],
                     
                     searchMode: r.searchMode,
                     
@@ -7021,8 +7030,8 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
         }
     }
 
-    private getFileActionDataForSave(fileActionIds: string[]): { [actionId: string]: any } {
-        const actionData: { [actionId: string]: any } = {};
+    private getFileActionDataForSave(fileActionIds: string[]): { [actionId: string]: Record<string, unknown> } {
+        const actionData: { [actionId: string]: Record<string, unknown> } = {};
 
         for (const actionId of fileActionIds) {
             const actionState = this.activeFileActions.get(actionId);
@@ -7036,7 +7045,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
                 
                 if (actionState.type === 'edit' && actionState.data) {
-                    actionData[actionId].editData = {
+                    (actionData[actionId] as Record<string, unknown>).editData = {
                         filePath: actionState.data.file?.path || '',
                         originalContent: actionState.data.originalContent || '',
                         editedContent: actionState.data.editedContent || '',
@@ -7046,7 +7055,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
                 
                 if (actionState.type === 'create' && actionState.data) {
-                    actionData[actionId].createData = {
+                    (actionData[actionId] as Record<string, unknown>).createData = {
                         folderName: actionState.data.folderName || '',
                         creationPrompt: actionState.data.creationPrompt || '',
                         files: actionState.data.files || []
@@ -7132,8 +7141,8 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
         
         const adjustHeight = () => {
-            textArea.setCssStyles({ 'height': 'auto' });
-            textArea.setCssStyles({ 'height': textArea.scrollHeight + 'px' });
+            textArea.setCssProps({ 'height':  'auto' });
+            textArea.setCssProps({ 'height':  textArea.scrollHeight + 'px' });
         };
         textArea.addEventListener('input', adjustHeight);
         setTimeout(adjustHeight, 0); 
@@ -7188,10 +7197,10 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
         menu.className = 'context-file-menu';
         
         const rect = anchorEl.getBoundingClientRect();
-        menu.setCssStyles({ 'position': 'fixed' });
-        menu.setCssStyles({ 'left': `${rect.left}px` });
-        menu.setCssStyles({ 'zIndex': '9999' });
-        menu.setCssStyles({ 'minWidth': '260px' });
+        menu.setCssProps({ 'position':  'fixed' });
+        menu.setCssProps({ 'left':  `${rect.left}px` });
+        menu.setCssProps({ 'z-index':  '9999' });
+        menu.setCssProps({ 'min-width':  '260px' });
         
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
@@ -7252,11 +7261,11 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
         const menuHeight = menu.offsetHeight;
         
         if (anchorEl.classList.contains('capsule-more-tag')) {
-            menu.setCssStyles({ 'left': `${rect.right - menu.offsetWidth}px` });
+            menu.setCssProps({ 'left':  `${rect.right - menu.offsetWidth}px` });
         } else {
-            menu.setCssStyles({ 'left': `${rect.left}px` });
+            menu.setCssProps({ 'left':  `${rect.left}px` });
         }
-        menu.setCssStyles({ 'top': `${rect.top - menuHeight - 8}px` });
+        menu.setCssProps({ 'top':  `${rect.top - menuHeight - 8}px` });
         this.contextMenuEl = menu;
     }
 
@@ -7303,10 +7312,10 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
         
         const rect = anchorEl.getBoundingClientRect();
-        menu.setCssStyles({ 'position': 'fixed' });
-        menu.setCssStyles({ 'left': `${rect.left}px` });
-        menu.setCssStyles({ 'zIndex': '9999' });
-        menu.setCssStyles({ 'minWidth': '260px' });
+        menu.setCssProps({ 'position':  'fixed' });
+        menu.setCssProps({ 'left':  `${rect.left}px` });
+        menu.setCssProps({ 'z-index':  '9999' });
+        menu.setCssProps({ 'min-width':  '260px' });
 
         
         const listContainer = document.createElement('div');
@@ -7325,7 +7334,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
 
         
         const menuHeight = menu.offsetHeight;
-        menu.setCssStyles({ 'top': `${rect.top - menuHeight - 8}px` });
+        menu.setCssProps({ 'top':  `${rect.top - menuHeight - 8}px` });
 
         this.contextMenuEl = menu;
     }
@@ -7370,7 +7379,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                     const badgeSpan = document.createElement('span');
                     badgeSpan.className = 'feature-badge beta-badge';
                     badgeSpan.textContent = (opt as any).badge;
-                    badgeSpan.setCssStyles({ 'cssText': 'margin-left: 6px; padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;' });
+                    badgeSpan.setCssProps({ 'css-text':  'margin-left: 6px; padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;' });
 
                     item.appendChild(labelSpan);
                     item.appendChild(badgeSpan);
@@ -7455,7 +7464,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                 const noResults = document.createElement('div');
                 noResults.className = 'context-file-menu-item';
                 noResults.textContent = 'No matches found';
-                noResults.setCssStyles({ 'opacity': '0.5' });
+                noResults.setCssProps({ 'opacity':  '0.5' });
                 container.appendChild(noResults);
             }
         }
@@ -7734,7 +7743,7 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
         
         if (optionType !== 'file') {
             if (this.contextMenuPreviewEl) {
-                this.contextMenuPreviewEl.setCssStyles({ 'display': 'none' });
+                this.contextMenuPreviewEl.setCssProps({ 'display':  'none' });
             }
             return;
         }
@@ -7787,16 +7796,16 @@ queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, he
                 const menuRect = this.contextMenuEl.getBoundingClientRect();
                 const previewHeight = 250; 
 
-                this.contextMenuPreviewEl.setCssStyles({ 'position': 'fixed' });
-                this.contextMenuPreviewEl.setCssStyles({ 'left': `${menuRect.left}px` });
-                this.contextMenuPreviewEl.setCssStyles({ 'bottom': `${window.innerHeight - menuRect.top + 8}px` });
-                this.contextMenuPreviewEl.setCssStyles({ 'width': `${Math.max(menuRect.width, 400)}px` });
-                this.contextMenuPreviewEl.setCssStyles({ 'maxHeight': `${previewHeight}px` });
-                this.contextMenuPreviewEl.setCssStyles({ 'display': 'block' });
+                this.contextMenuPreviewEl.setCssProps({ 'position':  'fixed' });
+                this.contextMenuPreviewEl.setCssProps({ 'left':  `${menuRect.left}px` });
+                this.contextMenuPreviewEl.setCssProps({ 'bottom':  `${window.innerHeight - menuRect.top + 8}px` });
+                this.contextMenuPreviewEl.setCssProps({ 'width':  `${Math.max(menuRect.width, 400)}px` });
+                this.contextMenuPreviewEl.setCssProps({ 'max-height':  `${previewHeight}px` });
+                this.contextMenuPreviewEl.setCssProps({ 'display':  'block' });
             }
         } catch (error) {
                         if (this.contextMenuPreviewEl) {
-                this.contextMenuPreviewEl.setCssStyles({ 'display': 'none' });
+                this.contextMenuPreviewEl.setCssProps({ 'display':  'none' });
             }
         }
     }
@@ -7921,12 +7930,12 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     const toggleContainer = document.createElement('div');
                     toggleContainer.className = 'vault-citation-toggle-container';
-                    toggleContainer.setCssStyles({ 'cssText': 'margin-left: auto; display: flex; align-items: center; gap: 10px;' });
+                    toggleContainer.setCssProps({ 'css-text':  'margin-left: auto; display: flex; align-items: center; gap: 10px;' });
 
                     
                     const toggleLabel = document.createElement('span');
                     toggleLabel.textContent = 'Citations';
-                    toggleLabel.setCssStyles({ 'cssText': 'font-size: 0.85em; color: var(--text-muted);' });
+                    toggleLabel.setCssProps({ 'css-text':  'font-size: 0.85em; color: var(--text-muted);' });
 
                     const toggleSwitch = document.createElement('input');
                     toggleSwitch.type = 'checkbox';
@@ -7945,7 +7954,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     toggleContainer.appendChild(toggleSwitch);
                     item.appendChild(toggleContainer);
 
-                    item.setCssStyles({ 'cssText': 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
+                    item.setCssProps({ 'css-text':  'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
                 } else if (opt.hasToggle && opt.value === '@flash ') {
                     
                     const labelSpan = document.createElement('span');
@@ -7954,11 +7963,11 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     const toggleContainer = document.createElement('div');
                     toggleContainer.className = 'flash-citation-toggle-container';
-                    toggleContainer.setCssStyles({ 'cssText': 'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
+                    toggleContainer.setCssProps({ 'css-text':  'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
 
                     const toggleLabel = document.createElement('span');
                     toggleLabel.textContent = 'Citations';
-                    toggleLabel.setCssStyles({ 'cssText': 'font-size: 0.85em; color: var(--text-muted);' });
+                    toggleLabel.setCssProps({ 'css-text':  'font-size: 0.85em; color: var(--text-muted);' });
 
                     const toggleSwitch = document.createElement('input');
                     toggleSwitch.type = 'checkbox';
@@ -7977,12 +7986,12 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     toggleContainer.appendChild(toggleSwitch);
                     item.appendChild(toggleContainer);
 
-                    item.setCssStyles({ 'cssText': 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
+                    item.setCssProps({ 'css-text':  'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
                     /* TEMPORARILY DISABLED - @agent mode
                     } else if (opt.hasToggle && opt.value === '@agent ') {
                         
                         const labelContainer = document.createElement('div');
-                        labelContainer.setCssStyles({ 'cssText': 'display: flex; align-items: center; gap: 6px;' });
+                        labelContainer.setCssProps({ 'css-text':  'display: flex; align-items: center; gap: 6px;' });
                         
                         const labelSpan = document.createElement('span');
                         labelSpan.textContent = opt.label;
@@ -7993,7 +8002,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                             const badgeSpan = document.createElement('span');
                             badgeSpan.className = 'feature-badge beta-badge';
                             badgeSpan.textContent = opt.badge;
-                            badgeSpan.setCssStyles({ 'cssText': 'padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;' });
+                            badgeSpan.setCssProps({ 'css-text':  'padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;' });
                             labelContainer.appendChild(badgeSpan);
                         }
                         
@@ -8001,11 +8010,11 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                         
                         const toggleContainer = document.createElement('div');
                         toggleContainer.className = 'agent-ratelimit-toggle-container';
-                        toggleContainer.setCssStyles({ 'cssText': 'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
+                        toggleContainer.setCssProps({ 'css-text':  'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
                         
                         const toggleLabel = document.createElement('span');
                         toggleLabel.textContent = 'Rate Limit';
-                        toggleLabel.setCssStyles({ 'cssText': 'font-size: 0.85em; color: var(--text-muted);' });
+                        toggleLabel.setCssProps({ 'css-text':  'font-size: 0.85em; color: var(--text-muted);' });
                         
                         const toggleSwitch = document.createElement('input');
                         toggleSwitch.type = 'checkbox';
@@ -8024,7 +8033,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                         toggleContainer.appendChild(toggleSwitch);
                         item.appendChild(toggleContainer);
                         
-                        item.setCssStyles({ 'cssText': 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
+                        item.setCssProps({ 'css-text':  'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
                     */ 
                 } else if (opt.hasToggle && opt.value === '@mcp ') {
                     
@@ -8034,11 +8043,11 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     const toggleContainer = document.createElement('div');
                     toggleContainer.className = 'mcp-ratelimit-toggle-container';
-                    toggleContainer.setCssStyles({ 'cssText': 'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
+                    toggleContainer.setCssProps({ 'css-text':  'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
 
                     const toggleLabel = document.createElement('span');
                     toggleLabel.textContent = 'Delay Limit';
-                    toggleLabel.setCssStyles({ 'cssText': 'font-size: 0.85em; color: var(--text-muted);' });
+                    toggleLabel.setCssProps({ 'css-text':  'font-size: 0.85em; color: var(--text-muted);' });
 
                     const toggleSwitch = document.createElement('input');
                     toggleSwitch.type = 'checkbox';
@@ -8057,7 +8066,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     toggleContainer.appendChild(toggleSwitch);
                     item.appendChild(toggleContainer);
 
-                    item.setCssStyles({ 'cssText': 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
+                    item.setCssProps({ 'css-text':  'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
                 } else {
                     item.textContent = opt.label;
                 }
@@ -8379,7 +8388,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 } else if (page === 0) {
                     sessionList.createDiv({ cls: 'no-sessions-message', text: 'No sessions yet.' });
                 }
-                paginationDiv.setCssStyles({ 'display': 'none' });
+                paginationDiv.setCssProps({ 'display':  'none' });
             } else {
                 
                 const fragment = document.createDocumentFragment();
@@ -8456,10 +8465,10 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                 
                 if (totalSessions > pageSize) {
-                    paginationDiv.setCssStyles({ 'display': 'flex' });
+                    paginationDiv.setCssProps({ 'display':  'flex' });
                     updatePagination();
                 } else {
-                    paginationDiv.setCssStyles({ 'display': 'none' });
+                    paginationDiv.setCssProps({ 'display':  'none' });
                 }
             }
         };
@@ -8799,7 +8808,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         });
 
         
-        capsule.setCssStyles({ 'display': 'flex' });
+        capsule.setCssProps({ 'display':  'flex' });
     }
 
     private reconstructActionData(savedActionData: any): any {
@@ -10556,7 +10565,7 @@ ${jsonContent}
 
                     for (const uri of resourceUris) {
                         try {
-                            const resourceData = await this.plugin.mcpService.readResource(serverId, uri);
+                            const resourceData = (await this.plugin.mcpService.readResource(serverId, uri)) as MCPResourceReadResult;
                             mcpContext += `\n--- ${uri} ---\n`;
 
                             if (resourceData.contents) {
@@ -11009,7 +11018,7 @@ class CodeCanvasModal extends Modal {
         setIcon(saveIcon, 'save');
         saveBtn.createSpan({ text: 'Save' });
         saveBtn.setAttribute('aria-label', 'Save changes to response');
-        saveBtn.setCssStyles({ 'display': 'none' });
+        saveBtn.setCssProps({ 'display':  'none' });
 
         const codeArea = codePanel.createEl('textarea', { cls: 'code-canvas-editor' });
         codeArea.value = this.code;
@@ -11047,17 +11056,17 @@ class CodeCanvasModal extends Modal {
                     iframe.className = 'code-exec-iframe code-canvas-iframe';
                     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
                     iframe.srcdoc = result.htmlContent;
-                    previewArea.setCssStyles({ 'padding': '0' });
+                    previewArea.setCssProps({ 'padding':  '0' });
                     previewArea.appendChild(iframe);
                     const onMsg = (e: MessageEvent) => {
                         if (e.data?.iframeHeight) {
-                            iframe.setCssStyles({ 'height': e.data.iframeHeight + 'px' });
+                            iframe.setCssProps({ 'height':  e.data.iframeHeight + 'px' });
                             window.removeEventListener('message', onMsg);
                         }
                     };
                     window.addEventListener('message', onMsg);
                 } else if (result.isMarkdown && result.markdownContent) {
-                    previewArea.setCssStyles({ 'padding': '' });
+                    previewArea.setCssProps({ 'padding':  '' });
                     { const _comp = new Component();
                     await MarkdownRenderer.render(this.app, result.markdownContent, previewArea, '', _comp);
                     _comp.load(); }
@@ -11081,7 +11090,7 @@ class CodeCanvasModal extends Modal {
         codeArea.addEventListener('input', () => {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(render, 600);
-            saveBtn.setCssStyles({ 'display': codeArea.value !== this.code ? '' : 'none' });
+            saveBtn.setCssProps({ 'display':  codeArea.value !== this.code ? '' : 'none' });
             if (this.onUpdate) this.onUpdate(codeArea.value);
         });
 
@@ -11089,7 +11098,7 @@ class CodeCanvasModal extends Modal {
             const newCode = codeArea.value;
             if (this.onSave) this.onSave(newCode);
             this.code = newCode;
-            saveBtn.setCssStyles({ 'display': 'none' });
+            saveBtn.setCssProps({ 'display':  'none' });
             setIcon(saveIcon, 'check');
             setTimeout(() => setIcon(saveIcon, 'save'), 1500);
         });
@@ -11130,7 +11139,7 @@ class CodeCanvasModal extends Modal {
         setIcon(saveIcon, 'save');
         saveBtn.createSpan({ text: 'Save' });
         saveBtn.setAttribute('aria-label', 'Save changes to response');
-        saveBtn.setCssStyles({ 'display': 'none' });
+        saveBtn.setCssProps({ 'display':  'none' });
 
         const codeArea = codePanel.createEl('textarea', { cls: 'code-canvas-editor' });
         codeArea.value = this.code;
@@ -11177,7 +11186,7 @@ class CodeCanvasModal extends Modal {
                 outputArea.appendChild(iframe);
                 const onMsg = (e: MessageEvent) => {
                     if (e.data?.iframeHeight && iframe.isConnected) {
-                        iframe.setCssStyles({ 'height': e.data.iframeHeight + 'px' });
+                        iframe.setCssProps({ 'height':  e.data.iframeHeight + 'px' });
                         window.removeEventListener('message', onMsg);
                     }
                 };
@@ -11201,7 +11210,7 @@ class CodeCanvasModal extends Modal {
         runBtn.addEventListener('click', run);
 
         codeArea.addEventListener('input', () => {
-            saveBtn.setCssStyles({ 'display': codeArea.value !== this.code ? '' : 'none' });
+            saveBtn.setCssProps({ 'display':  codeArea.value !== this.code ? '' : 'none' });
             if (this.onUpdate) this.onUpdate(codeArea.value);
         });
 
@@ -11209,7 +11218,7 @@ class CodeCanvasModal extends Modal {
             const newCode = codeArea.value;
             if (this.onSave) this.onSave(newCode);
             this.code = newCode;
-            saveBtn.setCssStyles({ 'display': 'none' });
+            saveBtn.setCssProps({ 'display':  'none' });
             setIcon(saveIcon, 'check');
             setTimeout(() => setIcon(saveIcon, 'save'), 1500);
         });

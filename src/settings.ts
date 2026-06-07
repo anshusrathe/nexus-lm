@@ -4,6 +4,10 @@ import { ModelLatencyModal } from './modals/modelLatencyModal';
 import { CustomProviderModal } from './modals/customProviderModal';
 import { MCPRegistryEntry } from './mcp/mcpRegistry';
 import { validateNvidiaApiKey } from './services/nvidiaService';
+import { ParsedFeedEntry } from './parsing/feedParsing';
+import { SavedConceptMap } from './tools/createConceptMaps';
+import { SavedSlideshow } from './tools/createSlides';
+import type AIPlugin from './main';
 
 // Move Provider type directly into settings.ts
 export type Provider = 'gemini' | 'groq' | 'openrouter' | 'opencode' | 'ollama' | 'nvidia' | (string & {});
@@ -99,7 +103,7 @@ export interface AISettings {
   // Kept for backward compatibility and as fallback when API headers are unavailable
   modelTokenLimits: Record<string, number>;
   embeddingFolderPath: string;
-  bookmarkedEntries: any[]; // New setting for bookmarked feed entries; type fixed from ParsedFeedEntry to any
+  bookmarkedEntries: ParsedFeedEntry[]; // New setting for bookmarked feed entries; type fixed from ParsedFeedEntry to any
   customModels: CustomModel[]; // New setting for custom models
   modelCache: { // Cache for dynamically fetched models
     gemini?: CustomModel[];
@@ -175,8 +179,8 @@ export interface AISettings {
   chatWallpaperHeaderOpacity: number; // Opacity of header/input with liquid glass (0-1)
   chatWallpaperEnabled: boolean; // Whether wallpaper is enabled
   customProviders: CustomProviderConfig[]; // New setting for custom providers
-  savedConceptMaps: any[];
-  savedSlideshows: any[];
+  savedConceptMaps: SavedConceptMap[];
+  savedSlideshows: SavedSlideshow[];
 }
 
 export const DEFAULT_SETTINGS: AISettings = {
@@ -685,7 +689,7 @@ function isGemini3Model(modelId: string): boolean {
   return modelId.startsWith('gemini-3');
 }
 
-export function getGeminiThinkingConfig(modelId: string, settings: AISettings): { thinkingConfig: any } | undefined {
+export function getGeminiThinkingConfig(modelId: string, settings: AISettings): { thinkingConfig: Record<string, unknown> } | undefined {
   if (!settings.enableThinkingMode || !modelId.startsWith('gemini')) return undefined;
 
   if (isGemini25Model(modelId)) {
@@ -979,7 +983,7 @@ export class AISettingTab extends PluginSettingTab {
   private expandedSections: Set<string> = new Set();
   constructor(
     app: App,
-    private plugin: any  // Change type to any to break circular dependency
+    private plugin: AIPlugin
   ) {
     super(app, plugin);
   }
@@ -1246,23 +1250,14 @@ await this.plugin.saveSettings();
     else apiKeyUrl = 'https://aistudio.google.com/app/apikey';
 
     // Style the control element to stack items vertically and align to the right
-    apiSetting.controlEl.setCssStyles({
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'flex-end'
+    apiSetting.controlEl.setCssProps({ 'display': 'flex', 'flex-direction': 'column', 'align-items': 'flex-end'
     });
 
     const linkContainer = apiSetting.controlEl.createDiv({
       cls: 'setting-item-description'
     });
     
-    linkContainer.setCssStyles({
-      maxWidth: '200px',
-      textAlign: 'right',
-      marginTop: '4px',
-      lineHeight: '1.2',
-      whiteSpace: 'normal',
-      wordBreak: 'break-word'
+    linkContainer.setCssProps({ 'max-width': '200px', 'text-align': 'right', 'margin-top': '4px', 'line-height': '1.2', 'white-space': 'normal', 'word-break': 'break-word'
     });
 
     linkContainer.createEl('a', {
@@ -1533,9 +1528,9 @@ await this.plugin.saveSettings();
     const headerSetting = new Setting(headerEl).setName(type === 'embedding' ? 'Embedding indexes' : 'BM25 indexes').setHeading();
     
     // Ensure the setting item takes full width and has no extra padding
-    headerSetting.settingEl.setCssStyles({ width: '100%' });
-    headerSetting.settingEl.setCssStyles({ borderTop: 'none' });
-    headerSetting.settingEl.setCssStyles({ padding: '0' });
+    headerSetting.settingEl.setCssProps({ 'width': '100%' });
+    headerSetting.settingEl.setCssProps({ 'border-top': 'none' });
+    headerSetting.settingEl.setCssProps({ 'padding': '0' });
 
     if (type === 'embedding') {
       headerSetting.addButton(btn => {
@@ -1544,7 +1539,7 @@ await this.plugin.saveSettings();
            .onClick(() => this.showAddIndexDialog('embedding'));
         btn.buttonEl.addClass('mod-cta');
         // Add some horizontal padding to make the plus look better
-        btn.buttonEl.setCssStyles({ padding: '0 10px' });
+        btn.buttonEl.setCssProps({ 'padding': '0 10px' });
       });
     }
 
@@ -1975,16 +1970,16 @@ await this.plugin.saveSettings();
     });
     // Results rendered inline (not absolute) to avoid clipping inside scrollable modal
     const searchResults = pickerEl.createDiv({ cls: 'index-excl-search-results' });
-    searchResults.setCssStyles({ display: 'none' });
+    searchResults.setCssProps({ 'display': 'none' });
 
     const allMdFiles = this.app.vault.getMarkdownFiles().map(f => f.path).sort();
 
     const renderSearchResults = (query: string) => {
       searchResults.empty();
-      if (!query.trim()) { searchResults.setCssStyles({ display: 'none' }); return; }
+      if (!query.trim()) { searchResults.setCssProps({ 'display': 'none' }); return; }
       const matches = allMdFiles.filter(p => p.toLowerCase().includes(query.toLowerCase())).slice(0, 20);
-      if (matches.length === 0) { searchResults.setCssStyles({ display: 'none' }); return; }
-      searchResults.setCssStyles({ display: 'block' });
+      if (matches.length === 0) { searchResults.setCssProps({ 'display': 'none' }); return; }
+      searchResults.setCssProps({ 'display': 'block' });
       for (const path of matches) {
         const item = searchResults.createDiv({ cls: 'index-excl-search-item' });
         const cb = item.createEl('input', { type: 'checkbox' });
@@ -2012,8 +2007,8 @@ await this.plugin.saveSettings();
     const folderListEl = pickerEl.createDiv({ cls: 'index-excl-folder-list' });
 
     // Use vault.getAllFolders() for reliable folder enumeration
-    const allFolders = (this.app.vault as any).getAllFolders
-      ? (this.app.vault as any).getAllFolders().map((f: any) => f.path).filter((p: string) => p !== '').sort()
+    const allFolders = (this.app.vault as unknown as any).getAllFolders
+      ? (this.app.vault as unknown as any).getAllFolders().map((f: any) => f.path).filter((p: string) => p !== '').sort()
       : this.app.vault.getAllLoadedFiles()
           .filter((f: any) => f.children !== undefined && f.path !== '')
           .map((f: any) => f.path)
@@ -2029,7 +2024,7 @@ await this.plugin.saveSettings();
         const selectAllCb = selectAllItem.createEl('input', { type: 'checkbox' });
         selectAllCb.checked = allPaths.every(p => pendingFolders.includes(p));
         const selectAllLabel = selectAllItem.createEl('span', { cls: 'index-excl-folder-label', text: 'Select All' });
-        selectAllLabel.setCssStyles({ fontWeight: 'bold' });
+        selectAllLabel.setCssProps({ 'font-weight': 'bold' });
 
         selectAllCb.addEventListener('change', () => {
           if (selectAllCb.checked) {
@@ -2423,13 +2418,13 @@ await this.plugin.saveSettings();
              this.plugin.settings.saveYoutubeTranscripts = val;
              await this.plugin.saveSettings();
              // Show/hide folder setting based on toggle
-             folderSetting.settingEl.setCssStyles({ display: val ? '' : 'none' });
+             folderSetting.settingEl.setCssProps({ 'display': val ? '' : 'none' });
              new Notice(`YouTube transcripts will ${val ? 'be saved as files' : 'be used internally only'}`);
            })
       );
 
     // Initially hide/show folder setting based on current toggle value
-    folderSetting.settingEl.setCssStyles({ display: (this.plugin.settings.saveYoutubeTranscripts ?? true) ? '' : 'none' });
+    folderSetting.settingEl.setCssProps({ 'display': (this.plugin.settings.saveYoutubeTranscripts ?? true) ? '' : 'none' });
 
     // Add PDF output directory setting
     new Setting(containerEl).setName('File output').setHeading();
@@ -2522,7 +2517,7 @@ if (this.validatePath(normalizedPath)) {
             // Update live - find all response views and update wallpaper
             const viewType = 'ai-tutor-response';
             this.app.workspace.getLeavesOfType(viewType).forEach(leaf => {
-              const view = leaf.view as any;
+              const view = leaf.view as unknown as any;
               if (view && typeof view.updateWallpaper === 'function') {
                 view.updateWallpaper();
               }
@@ -2548,7 +2543,7 @@ if (this.validatePath(normalizedPath)) {
             // Update live - find all response views and update wallpaper
             const viewType = 'ai-tutor-response';
             this.app.workspace.getLeavesOfType(viewType).forEach(leaf => {
-              const view = leaf.view as any;
+              const view = leaf.view as unknown as any;
               if (view && typeof view.updateWallpaper === 'function') {
                 view.updateWallpaper();
               }
@@ -2641,8 +2636,8 @@ if (this.validatePath(normalizedPath)) {
         cls: 'provider-model-count', 
         text: `${providerModels.length} models` 
       });
-      modelCount.setCssStyles({ color: 'var(--text-muted)' });
-      modelCount.setCssStyles({ fontSize: '0.85em' });
+      modelCount.setCssProps({ 'color': 'var(--text-muted)' });
+      modelCount.setCssProps({ 'font-size': '0.85em' });
 
       // Header Right: Verification Button / Spinner / Status
       const headerRight = header.createDiv({ cls: 'provider-header-right' });
@@ -2724,7 +2719,7 @@ if (this.validatePath(normalizedPath)) {
         emptyRow.createEl('td', { 
           text: 'No models added for this provider.',
           attr: { colspan: '5' }
-        }).setCssStyles({ textAlign: 'center' });
+        }).setCssProps({ 'text-align': 'center' });
       }
 
       const addBtnContainer = content.createDiv({ cls: 'provider-add-button-container' });
@@ -3028,8 +3023,8 @@ if (this.validatePath(normalizedPath)) {
         cls: 'provider-model-count', 
         text: `${providerModels.length} models` 
       });
-      modelCount.setCssStyles({ color: 'var(--text-muted)' });
-      modelCount.setCssStyles({ fontSize: '0.85em' });
+      modelCount.setCssProps({ 'color': 'var(--text-muted)' });
+      modelCount.setCssProps({ 'font-size': '0.85em' });
 
       // Header Right: Verification Button / Spinner / Status
       const headerRight = header.createDiv({ cls: 'provider-header-right' });
@@ -3099,7 +3094,7 @@ if (this.validatePath(normalizedPath)) {
         emptyRow.createEl('td', { 
           text: 'No embedding models added for this provider.',
           attr: { colspan: '4' }
-        }).setCssStyles({ textAlign: 'center' });
+        }).setCssProps({ 'text-align': 'center' });
       }
 
       const addBtnContainer = content.createDiv({ cls: 'provider-add-button-container' });
@@ -3241,7 +3236,7 @@ if (this.validatePath(normalizedPath)) {
     
     // Get all folders from vault, excluding already excluded ones
     const allFolders = this.app.vault.getAllLoadedFiles()
-      .filter(f => (f as any).children !== undefined)
+      .filter(f => (f as unknown as any).children !== undefined)
       .map(f => f.path)
       .filter(path => !this.plugin.settings.excludedFolders?.includes(path));
     
@@ -3301,7 +3296,7 @@ if (this.validatePath(normalizedPath)) {
 
     // Excluded folders list
     const foldersListSection = exclusionsContent.createDiv({ cls: 'exclusion-list-section' });
-    foldersListSection.createEl('h5', { text: 'Excluded Folders' });
+    new Setting(foldersListSection).setName('Excluded Folders').setHeading();
     const foldersList = foldersListSection.createDiv({ cls: 'exclusion-list' });
     
     const excludedFolders: string[] = this.plugin.settings.excludedFolders || [];
@@ -3326,7 +3321,7 @@ if (this.validatePath(normalizedPath)) {
 
     // Excluded files list
     const filesListSection = exclusionsContent.createDiv({ cls: 'exclusion-list-section' });
-    filesListSection.createEl('h5', { text: 'Excluded Files' });
+    new Setting(filesListSection).setName('Excluded Files').setHeading();
     const filesList = filesListSection.createDiv({ cls: 'exclusion-list' });
     
     const excludedFiles: string[] = this.plugin.settings.excludedFiles || [];
@@ -3367,7 +3362,7 @@ if (this.validatePath(normalizedPath)) {
       selectedIndex = -1;
 
       if (query.length === 0) {
-        suggestionsEl.setCssStyles({ display: 'none' });
+        suggestionsEl.setCssProps({ 'display': 'none' });
         return;
       }
 
@@ -3376,18 +3371,18 @@ if (this.validatePath(normalizedPath)) {
         .slice(0, 10); // Limit to 10 suggestions
 
       if (matches.length === 0) {
-        suggestionsEl.setCssStyles({ display: 'none' });
+        suggestionsEl.setCssProps({ 'display': 'none' });
         return;
       }
 
-      suggestionsEl.setCssStyles({ display: 'block' });
+      suggestionsEl.setCssProps({ 'display': 'block' });
       matches.forEach((match, idx) => {
         const suggestion = suggestionsEl.createDiv({ cls: 'autocomplete-suggestion' });
         suggestion.textContent = match;
         suggestion.addEventListener('click', () => {
           onSelect(match);
           input.value = '';
-          suggestionsEl.setCssStyles({ display: 'none' });
+          suggestionsEl.setCssProps({ 'display': 'none' });
         });
         suggestion.addEventListener('mouseenter', () => {
           selectedIndex = idx;
@@ -3413,16 +3408,16 @@ if (this.validatePath(normalizedPath)) {
         const selected = suggestions[selectedIndex] as HTMLElement;
         onSelect(selected.textContent || '');
         input.value = '';
-        suggestionsEl.setCssStyles({ display: 'none' });
+        suggestionsEl.setCssProps({ 'display': 'none' });
       } else if (e.key === 'Escape') {
-        suggestionsEl.setCssStyles({ display: 'none' });
+        suggestionsEl.setCssProps({ 'display': 'none' });
       }
     });
 
     input.addEventListener('blur', () => {
       // Delay to allow click on suggestion
       setTimeout(() => {
-        suggestionsEl.setCssStyles({ display: 'none' });
+        suggestionsEl.setCssProps({ 'display': 'none' });
       }, 200);
     });
   }
@@ -3522,7 +3517,7 @@ if (this.validatePath(normalizedPath)) {
             return;
           }
           // Use Node's child_process — available in Electron/Obsidian desktop
-          const { execSync } = (window as any).require('child_process') as typeof import('child_process');
+          const { execSync } = (window as unknown as any).require('child_process') as typeof import('child_process');
           const version = execSync(cmd, { timeout: 5000, encoding: 'utf8' }).trim();
 
           statusEl.textContent = `✅ Installed — ${version}`;
@@ -3538,8 +3533,8 @@ if (this.validatePath(normalizedPath)) {
 
           // Fade out and remove the card after a short delay
           setTimeout(() => {
-            card.setCssStyles({ transition: 'opacity 0.4s' });
-            card.setCssStyles({ opacity: '0' });
+            card.setCssProps({ 'transition': 'opacity 0.4s' });
+            card.setCssProps({ 'opacity': '0' });
             setTimeout(() => {
               card.remove();
               // If all cards gone, remove the whole wrapper
@@ -3602,9 +3597,9 @@ if (this.validatePath(normalizedPath)) {
         text: 'No MCP servers configured. Click "Add MCP Server" to get started.',
         attr: { colspan: '6' }
       });
-      emptyCell.setCssStyles({ textAlign: 'center' });
-      emptyCell.setCssStyles({ fontStyle: 'italic' });
-      emptyCell.setCssStyles({ color: 'var(--text-muted)' });
+      emptyCell.setCssProps({ 'text-align': 'center' });
+      emptyCell.setCssProps({ 'font-style': 'italic' });
+      emptyCell.setCssProps({ 'color': 'var(--text-muted)' });
     }
     
     // Add new server button
@@ -3626,8 +3621,8 @@ if (this.validatePath(normalizedPath)) {
     // Transport cell
     const transportCell = row.createEl('td');
     transportCell.setText(server.transport.toUpperCase());
-    transportCell.setCssStyles({ fontWeight: '600' });
-    transportCell.setCssStyles({ fontSize: '0.85em' });
+    transportCell.setCssProps({ 'font-weight': '600' });
+    transportCell.setCssProps({ 'font-size': '0.85em' });
     
     // Command/URL cell
     const commandCell = row.createEl('td');
@@ -3636,10 +3631,10 @@ if (this.validatePath(normalizedPath)) {
     } else {
       commandCell.setText(server.url || '');
     }
-    commandCell.setCssStyles({ fontFamily: 'monospace' });
-    commandCell.setCssStyles({ fontSize: '0.9em' });
-    commandCell.setCssStyles({ wordBreak: 'break-all' });
-    commandCell.setCssStyles({ whiteSpace: 'normal' });
+    commandCell.setCssProps({ 'font-family': 'monospace' });
+    commandCell.setCssProps({ 'font-size': '0.9em' });
+    commandCell.setCssProps({ 'word-break': 'break-all' });
+    commandCell.setCssProps({ 'white-space': 'normal' });
     
     // Arguments cell
     const argsCell = row.createEl('td');
@@ -3648,10 +3643,10 @@ if (this.validatePath(normalizedPath)) {
     } else {
       argsCell.setText(server.apiKey ? '🔑 API Key Set' : '-');
     }
-    argsCell.setCssStyles({ fontFamily: 'monospace' });
-    argsCell.setCssStyles({ fontSize: '0.9em' });
-    argsCell.setCssStyles({ wordBreak: 'break-all' });
-    argsCell.setCssStyles({ whiteSpace: 'normal' });
+    argsCell.setCssProps({ 'font-family': 'monospace' });
+    argsCell.setCssProps({ 'font-size': '0.9em' });
+    argsCell.setCssProps({ 'word-break': 'break-all' });
+    argsCell.setCssProps({ 'white-space': 'normal' });
     
     // Status cell
     const statusCell = row.createEl('td');
@@ -3662,8 +3657,8 @@ if (this.validatePath(normalizedPath)) {
     
     // Actions cell
     const actionsCell = row.createEl('td');
-    actionsCell.setCssStyles({ display: 'flex' });
-    actionsCell.setCssStyles({ gap: '8px' });
+    actionsCell.setCssProps({ 'display': 'flex' });
+    actionsCell.setCssProps({ 'gap': '8px' });
     
     // Edit button
     const editBtn = actionsCell.createEl('button', { 
@@ -3980,10 +3975,10 @@ class MCPServerModal extends Modal {
     
     // Buttons
     const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
-    buttonContainer.setCssStyles({ display: 'flex' });
-    buttonContainer.setCssStyles({ justifyContent: 'flex-end' });
-    buttonContainer.setCssStyles({ gap: '8px' });
-    buttonContainer.setCssStyles({ marginTop: '16px' });
+    buttonContainer.setCssProps({ 'display': 'flex' });
+    buttonContainer.setCssProps({ 'justify-content': 'flex-end' });
+    buttonContainer.setCssProps({ 'gap': '8px' });
+    buttonContainer.setCssProps({ 'margin-top': '16px' });
     
     const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
     cancelBtn.addEventListener('click', () => this.close());
@@ -3994,19 +3989,19 @@ class MCPServerModal extends Modal {
 
   private updateViewMode(): void {
     if (this.isSchemaView) {
-      this.fieldsContainer.setCssStyles({ display: 'none' });
-      this.schemaContainer.setCssStyles({ display: 'block' });
+      this.fieldsContainer.setCssProps({ 'display': 'none' });
+      this.schemaContainer.setCssProps({ 'display': 'block' });
       
       // Try to populate schema from fields if empty or just switched
       const currentConfig = this.getCurrentConfigFromFields();
       if (currentConfig) {
         // Strip out ID and disabled state for cleaner schema view
-        const { id, disabled, name, ...schemaFields } = currentConfig as any;
+        const { id, disabled, name, ...schemaFields } = currentConfig as unknown as any;
         this.schemaInput.value = JSON.stringify(schemaFields, null, 2);
       }
     } else {
-      this.fieldsContainer.setCssStyles({ display: 'block' });
-      this.schemaContainer.setCssStyles({ display: 'none' });
+      this.fieldsContainer.setCssProps({ 'display': 'block' });
+      this.schemaContainer.setCssProps({ 'display': 'none' });
       
       // Try to populate fields from schema if schema was edited
       this.syncFieldsFromSchema();
@@ -4089,11 +4084,11 @@ class MCPServerModal extends Modal {
 
   private updateTransportFields(transport: 'stdio' | 'sse'): void {
     if (transport === 'stdio') {
-      this.stdioContainer.setCssStyles({ display: 'block' });
-      this.sseContainer.setCssStyles({ display: 'none' });
+      this.stdioContainer.setCssProps({ 'display': 'block' });
+      this.sseContainer.setCssProps({ 'display': 'none' });
     } else {
-      this.stdioContainer.setCssStyles({ display: 'none' });
-      this.sseContainer.setCssStyles({ display: 'block' });
+      this.stdioContainer.setCssProps({ 'display': 'none' });
+      this.sseContainer.setCssProps({ 'display': 'block' });
     }
   }
 

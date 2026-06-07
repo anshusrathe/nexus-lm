@@ -104,8 +104,9 @@ export class GeminiFileAPIService {
                 fileName: file.name
             };
 
-        } catch (error: any) {
-                        new Notice(`Failed to upload ${file.name}: ${error.message}`);
+        } catch (error: unknown) {
+            const err = error as { message?: string };
+            new Notice(`Failed to upload ${file.name}: ${err.message || 'Unknown error'}`);
             return null;
         }
     }

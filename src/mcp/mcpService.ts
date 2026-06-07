@@ -1,9 +1,9 @@
 import { Notice, requestUrl, Platform } from 'obsidian';
 
 
-const child_process = (!Platform.isMobile && (window as any).require) ? (window as any).require('child_process') : null;
+const child_process = (!Platform.isMobile && (window as unknown as any).require) ? (window as unknown as any).require('child_process') : null;
 const spawn = child_process?.spawn;
-type ChildProcess = any; 
+type ChildProcess = import('child_process').ChildProcess; 
 
 function spawnMCPProcess(
     command: string,
@@ -79,7 +79,7 @@ export interface MCPServerConfig {
 export interface MCPTool {
     name: string;
     description?: string;
-    inputSchema: any;
+    inputSchema: Record<string, unknown>;
 }
 
 export interface MCPResource {
@@ -92,14 +92,14 @@ export interface MCPResource {
 interface MCPServerConnection {
     config: MCPServerConfig;
     process?: ChildProcess; 
-    eventSource?: any; 
+    eventSource?: unknown; 
     tools: MCPTool[];
     resources: MCPResource[];
     connected: boolean;
     messageId: number;
     pendingRequests: Map<number, {
-        resolve: (value: any) => void;
-        reject: (error: any) => void;
+        resolve: (value: unknown) => void;
+        reject: (error: Error) => void;
     }>;
     buffer: string;
     
@@ -460,7 +460,7 @@ export class MCPService {
     /**
      * Send JSON-RPC request to MCP server
      */
-    private async sendRequest(serverId: string, method: string, params?: any): Promise<any> {
+    private async sendRequest(serverId: string, method: string, params?: Record<string, unknown>): Promise<unknown> {
         const connection = this.servers.get(serverId);
         if (!connection) {
             throw new Error(`MCP server ${serverId} not connected`);
@@ -551,7 +551,7 @@ export class MCPService {
      *
      * @param urlOverride - use this URL instead of config.url (for stdio+streamUrl mode)
      */
-    private async sendSSERequest(connection: MCPServerConnection, request: any, urlOverride?: string): Promise<any> {
+    private async sendSSERequest(connection: MCPServerConnection, request: Record<string, unknown>, urlOverride?: string): Promise<unknown> {
         const config = connection.config;
         const url = urlOverride || config.url;
         if (!url) {
@@ -607,7 +607,7 @@ export class MCPService {
 
             
             if (contentType.includes('text/event-stream')) {
-                                return this.parseSSEBody(response.text, request.id, config.name);
+                                return this.parseSSEBody(response.text, request.id as number, config.name);
             }
 
             
@@ -629,10 +629,10 @@ export class MCPService {
      * Parse an SSE response body (received as a complete string via requestUrl).
      * Extracts the JSON-RPC result matching the given requestId.
      */
-    private parseSSEBody(body: string, requestId: number, serverName: string): any {
-        let result: any = null;
+    private parseSSEBody(body: string, requestId: number, serverName: string): unknown {
+        let result: unknown = null;
         let hasError = false;
-        let errorObj: any = null;
+        let errorObj: Record<string, unknown> | null = null;
 
         const lines = body.split('\n');
         let currentEvent = '';
@@ -664,7 +664,8 @@ export class MCPService {
         }
 
         if (hasError && errorObj) {
-            throw new Error(errorObj.message || `MCP Error (code ${errorObj.code})`);
+            const msg = (errorObj.message as string | undefined) || `MCP Error (code ${errorObj.code})`;
+            throw new Error(msg);
         }
         if (result === null) {
             throw new Error('No response received from SSE stream');
@@ -715,8 +716,8 @@ export class MCPService {
         if (!connection) return;
 
         try {
-            const result = await this.sendRequest(serverId, 'tools/list');
-            connection.tools = result.tools || [];
+            const result = await this.sendRequest(serverId, 'tools/list') as Record<string, unknown>;
+            connection.tools = (result.tools as MCPTool[]) || [];
                     } catch (error) {
                         connection.tools = [];
         }
@@ -730,8 +731,8 @@ export class MCPService {
         if (!connection) return;
 
         try {
-            const result = await this.sendRequest(serverId, 'resources/list');
-            connection.resources = result.resources || [];
+            const result = await this.sendRequest(serverId, 'resources/list') as Record<string, unknown>;
+            connection.resources = (result.resources as MCPResource[]) || [];
                     } catch (error) {
             
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -762,7 +763,7 @@ export class MCPService {
     /**
      * Invoke a tool on a specific MCP server
      */
-    async invokeTool(serverId: string, toolName: string, args: any): Promise<any> {
+    async invokeTool(serverId: string, toolName: string, args: Record<string, unknown>): Promise<unknown> {
         const connection = this.servers.get(serverId);
         if (!connection || !connection.connected) {
             throw new Error(`MCP server ${serverId} not connected`);
@@ -784,7 +785,7 @@ export class MCPService {
     /**
      * Read a resource from a specific MCP server
      */
-    async readResource(serverId: string, uri: string): Promise<any> {
+    async readResource(serverId: string, uri: string): Promise<unknown> {
         const connection = this.servers.get(serverId);
         if (!connection || !connection.connected) {
             throw new Error(`MCP server ${serverId} not connected`);
@@ -815,7 +816,7 @@ export class MCPService {
                 connection.process.kill();
             }
             if (connection.eventSource) {
-                connection.eventSource.close();
+                (connection.eventSource as unknown as any).close();
             }
         } catch (error) {
                     }
@@ -829,6 +830,22 @@ export class MCPService {
     async disconnectAll(): Promise<void> {
         const serverIds = Array.from(this.servers.keys());
         await Promise.all(serverIds.map(id => this.disconnectServer(id)));
+    }
+
+    /**
+     * Get the name of a specific server
+     */
+    getServerName(serverId: string): string | null {
+        const connection = this.servers.get(serverId);
+        return connection?.config.name || null;
+    }
+
+    /**
+     * Get a connected server config by its ID
+     */
+    getConnectedServerById(serverId: string): MCPServerConfig | null {
+        const connection = this.servers.get(serverId);
+        return (connection && connection.connected) ? connection.config : null;
     }
 
     /**

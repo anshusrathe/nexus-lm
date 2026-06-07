@@ -76,7 +76,7 @@ export class CombinedFeedView extends ItemView {
     
     private async fetchAndRenderCombinedFeeds(): Promise<void> {
         if (this.loadingIndicator) {
-            this.loadingIndicator.setCssStyles({ 'display': 'block' }); 
+            this.loadingIndicator.setCssProps({ 'display':  'block' }); 
             this.entriesContainer?.empty(); 
         }
 
@@ -104,7 +104,7 @@ export class CombinedFeedView extends ItemView {
         }
 
         if (this.loadingIndicator) {
-             this.loadingIndicator.setCssStyles({ 'display': 'none' }); 
+             this.loadingIndicator.setCssProps({ 'display':  'none' }); 
         }
 
         

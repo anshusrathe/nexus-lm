@@ -149,7 +149,7 @@ export class VaultSearchAgent {
     private stopProcessing: boolean = false; 
     private lastApiCallTime: number = 0;  
     private snippetUpdateCallback: SnippetUpdateCallback; 
-    search: any;
+    search: unknown;
 
     
     private rateLimitManager: RateLimitManager;
@@ -355,7 +355,7 @@ export class VaultSearchAgent {
         query: string,
         relevantContent: VaultSearchResult[],
         enableInlineCitations: boolean = false, 
-        chatHistory: any[] = [], 
+        chatHistory: Record<string, unknown>[] = [], 
         multimodalInputs: MultimodalInput[] = [],
         systemInstructions: string = '', 
         temporalContext?: {startDate: number | null, endDate: number | null, cleanQuery: string}, 
@@ -644,7 +644,7 @@ RESPONSE QUALITY CHECKLIST:
                     const model = genAI.getGenerativeModel({ model: this.settings.model });
 
                     
-                    const chatConfig: any = {
+                    const chatConfig: Record<string, unknown> = {
                         history: chatHistory,
                         generationConfig: {
                             temperature: getModelTemperature(this.settings.model, this.settings),
@@ -655,13 +655,13 @@ RESPONSE QUALITY CHECKLIST:
                     };
                     const geminiThinkingConfig = getGeminiThinkingConfig(this.settings.model, this.settings);
                     if (geminiThinkingConfig) {
-                        chatConfig.generationConfig.thinkingConfig = geminiThinkingConfig.thinkingConfig;
+                        (chatConfig.generationConfig as Record<string, unknown>).thinkingConfig = geminiThinkingConfig.thinkingConfig;
                     }
                     
-                    const chat = model.startChat(chatConfig);
+                    const chat = model.startChat(chatConfig as unknown as any);
                     
                     
-                    const messageParts: any[] = [];
+                    const messageParts: Record<string, unknown>[] = [];
                     
                     
                     const fullPrompt = `${baseSystemInstructions}\n\nContent from notes:\n${formattedVaultContent}\n\nQuestion: ${query}`;
@@ -693,7 +693,7 @@ RESPONSE QUALITY CHECKLIST:
                         }
                     }
 
-                    const streamResult = await chat.sendMessageStream(messageParts, { signal: abortSignal });
+                    const streamResult = await chat.sendMessageStream(messageParts as unknown as any[], { signal: abortSignal });
                     for await (const chunk of streamResult.stream) {
                         if (abortSignal?.aborted || this.stopProcessing) {
                             throw new DOMException('Aborted', 'AbortError');
@@ -704,7 +704,7 @@ RESPONSE QUALITY CHECKLIST:
                         for (const part of parts) {
                             const text = typeof part?.text === 'string' ? part.text : '';
                             if (!text) continue;
-                            if ((part as any)?.thought === true) {
+                            if ((part as unknown as any)?.thought === true) {
                                 this.snippetUpdateCallback('Thinking...', text);
                             } else {
                                 finalAnswer += text;
@@ -718,8 +718,8 @@ RESPONSE QUALITY CHECKLIST:
                     }
                     
                     
-                    if ((finalResponse as any).usageMetadata) {
-                        const usage = (finalResponse as any).usageMetadata;
+                    if ((finalResponse as unknown as any).usageMetadata) {
+                        const usage = (finalResponse as unknown as any).usageMetadata;
                         totalTokens = (usage.promptTokenCount || 0) + (usage.candidatesTokenCount || 0);
                     }
                 } else if (this.settings.provider === 'groq') {
@@ -739,7 +739,7 @@ RESPONSE QUALITY CHECKLIST:
                     const modelTokenLimit = rateLimitState.limits?.tokensPerMinute || 8000;
                     const groqMessages: GroqChatMessage[] = [
                         { role: 'system', content: baseSystemInstructions },
-                        ...convertChatHistoryForGroq(chatHistory, this.settings.model, modelTokenLimit)
+                        ...convertChatHistoryForGroq(chatHistory as unknown as any[], this.settings.model, modelTokenLimit) as unknown as any[]
                     ];
                     if (formattedVaultContent) {
                         groqMessages.push({ role: 'user', content: `Content from notes:\n${formattedVaultContent}` } as GroqChatMessage);
@@ -814,7 +814,7 @@ RESPONSE QUALITY CHECKLIST:
                     const modelTokenLimit = rateLimitState.limits?.tokensPerMinute || 8000;
                     const openRouterMessages: OpenRouterChatMessage[] = [
                         { role: 'system', content: baseSystemInstructions },
-                        ...convertChatHistoryForGroq(chatHistory, this.settings.model, modelTokenLimit) as OpenRouterChatMessage[]
+                        ...convertChatHistoryForGroq(chatHistory as unknown as any[], this.settings.model, modelTokenLimit) as unknown as any[] as OpenRouterChatMessage[]
                     ];
                     if (formattedVaultContent) {
                         openRouterMessages.push({ role: 'user', content: `Content from notes:\n${formattedVaultContent}` });
@@ -837,7 +837,7 @@ RESPONSE QUALITY CHECKLIST:
                     );
                 } else if (this.settings.provider === 'ollama') {
                     
-                    const { OllamaService } = await import('../services/ollamaService');
+                    
                     const ollamaService = new OllamaService(
                         this.settings.ollamaBaseUrl,
                         this.settings.ollamaApiKey,
@@ -847,9 +847,9 @@ RESPONSE QUALITY CHECKLIST:
                     
                     const rateLimitState = this.rateLimitManager.getState(this.settings.provider, this.settings.model);
                     const modelTokenLimit = rateLimitState.limits?.tokensPerMinute || 8000;
-                    const ollamaMessages: any[] = [
+                    const ollamaMessages: Record<string, unknown>[] = [
                         { role: 'system', content: baseSystemInstructions },
-                        ...convertChatHistoryForGroq(chatHistory, this.settings.model, modelTokenLimit)
+                        ...(convertChatHistoryForGroq(chatHistory as unknown as any[], this.settings.model, modelTokenLimit) as unknown as any[] as unknown as any[])
                     ];
                     if (formattedVaultContent) {
                         ollamaMessages.push({ role: 'user', content: `Content from notes:\n${formattedVaultContent}` });
@@ -865,7 +865,7 @@ RESPONSE QUALITY CHECKLIST:
                     
                     if (ollamaThinkOption) {
                         let contentBuffer = '';
-                        await (ollamaService as any).generateContentStreamEvents(
+                        await (ollamaService as unknown as any).generateContentStreamEvents(
                             this.settings.model,
                             ollamaMessages,
                             (evt: any) => {
@@ -888,7 +888,7 @@ RESPONSE QUALITY CHECKLIST:
                     } else {
                         
                         let contentBuffer = '';
-                        await (ollamaService as any).generateContentStream(
+                        await (ollamaService as unknown as any).generateContentStream(
                             this.settings.model,
                             ollamaMessages,
                             (chunk: string) => {
@@ -917,7 +917,7 @@ RESPONSE QUALITY CHECKLIST:
                     const modelTokenLimit = rateLimitState.limits?.tokensPerMinute || 8000;
                     const nvidiaMessages: NvidiaChatMessage[] = [
                         { role: 'system', content: baseSystemInstructions },
-                        ...(convertChatHistoryForGroq(chatHistory, this.settings.model, modelTokenLimit) as any[])
+                        ...(convertChatHistoryForGroq(chatHistory as unknown as any[], this.settings.model, modelTokenLimit) as unknown as any[] as unknown as any[])
                     ];
                     if (formattedVaultContent) {
                         nvidiaMessages.push({ role: 'user', content: `Content from notes:\n${formattedVaultContent}` } as NvidiaChatMessage);
@@ -958,14 +958,14 @@ RESPONSE QUALITY CHECKLIST:
                 } else if (UnifiedProviderManager.getInstance().hasProvider(this.settings.provider)) {
                     const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(this.settings.provider)!;
                     
-                    const unifiedMessages: any[] = [
+                    const unifiedMessages: Record<string, unknown>[] = [
                         { role: 'system', content: baseSystemInstructions },
-                        ...chatHistory
-                            .filter(m => (m.parts?.[0]?.text || m.content || '').trim().length > 0)
+                        ...(chatHistory
+                            .filter(m => (((m.parts as unknown as any)?.[0]?.text || m.content || '') as string).trim().length > 0)
                             .map(m => ({
                                 role: (m.role === 'model' || m.role === 'assistant') ? 'assistant' : 'user',
-                                content: m.parts?.[0]?.text || m.content || ''
-                            }))
+                                content: (m.parts as unknown as any)?.[0]?.text || m.content || ''
+                            })) as unknown as any[])
                     ];
 
                     let finalUserContent = '';
@@ -979,7 +979,7 @@ RESPONSE QUALITY CHECKLIST:
                     if (unifiedProvider.streamContent) {
                         const response = await unifiedProvider.streamContent(
                             this.settings.model,
-                            unifiedMessages,
+                            unifiedMessages as unknown as any[],
                             (chunk: string) => {
                                 finalAnswer += chunk;
                                 this.snippetUpdateCallback('Generating response...', chunk);
@@ -998,7 +998,7 @@ RESPONSE QUALITY CHECKLIST:
                     } else {
                         const response = await unifiedProvider.generateContent(
                             this.settings.model,
-                            unifiedMessages,
+                            unifiedMessages as unknown as any[],
                             {
                                 temperature: getModelTemperature(this.settings.model, this.settings),
                                 maxTokens: 8192,
@@ -1014,9 +1014,9 @@ RESPONSE QUALITY CHECKLIST:
                 } else {
                     
                     
-                    const messages: any[] = [
+                    const messages: Record<string, unknown>[] = [
                         { role: 'system', content: baseSystemInstructions },
-                        ...chatHistory 
+                        ...chatHistory as unknown as any[]
                     ];
 
                     let finalUserContent = '';
@@ -1044,7 +1044,7 @@ RESPONSE QUALITY CHECKLIST:
                     });
                     finalAnswer = resp.json.choices[0].message.content;
                 }
-            } catch (error: any) {
+            } catch (error: unknown) {
                                   
                  
                  if (this.stopProcessing) {
@@ -1085,7 +1085,7 @@ RESPONSE QUALITY CHECKLIST:
                      }
                  }
                   
-                  else if (error.status === 429) { 
+                  else if ((error as unknown as any).status === 429) { 
                        
                        throw new Error(`API rate limit exceeded`);
                   } else if (error instanceof Error) {

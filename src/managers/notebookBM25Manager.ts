@@ -212,7 +212,7 @@ export class NotebookBM25Manager {
 
         try {
             // Build filter for selected paths
-            const where: any = {};
+            const where: Record<string, unknown> = {};
             if (selectedPaths && selectedPaths.length > 0) {
                 where.path = selectedPaths;
             }
@@ -232,7 +232,7 @@ export class NotebookBM25Manager {
             });
 
             if (searchResponse && searchResponse.results?.hits) {
-                return searchResponse.results.hits.map((hit: any) => {
+                return searchResponse.results.hits.map((hit: { document: Record<string, unknown>, score: number }) => {
                     const doc = hit.document;
                     return {
                         path: doc.path,
@@ -348,7 +348,7 @@ export class NotebookBM25Manager {
             };
             const response = await OramaWorkerManager.getInstance().save(this.notebookId, true, metadata);
             const compressed = response.data as Uint8Array;
-            await this.app.vault.adapter.writeBinary(indexPath, compressed);
+            await this.app.vault.adapter.writeBinary(indexPath, compressed.buffer as ArrayBuffer);
         } catch (error) {
             // Failed to save index
         }

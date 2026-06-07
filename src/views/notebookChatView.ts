@@ -917,7 +917,7 @@ Rules:
     const leftControls = inputRow.createDiv({ cls: 'notebook-input-left-controls' });
     const plusBtn = leftControls.createDiv({ cls: 'context-menu-btn' });
     setIcon(plusBtn, 'plus');
-    plusBtn.setCssStyles({ 'cursor': 'pointer' });
+    plusBtn.setCssProps({ 'cursor':  'pointer' });
     plusBtn.setAttribute('aria-label', 'Add context');
     plusBtn.setAttribute('tabindex', '0');
     plusBtn.addEventListener('click', (e) => {
@@ -935,12 +935,12 @@ Rules:
     this.chatInput.inputEl.addEventListener('input', function () {
       const parent = this.parentElement;
       if (parent) {
-        parent.setCssStyles({ 'minHeight': parent.clientHeight + 'px' });
+        parent.setCssProps({ 'min-height':  parent.clientHeight + 'px' });
       }
-      this.setCssStyles({ 'height': 'auto' });
-      this.setCssStyles({ 'height': Math.min(this.scrollHeight, 200) + 'px' });
+      this.setCssProps({ 'height':  'auto' });
+      this.setCssProps({ 'height':  Math.min(this.scrollHeight, 200) + 'px' });
       if (parent) {
-        parent.setCssStyles({ 'minHeight': '' });
+        parent.setCssProps({ 'min-height':  '' });
       }
     });
 
@@ -1004,7 +1004,7 @@ Rules:
     const rightControls = inputRow.createDiv({ cls: 'notebook-input-right-controls' });
     const sendBtn = rightControls.createDiv({ cls: 'send-button-new' });
     setIcon(sendBtn, 'arrow-up');
-    sendBtn.setCssStyles({ 'cursor': 'pointer' });
+    sendBtn.setCssProps({ 'cursor':  'pointer' });
     sendBtn.setAttribute('aria-label', 'Send message');
     sendBtn.setAttribute('tabindex', '0');
     sendBtn.addEventListener('click', () => this.handleSendMessage());
@@ -1113,12 +1113,12 @@ Rules:
     this.chatInput.inputEl.addEventListener('input', function () {
       const parent = this.parentElement;
       if (parent) {
-        parent.setCssStyles({ 'minHeight': parent.clientHeight + 'px' });
+        parent.setCssProps({ 'min-height':  parent.clientHeight + 'px' });
       }
-      this.setCssStyles({ 'height': 'auto' });
-      this.setCssStyles({ 'height': Math.min(this.scrollHeight, 120) + 'px' });
+      this.setCssProps({ 'height':  'auto' });
+      this.setCssProps({ 'height':  Math.min(this.scrollHeight, 120) + 'px' });
       if (parent) {
-        parent.setCssStyles({ 'minHeight': '' });
+        parent.setCssProps({ 'min-height':  '' });
       }
     });
 
@@ -1488,7 +1488,7 @@ Rules:
         label.appendChild(checkbox);
         const nameSpan = document.createElement('span');
         nameSpan.textContent = ' ' + fileName;
-        nameSpan.setCssStyles({ 'fontWeight': 'bold' });
+        nameSpan.setCssProps({ 'font-weight':  'bold' });
         label.appendChild(nameSpan);
 
         
@@ -1551,10 +1551,10 @@ Rules:
     menu.className = 'context-file-menu notebook-prefix-menu';
 
     const rect = anchorEl.getBoundingClientRect();
-    menu.setCssStyles({ 'position': 'fixed' });
-    menu.setCssStyles({ 'left': `${rect.left}px` });
-    menu.setCssStyles({ 'zIndex': '9999' });
-    menu.setCssStyles({ 'minWidth': '220px' });
+    menu.setCssProps({ 'position':  'fixed' });
+    menu.setCssProps({ 'left':  `${rect.left}px` });
+    menu.setCssProps({ 'z-index':  '9999' });
+    menu.setCssProps({ 'min-width':  '220px' });
 
     
     const prefixOptions = [
@@ -1569,12 +1569,12 @@ Rules:
 
       const labelSpan = document.createElement('span');
       labelSpan.textContent = opt.label;
-      labelSpan.setCssStyles({ 'fontWeight': '500' });
+      labelSpan.setCssProps({ 'font-weight':  '500' });
       item.appendChild(labelSpan);
 
       const descSpan = document.createElement('span');
       descSpan.textContent = opt.description;
-      descSpan.setCssStyles({ 'cssText': 'font-size: 0.85em; color: var(--text-muted); margin-left: 8px;' });
+      descSpan.setCssProps({ 'css-text':  'font-size: 0.85em; color: var(--text-muted); margin-left: 8px;' });
       item.appendChild(descSpan);
 
       item.addEventListener('click', async (e) => {
@@ -1605,7 +1605,7 @@ Rules:
 
     
     const menuHeight = menu.offsetHeight;
-    menu.setCssStyles({ 'top': `${rect.top - menuHeight - 8}px` });
+    menu.setCssProps({ 'top':  `${rect.top - menuHeight - 8}px` });
 
     this.contextMenuEl = menu;
 
@@ -1810,12 +1810,12 @@ Rules:
 
     
     const sliderContainer = sourcesHeader.createDiv({ cls: 'cag-history-slider-container' });
-    sliderContainer.setCssStyles({ 'display': (this.notebook.mode === 'cag' && this.sourceViewMode === 'notes') ? 'flex' : 'none' });
-    sliderContainer.setCssStyles({ 'alignItems': 'center' });
-    sliderContainer.setCssStyles({ 'gap': '8px' });
-    sliderContainer.setCssStyles({ 'fontSize': '0.8em' });
-    sliderContainer.setCssStyles({ 'color': 'var(--text-muted)' });
-    sliderContainer.setCssStyles({ 'marginTop': '4px' });
+    sliderContainer.setCssProps({ 'display':  (this.notebook.mode === 'cag' && this.sourceViewMode === 'notes') ? 'flex':  'none' });
+    sliderContainer.setCssProps({ 'align-items':  'center' });
+    sliderContainer.setCssProps({ 'gap':  '8px' });
+    sliderContainer.setCssProps({ 'font-size':  '0.8em' });
+    sliderContainer.setCssProps({ 'color':  'var(--text-muted)' });
+    sliderContainer.setCssProps({ 'margin-top':  '4px' });
 
     const sliderLabel = sliderContainer.createSpan({ 
       text: `History: ${this.cagHistoryContextLength === 20 ? 'All' : this.cagHistoryContextLength}` 
@@ -1830,8 +1830,8 @@ Rules:
       },
       cls: 'cag-history-slider'
     });
-    slider.setCssStyles({ 'width': '60px' });
-    slider.setCssStyles({ 'height': '4px' });
+    slider.setCssProps({ 'width':  '60px' });
+    slider.setCssProps({ 'height':  '4px' });
     
     slider.addEventListener('input', (e) => {
       const val = parseInt((e.target as HTMLInputElement).value);
@@ -1889,7 +1889,7 @@ Rules:
         
         const nameSpan = document.createElement('span');
         nameSpan.textContent = ' ' + fileName;
-        nameSpan.setCssStyles({ 'fontWeight': 'bold' });
+        nameSpan.setCssProps({ 'font-weight':  'bold' });
         label.appendChild(nameSpan);
 
         
@@ -1998,7 +1998,7 @@ Rules:
           
           const progressBarOuter = progressContainer.createDiv({ cls: 'rag-progress-bar-outer' });
           const progressBarInner = progressBarOuter.createDiv({ cls: 'rag-progress-bar-inner' });
-          progressBarInner.setCssStyles({ 'width': '0%' });
+          progressBarInner.setCssProps({ 'width':  '0%' });
 
           
           progressContainer.createEl('span', { text: '0%', cls: 'rag-progress-text' });
@@ -2051,7 +2051,7 @@ Rules:
 
           
           if (progressBar) {
-            progressBar.setCssStyles({ 'width': `${percentage}%` });
+            progressBar.setCssProps({ 'width':  `${percentage}%` });
           }
 
           
@@ -2092,7 +2092,7 @@ Rules:
 
           
           if (progressBar) {
-            progressBar.setCssStyles({ 'width': `${percentage}%` });
+            progressBar.setCssProps({ 'width':  `${percentage}%` });
           }
 
           
@@ -2224,7 +2224,7 @@ Rules:
   
   private editUserMessage(messageContainer: HTMLElement, contentEl: HTMLElement, originalContent: string, actionsContainer: HTMLElement, saveSession: boolean) {
     contentEl.empty();
-    actionsContainer.setCssStyles({ 'display': 'none' });
+    actionsContainer.setCssProps({ 'display':  'none' });
 
     const editContainer = contentEl.createDiv({ cls: 'query-edit-container' });
     const textArea = editContainer.createEl('textarea', { cls: 'query-edit-textarea' });
@@ -2232,8 +2232,8 @@ Rules:
     textArea.rows = originalContent.split('\n').length;
 
     const adjustHeight = () => {
-      textArea.setCssStyles({ 'height': 'auto' });
-      textArea.setCssStyles({ 'height': textArea.scrollHeight + 'px' });
+      textArea.setCssProps({ 'height':  'auto' });
+      textArea.setCssProps({ 'height':  textArea.scrollHeight + 'px' });
     };
     textArea.addEventListener('input', adjustHeight);
     setTimeout(adjustHeight, 0);
@@ -2245,7 +2245,7 @@ Rules:
       .onClick(() => {
         contentEl.empty();
         contentEl.createEl('p', { text: originalContent });
-        actionsContainer.setCssStyles({ 'display': '' });
+        actionsContainer.setCssProps({ 'display':  '' });
       });
 
     new ButtonComponent(buttonContainer)
@@ -2270,7 +2270,7 @@ Rules:
         } else {
           contentEl.empty();
           contentEl.createEl('p', { text: originalContent });
-          actionsContainer.setCssStyles({ 'display': '' });
+          actionsContainer.setCssProps({ 'display':  '' });
         }
       });
   }
@@ -2625,13 +2625,13 @@ Rules:
       query = `${query} ${urls}`.trim();
     }
     this.chatInput.setValue('');
-    this.chatInput.inputEl.setCssStyles({ 'height': '' });
+    this.chatInput.inputEl.setCssProps({ 'height':  '' });
     
     
     
     const userMessageContainer = this.addMessage('user', originalQuery, false, [], false);
     const spinner = userMessageContainer.createDiv({ cls: 'loading-spinner' });
-    spinner.setCssStyles({ 'display': 'block' });
+    spinner.setCssProps({ 'display':  'block' });
     try {
       let cachedContext = '';
       
@@ -3639,23 +3639,23 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
           targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
           
-          targetEl.setCssStyles({ 'backgroundColor': 'var(--text-accent)' });
-          targetEl.setCssStyles({ 'opacity': '0.3' });
+          targetEl.setCssProps({ 'background-color':  'var(--text-accent)' });
+          targetEl.setCssProps({ 'opacity':  '0.3' });
 
           
           const backArrow = targetEl.querySelector('.footnote-backref') as HTMLElement;
           if (backArrow) {
-            backArrow.setCssStyles({ 'color': 'var(--text-accent)' });
-            backArrow.setCssStyles({ 'fontWeight': 'bold' });
+            backArrow.setCssProps({ 'color':  'var(--text-accent)' });
+            backArrow.setCssProps({ 'font-weight':  'bold' });
           }
 
           
           setTimeout(() => {
-            targetEl.setCssStyles({ 'backgroundColor': '' });
-            targetEl.setCssStyles({ 'opacity': '' });
+            targetEl.setCssProps({ 'background-color':  '' });
+            targetEl.setCssProps({ 'opacity':  '' });
             if (backArrow) {
-              backArrow.setCssStyles({ 'color': '' });
-              backArrow.setCssStyles({ 'fontWeight': '' });
+              backArrow.setCssProps({ 'color':  '' });
+              backArrow.setCssProps({ 'font-weight':  '' });
             }
           }, 2000);
         }
@@ -3674,7 +3674,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         if (targetEl) {
           const tooltip = document.createElement('div');
           tooltip.classList.add('footnote-tooltip');
-          tooltip.setCssStyles({ 'cssText': `
+          tooltip.setCssProps({ 'css-text':  `
             position: fixed;
             background-color: var(--background-primary);
             border: 1px solid var(--background-modifier-border);
@@ -3697,8 +3697,8 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
 
           
           const rect = refLink.getBoundingClientRect();
-          tooltip.setCssStyles({ 'left': `${rect.left}px` });
-          tooltip.setCssStyles({ 'top': `${rect.bottom + 5}px` });
+          tooltip.setCssProps({ 'left':  `${rect.left}px` });
+          tooltip.setCssProps({ 'top':  `${rect.bottom + 5}px` });
 
           
           const removeTooltip = () => {
@@ -3732,7 +3732,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
           backArrow.classList.add('footnote-backref');
           backArrow.textContent = ' ↩';
           backArrow.setAttribute('aria-label', 'Back to content');
-          backArrow.setCssStyles({ 'cssText': 'margin-left: 0.25em; cursor: pointer; text-decoration: none;' });
+          backArrow.setCssProps({ 'css-text':  'margin-left: 0.25em; cursor: pointer; text-decoration: none;' });
 
           backArrow.addEventListener('click', (e: MouseEvent) => {
             e.preventDefault();
@@ -3742,11 +3742,11 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
               refLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
               
-              refLink.setCssStyles({ 'backgroundColor': 'var(--text-accent)' });
-              refLink.setCssStyles({ 'opacity': '0.3' });
+              refLink.setCssProps({ 'background-color':  'var(--text-accent)' });
+              refLink.setCssProps({ 'opacity':  '0.3' });
               setTimeout(() => {
-                refLink.setCssStyles({ 'backgroundColor': '' });
-                refLink.setCssStyles({ 'opacity': '' });
+                refLink.setCssProps({ 'background-color':  '' });
+                refLink.setCssProps({ 'opacity':  '' });
               }, 1000);
             }
           });
@@ -3772,19 +3772,19 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     
     const searchContainer = document.createElement('div');
     searchContainer.className = 'model-search-container';
-    searchContainer.setCssStyles({ 'position': 'sticky' });
-    searchContainer.setCssStyles({ 'top': '0' });
-    searchContainer.setCssStyles({ 'background': 'var(--background-primary)' });
-    searchContainer.setCssStyles({ 'zIndex': '2' });
-    searchContainer.setCssStyles({ 'padding': '8px' });
-    searchContainer.setCssStyles({ 'borderBottom': '1px solid var(--background-modifier-border)' });
+    searchContainer.setCssProps({ 'position':  'sticky' });
+    searchContainer.setCssProps({ 'top':  '0' });
+    searchContainer.setCssProps({ 'background':  'var(--background-primary)' });
+    searchContainer.setCssProps({ 'z-index':  '2' });
+    searchContainer.setCssProps({ 'padding':  '8px' });
+    searchContainer.setCssProps({ 'border-bottom':  '1px solid var(--background-modifier-border)' });
 
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Search models...';
     searchInput.className = 'model-search-input';
-    searchInput.setCssStyles({ 'width': '100%' });
-    searchInput.setCssStyles({ 'boxSizing': 'border-box' });
+    searchInput.setCssProps({ 'width':  '100%' });
+    searchInput.setCssProps({ 'box-sizing':  'border-box' });
     searchInput.addEventListener('keydown', (e) => e.stopPropagation());
     searchContainer.appendChild(searchInput);
     menuEl.appendChild(searchContainer);
@@ -3810,10 +3810,10 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         document.body.appendChild(menuEl);
         const btnRect = modelBtn.getBoundingClientRect();
         const menuRect = menuEl.getBoundingClientRect();
-        menuEl.setCssStyles({ 'position': 'absolute' });
-        menuEl.setCssStyles({ 'left': `${btnRect.left}px` });
-        menuEl.setCssStyles({ 'top': `${btnRect.top - menuRect.height - 8}px` });
-        menuEl.setCssStyles({ 'zIndex': '1000' });
+        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.setCssProps({ 'left':  `${btnRect.left}px` });
+        menuEl.setCssProps({ 'top':  `${btnRect.top - menuRect.height - 8}px` });
+        menuEl.setCssProps({ 'z-index':  '1000' });
 
         setTimeout(() => {
           document.addEventListener('click', closeMenuNotice);
@@ -3898,12 +3898,12 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     searchInput.addEventListener('input', (e) => {
       const query = (e.target as HTMLInputElement).value.toLowerCase();
       itemsToFilter.forEach(obj => {
-        obj.itemEl.setCssStyles({ 'display': obj.name.includes(query) ? '' : 'none' });
+        obj.itemEl.setCssProps({ 'display':  obj.name.includes(query) ? '' : 'none' });
       });
       headersToFilter.forEach(headerObj => {
         const hasVisibleItems = headerObj.items.some(item => item.style.display !== 'none');
-        headerObj.headerEl.setCssStyles({ 'display': hasVisibleItems ? '' : 'none' });
-        if (headerObj.separatorEl) headerObj.separatorEl.setCssStyles({ 'display': hasVisibleItems ? '' : 'none' });
+        headerObj.headerEl.setCssProps({ 'display':  hasVisibleItems ? '' : 'none' });
+        if (headerObj.separatorEl) headerObj.separatorEl.setCssProps({ 'display':  hasVisibleItems ? '' : 'none' });
       });
     });
 
@@ -3911,10 +3911,10 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     
     const btnRect = modelBtn.getBoundingClientRect();
     const menuRect = menuEl.getBoundingClientRect();
-    menuEl.setCssStyles({ 'position': 'absolute' });
-    menuEl.setCssStyles({ 'left': `${btnRect.left}px` });
-    menuEl.setCssStyles({ 'top': `${btnRect.top - menuRect.height - 8}px` });
-    menuEl.setCssStyles({ 'zIndex': '1000' });
+    menuEl.setCssProps({ 'position':  'absolute' });
+    menuEl.setCssProps({ 'left':  `${btnRect.left}px` });
+    menuEl.setCssProps({ 'top':  `${btnRect.top - menuRect.height - 8}px` });
+    menuEl.setCssProps({ 'z-index':  '1000' });
     setTimeout(() => {
       document.addEventListener('click', closeMenu);
     }, 0);
@@ -3952,7 +3952,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
       }
     }
 
-    this.contextBarContainer.setCssStyles({ 'display': 'flex' });
+    this.contextBarContainer.setCssProps({ 'display':  'flex' });
 
     let currentTokens = 0;
     let docsTokens = 0;
@@ -4001,8 +4001,8 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     const percentage = Math.min(100, (currentTokens / maxTokens) * 100);
 
     
-    this.contextProgressBar.setCssStyles({ 'transition': 'width 0.3s ease-out' });
-    this.contextProgressBar.setCssStyles({ 'width': `${percentage}%` });
+    this.contextProgressBar.setCssProps({ 'transition':  'width 0.3s ease-out' });
+    this.contextProgressBar.setCssProps({ 'width':  `${percentage}%` });
 
     
     if (this.notebook.mode === 'rag') {
@@ -4046,9 +4046,9 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
       
       const docsRatio = docsTokens / currentTokens;
       const splitPoint = docsRatio * 100;
-      this.contextProgressBar.setCssStyles({ 'background': `linear-gradient(to right, ${baseColor} ${splitPoint}%, var(--color-purple, #9b59b6) ${splitPoint}%)` });
+      this.contextProgressBar.setCssProps({ 'background':  `linear-gradient(to right, ${baseColor} ${splitPoint}%, var(--color-purple, #9b59b6) ${splitPoint}%)` });
     } else {
-      this.contextProgressBar.setCssStyles({ 'background': '' });
+      this.contextProgressBar.setCssProps({ 'background':  '' });
     }
   }
 

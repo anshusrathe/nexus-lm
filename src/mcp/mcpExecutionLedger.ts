@@ -31,7 +31,7 @@ export type Provider = 'groq' | 'gemini' | 'openrouter' | 'ollama' | 'nvidia';
 export interface MCPPlanStep {
     stepId: string;
     toolName: string;
-    arguments: Record<string, any>;
+    arguments: Record<string, unknown>;
     dependsOn: string[];
     rationale: string;
     status: StepStatus;
@@ -96,10 +96,11 @@ export const DEFAULT_STEP_TIMEOUT_MS = 30_000;
  */
 export function buildFallbackPlan(
     query: string,
-    mcpTools: any[]
+    mcpTools: Record<string, unknown>[]
 ): MCPExecutionPlan {
     const steps: MCPPlanStep[] = mcpTools.map((tool, idx) => {
-        const toolName = tool.function?.name || tool.name || `tool_${idx}`;
+        const toolFn = tool.function as Record<string, unknown> | undefined;
+        const toolName = (toolFn?.name as string | undefined) || (tool.name as string | undefined) || `tool_${idx}`;
         return {
             stepId: `step_${idx + 1}`,
             toolName,
@@ -143,7 +144,7 @@ export function buildSynthesisFromLedger(
     ledger: MCPExecutionLedger,
     query: string,
     systemPrompt: string
-): any[] {
+): Record<string, unknown>[] {
     const { plan } = ledger;
 
     let resultsBlock = '## Tool Execution Results\n\n';
