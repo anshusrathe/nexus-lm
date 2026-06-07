@@ -917,7 +917,7 @@ Rules:
     const leftControls = inputRow.createDiv({ cls: 'notebook-input-left-controls' });
     const plusBtn = leftControls.createDiv({ cls: 'context-menu-btn' });
     setIcon(plusBtn, 'plus');
-    plusBtn.setCssProps({ 'cursor':  'pointer' });
+    plusBtn.addClass('nl-cursor-pointer');
     plusBtn.setAttribute('aria-label', 'Add context');
     plusBtn.setAttribute('tabindex', '0');
     plusBtn.addEventListener('click', (e) => {
@@ -937,10 +937,10 @@ Rules:
       if (parent) {
         parent.setCssProps({ 'min-height':  parent.clientHeight + 'px' });
       }
-      this.setCssProps({ 'height':  'auto' });
+      this.addClass('nl-height-auto');
       this.setCssProps({ 'height':  Math.min(this.scrollHeight, 200) + 'px' });
       if (parent) {
-        parent.setCssProps({ 'min-height':  '' });
+        parent.addClass('nl-min-height-');
       }
     });
 
@@ -1004,7 +1004,7 @@ Rules:
     const rightControls = inputRow.createDiv({ cls: 'notebook-input-right-controls' });
     const sendBtn = rightControls.createDiv({ cls: 'send-button-new' });
     setIcon(sendBtn, 'arrow-up');
-    sendBtn.setCssProps({ 'cursor':  'pointer' });
+    sendBtn.addClass('nl-cursor-pointer');
     sendBtn.setAttribute('aria-label', 'Send message');
     sendBtn.setAttribute('tabindex', '0');
     sendBtn.addEventListener('click', () => this.handleSendMessage());
@@ -1115,10 +1115,10 @@ Rules:
       if (parent) {
         parent.setCssProps({ 'min-height':  parent.clientHeight + 'px' });
       }
-      this.setCssProps({ 'height':  'auto' });
+      this.addClass('nl-height-auto');
       this.setCssProps({ 'height':  Math.min(this.scrollHeight, 120) + 'px' });
       if (parent) {
-        parent.setCssProps({ 'min-height':  '' });
+        parent.addClass('nl-min-height-');
       }
     });
 
@@ -1488,7 +1488,7 @@ Rules:
         label.appendChild(checkbox);
         const nameSpan = document.createElement('span');
         nameSpan.textContent = ' ' + fileName;
-        nameSpan.setCssProps({ 'font-weight':  'bold' });
+        nameSpan.addClass('nl-font-weight-bold');
         label.appendChild(nameSpan);
 
         
@@ -1551,10 +1551,10 @@ Rules:
     menu.className = 'context-file-menu notebook-prefix-menu';
 
     const rect = anchorEl.getBoundingClientRect();
-    menu.setCssProps({ 'position':  'fixed' });
+    menu.addClass('nl-position-fixed');
     menu.setCssProps({ 'left':  `${rect.left}px` });
-    menu.setCssProps({ 'z-index':  '9999' });
-    menu.setCssProps({ 'min-width':  '220px' });
+    menu.addClass('nl-z-index-9999');
+    menu.addClass('nl-min-width-220px');
 
     
     const prefixOptions = [
@@ -1569,7 +1569,7 @@ Rules:
 
       const labelSpan = document.createElement('span');
       labelSpan.textContent = opt.label;
-      labelSpan.setCssProps({ 'font-weight':  '500' });
+      labelSpan.addClass('nl-font-weight-500');
       item.appendChild(labelSpan);
 
       const descSpan = document.createElement('span');
@@ -1811,11 +1811,11 @@ Rules:
     
     const sliderContainer = sourcesHeader.createDiv({ cls: 'cag-history-slider-container' });
     sliderContainer.setCssProps({ 'display':  (this.notebook.mode === 'cag' && this.sourceViewMode === 'notes') ? 'flex':  'none' });
-    sliderContainer.setCssProps({ 'align-items':  'center' });
-    sliderContainer.setCssProps({ 'gap':  '8px' });
-    sliderContainer.setCssProps({ 'font-size':  '0.8em' });
-    sliderContainer.setCssProps({ 'color':  'var(--text-muted)' });
-    sliderContainer.setCssProps({ 'margin-top':  '4px' });
+    sliderContainer.addClass('nl-align-items-center');
+    sliderContainer.addClass('nl-gap-8px');
+    sliderContainer.addClass('nl-font-size-08em');
+    sliderContainer.addClass('nl-color-var--text-muted');
+    sliderContainer.addClass('nl-margin-top-4px');
 
     const sliderLabel = sliderContainer.createSpan({ 
       text: `History: ${this.cagHistoryContextLength === 20 ? 'All' : this.cagHistoryContextLength}` 
@@ -1830,8 +1830,8 @@ Rules:
       },
       cls: 'cag-history-slider'
     });
-    slider.setCssProps({ 'width':  '60px' });
-    slider.setCssProps({ 'height':  '4px' });
+    slider.addClass('nl-width-60px');
+    slider.addClass('nl-height-4px');
     
     slider.addEventListener('input', (e) => {
       const val = parseInt((e.target as HTMLInputElement).value);
@@ -1889,7 +1889,7 @@ Rules:
         
         const nameSpan = document.createElement('span');
         nameSpan.textContent = ' ' + fileName;
-        nameSpan.setCssProps({ 'font-weight':  'bold' });
+        nameSpan.addClass('nl-font-weight-bold');
         label.appendChild(nameSpan);
 
         
@@ -1998,7 +1998,7 @@ Rules:
           
           const progressBarOuter = progressContainer.createDiv({ cls: 'rag-progress-bar-outer' });
           const progressBarInner = progressBarOuter.createDiv({ cls: 'rag-progress-bar-inner' });
-          progressBarInner.setCssProps({ 'width':  '0%' });
+          progressBarInner.addClass('nl-width-0');
 
           
           progressContainer.createEl('span', { text: '0%', cls: 'rag-progress-text' });
@@ -2224,7 +2224,7 @@ Rules:
   
   private editUserMessage(messageContainer: HTMLElement, contentEl: HTMLElement, originalContent: string, actionsContainer: HTMLElement, saveSession: boolean) {
     contentEl.empty();
-    actionsContainer.setCssProps({ 'display':  'none' });
+    actionsContainer.addClass('nl-display-none');
 
     const editContainer = contentEl.createDiv({ cls: 'query-edit-container' });
     const textArea = editContainer.createEl('textarea', { cls: 'query-edit-textarea' });
@@ -2232,7 +2232,7 @@ Rules:
     textArea.rows = originalContent.split('\n').length;
 
     const adjustHeight = () => {
-      textArea.setCssProps({ 'height':  'auto' });
+      textArea.addClass('nl-height-auto');
       textArea.setCssProps({ 'height':  textArea.scrollHeight + 'px' });
     };
     textArea.addEventListener('input', adjustHeight);
@@ -2245,7 +2245,7 @@ Rules:
       .onClick(() => {
         contentEl.empty();
         contentEl.createEl('p', { text: originalContent });
-        actionsContainer.setCssProps({ 'display':  '' });
+        actionsContainer.addClass('nl-display-');
       });
 
     new ButtonComponent(buttonContainer)
@@ -2270,7 +2270,7 @@ Rules:
         } else {
           contentEl.empty();
           contentEl.createEl('p', { text: originalContent });
-          actionsContainer.setCssProps({ 'display':  '' });
+          actionsContainer.addClass('nl-display-');
         }
       });
   }
@@ -2625,13 +2625,13 @@ Rules:
       query = `${query} ${urls}`.trim();
     }
     this.chatInput.setValue('');
-    this.chatInput.inputEl.setCssProps({ 'height':  '' });
+    this.chatInput.inputEl.addClass('nl-height-');
     
     
     
     const userMessageContainer = this.addMessage('user', originalQuery, false, [], false);
     const spinner = userMessageContainer.createDiv({ cls: 'loading-spinner' });
-    spinner.setCssProps({ 'display':  'block' });
+    spinner.addClass('nl-display-block');
     try {
       let cachedContext = '';
       
@@ -3639,23 +3639,23 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
           targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
           
-          targetEl.setCssProps({ 'background-color':  'var(--text-accent)' });
-          targetEl.setCssProps({ 'opacity':  '0.3' });
+          targetEl.addClass('nl-background-color-var--text-accent');
+          targetEl.addClass('nl-opacity-03');
 
           
           const backArrow = targetEl.querySelector('.footnote-backref') as HTMLElement;
           if (backArrow) {
-            backArrow.setCssProps({ 'color':  'var(--text-accent)' });
-            backArrow.setCssProps({ 'font-weight':  'bold' });
+            backArrow.addClass('nl-color-var--text-accent');
+            backArrow.addClass('nl-font-weight-bold');
           }
 
           
           setTimeout(() => {
-            targetEl.setCssProps({ 'background-color':  '' });
-            targetEl.setCssProps({ 'opacity':  '' });
+            targetEl.addClass('nl-background-color-');
+            targetEl.addClass('nl-opacity-');
             if (backArrow) {
-              backArrow.setCssProps({ 'color':  '' });
-              backArrow.setCssProps({ 'font-weight':  '' });
+              backArrow.addClass('nl-color-');
+              backArrow.addClass('nl-font-weight-');
             }
           }, 2000);
         }
@@ -3742,11 +3742,11 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
               refLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
               
-              refLink.setCssProps({ 'background-color':  'var(--text-accent)' });
-              refLink.setCssProps({ 'opacity':  '0.3' });
+              refLink.addClass('nl-background-color-var--text-accent');
+              refLink.addClass('nl-opacity-03');
               setTimeout(() => {
-                refLink.setCssProps({ 'background-color':  '' });
-                refLink.setCssProps({ 'opacity':  '' });
+                refLink.addClass('nl-background-color-');
+                refLink.addClass('nl-opacity-');
               }, 1000);
             }
           });
@@ -3772,19 +3772,19 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     
     const searchContainer = document.createElement('div');
     searchContainer.className = 'model-search-container';
-    searchContainer.setCssProps({ 'position':  'sticky' });
-    searchContainer.setCssProps({ 'top':  '0' });
-    searchContainer.setCssProps({ 'background':  'var(--background-primary)' });
-    searchContainer.setCssProps({ 'z-index':  '2' });
-    searchContainer.setCssProps({ 'padding':  '8px' });
-    searchContainer.setCssProps({ 'border-bottom':  '1px solid var(--background-modifier-border)' });
+    searchContainer.addClass('nl-position-sticky');
+    searchContainer.addClass('nl-top-0');
+    searchContainer.addClass('nl-background-var--background-primary');
+    searchContainer.addClass('nl-z-index-2');
+    searchContainer.addClass('nl-padding-8px');
+    searchContainer.addClass('nl-border-bottom-1pxsolidvar--background-modifier-border');
 
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Search models...';
     searchInput.className = 'model-search-input';
-    searchInput.setCssProps({ 'width':  '100%' });
-    searchInput.setCssProps({ 'box-sizing':  'border-box' });
+    searchInput.addClass('nl-width-100');
+    searchInput.addClass('nl-box-sizing-border-box');
     searchInput.addEventListener('keydown', (e) => e.stopPropagation());
     searchContainer.appendChild(searchInput);
     menuEl.appendChild(searchContainer);
@@ -3810,10 +3810,10 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         document.body.appendChild(menuEl);
         const btnRect = modelBtn.getBoundingClientRect();
         const menuRect = menuEl.getBoundingClientRect();
-        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.addClass('nl-position-absolute');
         menuEl.setCssProps({ 'left':  `${btnRect.left}px` });
         menuEl.setCssProps({ 'top':  `${btnRect.top - menuRect.height - 8}px` });
-        menuEl.setCssProps({ 'z-index':  '1000' });
+        menuEl.addClass('nl-z-index-1000');
 
         setTimeout(() => {
           document.addEventListener('click', closeMenuNotice);
@@ -3898,12 +3898,12 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     searchInput.addEventListener('input', (e) => {
       const query = (e.target as HTMLInputElement).value.toLowerCase();
       itemsToFilter.forEach(obj => {
-        obj.itemEl.setCssProps({ 'display':  obj.name.includes(query) ? '' : 'none' });
+        obj.itemEl.toggleClass('nl-display-none', !(obj.name.includes(query)));
       });
       headersToFilter.forEach(headerObj => {
         const hasVisibleItems = headerObj.items.some(item => item.style.display !== 'none');
-        headerObj.headerEl.setCssProps({ 'display':  hasVisibleItems ? '' : 'none' });
-        if (headerObj.separatorEl) headerObj.separatorEl.setCssProps({ 'display':  hasVisibleItems ? '' : 'none' });
+        headerObj.headerEl.toggleClass('nl-display-none', !(hasVisibleItems));
+        if (headerObj.separatorEl) headerObj.separatorEl.toggleClass('nl-display-none', !(hasVisibleItems));
       });
     });
 
@@ -3911,10 +3911,10 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     
     const btnRect = modelBtn.getBoundingClientRect();
     const menuRect = menuEl.getBoundingClientRect();
-    menuEl.setCssProps({ 'position':  'absolute' });
+    menuEl.addClass('nl-position-absolute');
     menuEl.setCssProps({ 'left':  `${btnRect.left}px` });
     menuEl.setCssProps({ 'top':  `${btnRect.top - menuRect.height - 8}px` });
-    menuEl.setCssProps({ 'z-index':  '1000' });
+    menuEl.addClass('nl-z-index-1000');
     setTimeout(() => {
       document.addEventListener('click', closeMenu);
     }, 0);
@@ -3952,7 +3952,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
       }
     }
 
-    this.contextBarContainer.setCssProps({ 'display':  'flex' });
+    this.contextBarContainer.addClass('nl-display-flex');
 
     let currentTokens = 0;
     let docsTokens = 0;
@@ -4001,7 +4001,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     const percentage = Math.min(100, (currentTokens / maxTokens) * 100);
 
     
-    this.contextProgressBar.setCssProps({ 'transition':  'width 0.3s ease-out' });
+    this.contextProgressBar.addClass('nl-transition-width03sease-out');
     this.contextProgressBar.setCssProps({ 'width':  `${percentage}%` });
 
     
@@ -4048,7 +4048,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
       const splitPoint = docsRatio * 100;
       this.contextProgressBar.setCssProps({ 'background':  `linear-gradient(to right, ${baseColor} ${splitPoint}%, var(--color-purple, #9b59b6) ${splitPoint}%)` });
     } else {
-      this.contextProgressBar.setCssProps({ 'background':  '' });
+      this.contextProgressBar.addClass('nl-background-');
     }
   }
 

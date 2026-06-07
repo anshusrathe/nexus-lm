@@ -240,7 +240,7 @@ class YouTubeURLModal extends Modal {
                     .onChange(value => {
                         this.youtubeUrl = value;
                     });
-                text.inputEl.setCssProps({ 'width':  '100%' });
+                text.inputEl.addClass('nl-width-100');
                 
                 setTimeout(() => text.inputEl.focus(), 50);
             });
@@ -1035,13 +1035,13 @@ export class ResponseView extends ItemView {
         }
 
         if (this.contextCollapsed) {
-            fileTagsScrollWrapper.setCssProps({ 'display':  'none' });
+            fileTagsScrollWrapper.addClass('nl-display-none');
             if (toggleBtn) {
                 toggleBtn.empty();
                 toggleBtn.createSpan({ text: '▶', attr: { style: 'font-size:18px;user-select:none;' } });
             }
         } else {
-            fileTagsScrollWrapper.setCssProps({ 'display':  '' });
+            fileTagsScrollWrapper.addClass('nl-display-');
             if (toggleBtn) {
                 toggleBtn.empty();
                 toggleBtn.createSpan({ text: '▼', attr: { style: 'font-size:18px;user-select:none;' } });
@@ -1074,7 +1074,7 @@ export class ResponseView extends ItemView {
         if (this.settings.aiChatHistoryEnabled) {
             const historyBtn = headerLeftControls.createDiv({ cls: 'header-history-btn' });
             setIcon(historyBtn, 'history');
-            historyBtn.setCssProps({ 'cursor':  'pointer' });
+            historyBtn.addClass('nl-cursor-pointer');
             historyBtn.setAttr('aria-label', 'View chat history');
             historyBtn.setAttr('tabindex', '0');
             historyBtn.addEventListener('click', (e) => {
@@ -1096,7 +1096,7 @@ export class ResponseView extends ItemView {
         
         const systemInstructionsBtn = headerLeftControls.createDiv({ cls: 'header-system-instructions-btn' });
         setIcon(systemInstructionsBtn, 'wrench');
-        systemInstructionsBtn.setCssProps({ 'cursor':  'pointer' });
+        systemInstructionsBtn.addClass('nl-cursor-pointer');
         systemInstructionsBtn.setAttr('aria-label', 'System Instructions');
         systemInstructionsBtn.setAttr('tabindex', '0');
         
@@ -1111,7 +1111,7 @@ export class ResponseView extends ItemView {
         
         const newChatBtn = headerLeftControls.createDiv({ cls: 'header-new-chat-btn' });
         setIcon(newChatBtn, 'plus');
-        newChatBtn.setCssProps({ 'cursor':  'pointer' });
+        newChatBtn.addClass('nl-cursor-pointer');
         newChatBtn.setAttr('aria-label', 'Start new chat');
         newChatBtn.setAttr('tabindex', '0');
         newChatBtn.addEventListener('click', (e) => {
@@ -1134,7 +1134,7 @@ export class ResponseView extends ItemView {
         
         const ellipsisBtn = headerRightControls.createDiv({ cls: 'header-ellipsis-btn' });
         setIcon(ellipsisBtn, 'more-vertical');
-        ellipsisBtn.setCssProps({ 'cursor':  'pointer' });
+        ellipsisBtn.addClass('nl-cursor-pointer');
         ellipsisBtn.setAttr('aria-label', 'Menu options');
         ellipsisBtn.setAttr('tabindex', '0');
         ellipsisBtn.addEventListener('click', (e) => {
@@ -1193,7 +1193,7 @@ export class ResponseView extends ItemView {
         
         const capsuleBtn = leftControls.createDiv({ cls: 'context-menu-btn' });
         setIcon(capsuleBtn, 'plus');
-        capsuleBtn.setCssProps({ 'cursor':  'pointer' });
+        capsuleBtn.addClass('nl-cursor-pointer');
         capsuleBtn.setAttr('aria-label', 'Add context');
         capsuleBtn.setAttr('tabindex', '0');
         capsuleBtn.addEventListener('click', (e) => {
@@ -1216,7 +1216,7 @@ export class ResponseView extends ItemView {
         
         const sendBtn = inputRow.createDiv({ cls: 'send-button-new' });
         setIcon(sendBtn, 'arrow-up');
-        sendBtn.setCssProps({ 'cursor':  'pointer' });
+        sendBtn.addClass('nl-cursor-pointer');
         sendBtn.setAttr('aria-label', 'Send message');
         sendBtn.setAttr('tabindex', '0');
         sendBtn.setAttr('data-state', 'send'); 
@@ -1499,12 +1499,12 @@ export class ResponseView extends ItemView {
             parent.setCssProps({ 'min-height':  parent.clientHeight + 'px' });
         }
 
-        textarea.setCssProps({ 'height':  'auto' });
+        textarea.addClass('nl-height-auto');
         textarea.setCssProps({ 'height':  textarea.scrollHeight + 'px' });
 
         
         if (parent) {
-            parent.setCssProps({ 'min-height':  '' });
+            parent.addClass('nl-min-height-');
         }
     }
 
@@ -1553,9 +1553,9 @@ export class ResponseView extends ItemView {
                 nameSpan.setCssProps({ 'margin-left':  `${(maxAllowedWidth - currentWidth) / 2}px` }); // Center the scaled text
                 nameSpan.setCssProps({ 'margin-right':  `${(maxAllowedWidth - currentWidth) / 2}px` });
             } else {
-                nameSpan.setCssProps({ 'transform':  'none' });
-                nameSpan.setCssProps({ 'width':  'auto' });
-                nameSpan.setCssProps({ 'margin':  '0' });
+                nameSpan.addClass('nl-transform-none');
+                nameSpan.addClass('nl-width-auto');
+                nameSpan.addClass('nl-margin-0');
             }
         });
     }
@@ -1605,7 +1605,7 @@ export class ResponseView extends ItemView {
         const brainBtn = container.createDiv({ cls: 'header-ollama-thinking-btn' });
         this.thinkingBtnEl = brainBtn;
         setIcon(brainBtn, 'brain');
-        brainBtn.setCssProps({ 'cursor':  'pointer' });
+        brainBtn.addClass('nl-cursor-pointer');
         brainBtn.setAttr('aria-label', `${activeProvider === 'gemini' ? 'Gemini' : activeProvider === 'groq' ? 'Groq' : 'Ollama'} thinking controls`);
         brainBtn.setAttr('tabindex', '0');
         if (isActive) {
@@ -1692,7 +1692,7 @@ export class ResponseView extends ItemView {
 
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.addClass('nl-position-absolute');
         menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
         menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
 
@@ -1739,7 +1739,7 @@ export class ResponseView extends ItemView {
 
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.addClass('nl-position-absolute');
         menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
         menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
         const closeHandler = (e: MouseEvent) => {
@@ -1789,7 +1789,7 @@ export class ResponseView extends ItemView {
 
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.addClass('nl-position-absolute');
         menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
         menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
         const closeHandler = (e: MouseEvent) => {
@@ -1830,18 +1830,18 @@ export class ResponseView extends ItemView {
         
         const rect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.addClass('nl-position-absolute');
         menuEl.setCssProps({ 'top':  `${rect.bottom - containerRect.top + 5}px` });
         menuEl.setCssProps({ 'left':  `${rect.left - containerRect.left}px` });
-        menuEl.setCssProps({ 'z-index':  '1000' });
-        menuEl.setCssProps({ 'min-width':  '250px' });
-        menuEl.setCssProps({ 'max-height':  '400px' });
-        menuEl.setCssProps({ 'overflow-y':  'auto' });
-        menuEl.setCssProps({ 'background-color':  'var(--background-primary)' });
-        menuEl.setCssProps({ 'border':  '1px solid var(--background-modifier-border)' });
-        menuEl.setCssProps({ 'border-radius':  '6px' });
-        menuEl.setCssProps({ 'box-shadow':  'var(--shadow-s)' });
-        menuEl.setCssProps({ 'padding':  '4px' });
+        menuEl.addClass('nl-z-index-1000');
+        menuEl.addClass('nl-min-width-250px');
+        menuEl.addClass('nl-max-height-400px');
+        menuEl.addClass('nl-overflow-y-auto');
+        menuEl.addClass('nl-background-color-var--background-primary');
+        menuEl.addClass('nl-border-1pxsolidvar--background-modifier-border');
+        menuEl.addClass('nl-border-radius-6px');
+        menuEl.addClass('nl-box-shadow-var--shadow-s');
+        menuEl.addClass('nl-padding-4px');
 
         const indexConfigs = this.settings.indexConfigurations || [];
         const embeddingIndexes = indexConfigs.filter(config => config.type === 'embedding');
@@ -1849,14 +1849,14 @@ export class ResponseView extends ItemView {
         if (embeddingIndexes.length === 0) {
             const emptyMsg = menuEl.createDiv({ cls: 'model-select-menu-item' });
             emptyMsg.createSpan({ text: 'No embedding indexes found' });
-            emptyMsg.setCssProps({ 'cursor':  'default' });
+            emptyMsg.addClass('nl-cursor-default');
         } else {
             embeddingIndexes.forEach((index, idx) => {
                 const itemEl = menuEl.createDiv({ cls: 'model-select-menu-item' });
-                itemEl.setCssProps({ 'display':  'flex' });
-                itemEl.setCssProps({ 'flex-direction':  'column' });
-                itemEl.setCssProps({ 'padding':  '8px 12px' });
-                itemEl.setCssProps({ 'gap':  '2px' });
+                itemEl.addClass('nl-display-flex');
+                itemEl.addClass('nl-flex-direction-column');
+                itemEl.addClass('nl-padding-8px12px');
+                itemEl.addClass('nl-gap-2px');
 
                 if (this.settings.selectedEmbeddingIndexId === index.id) {
                     itemEl.classList.add('selected');
@@ -1864,35 +1864,35 @@ export class ResponseView extends ItemView {
 
                 
                 const topRow = itemEl.createDiv();
-                topRow.setCssProps({ 'display':  'flex' });
-                topRow.setCssProps({ 'justify-content':  'space-between' });
-                topRow.setCssProps({ 'align-items':  'center' });
-                topRow.setCssProps({ 'width':  '100%' });
+                topRow.addClass('nl-display-flex');
+                topRow.addClass('nl-justify-content-space-between');
+                topRow.addClass('nl-align-items-center');
+                topRow.addClass('nl-width-100');
 
                 const leftInfo = topRow.createDiv();
-                leftInfo.setCssProps({ 'display':  'flex' });
-                leftInfo.setCssProps({ 'align-items':  'center' });
-                leftInfo.setCssProps({ 'gap':  '8px' });
+                leftInfo.addClass('nl-display-flex');
+                leftInfo.addClass('nl-align-items-center');
+                leftInfo.addClass('nl-gap-8px');
 
                 const nameSpan = leftInfo.createSpan();
                 nameSpan.textContent = index.name;
-                nameSpan.setCssProps({ 'font-weight':  'var(--font-semibold)' });
+                nameSpan.addClass('nl-font-weight-var--font-semibold');
 
                 const countSpan = leftInfo.createSpan();
                 countSpan.textContent = `(${index.fileCount || 0} files)`;
-                countSpan.setCssProps({ 'font-size':  '0.8em' });
-                countSpan.setCssProps({ 'color':  'var(--text-muted)' });
+                countSpan.addClass('nl-font-size-08em');
+                countSpan.addClass('nl-color-var--text-muted');
 
                 const checkbox = topRow.createEl('input', { type: 'checkbox' });
                 checkbox.checked = this.settings.selectedEmbeddingIndexId === index.id;
-                checkbox.setCssProps({ 'pointer-events':  'none' }); 
+                checkbox.addClass('nl-pointer-events-none'); 
 
                 
                 const bottomRow = itemEl.createDiv();
                 const modelSpan = bottomRow.createSpan();
                 modelSpan.textContent = index.model || 'Unknown model';
-                modelSpan.setCssProps({ 'font-size':  '0.85em' });
-                modelSpan.setCssProps({ 'color':  'var(--text-muted)' });
+                modelSpan.addClass('nl-font-size-085em');
+                modelSpan.addClass('nl-color-var--text-muted');
 
                 itemEl.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -2012,26 +2012,26 @@ export class ResponseView extends ItemView {
         modelGroups.forEach((group, groupIndex) => {
             
             const headerEl = modelList.createDiv({ cls: 'model-select-menu-header' });
-            headerEl.setCssProps({ 'display':  'flex' });
-            headerEl.setCssProps({ 'justify-content':  'space-between' });
-            headerEl.setCssProps({ 'align-items':  'center' });
-            headerEl.setCssProps({ 'padding-right':  '8px' });
+            headerEl.addClass('nl-display-flex');
+            headerEl.addClass('nl-justify-content-space-between');
+            headerEl.addClass('nl-align-items-center');
+            headerEl.addClass('nl-padding-right-8px');
 
             const headerTitle = headerEl.createSpan();
             headerTitle.textContent = group.label === 'Google Gemini' ? 'Gemini' : group.label;
 
             
             const modalitiesContainer = headerEl.createSpan({ cls: 'provider-modalities' });
-            modalitiesContainer.setCssProps({ 'display':  'flex' });
-            modalitiesContainer.setCssProps({ 'gap':  '4px' });
-            modalitiesContainer.setCssProps({ 'align-items':  'center' });
+            modalitiesContainer.addClass('nl-display-flex');
+            modalitiesContainer.addClass('nl-gap-4px');
+            modalitiesContainer.addClass('nl-align-items-center');
 
             const addModalityIcon = (iconName: string) => {
                 const iconEl = modalitiesContainer.createSpan();
                 setIcon(iconEl, iconName);
                 const svg = iconEl.querySelector('svg');
                 if (svg) {
-                    svg.setCssProps({ 'opacity':  '0.7' });
+                    svg.addClass('nl-opacity-07');
                 }
             };
 
@@ -2085,9 +2085,9 @@ export class ResponseView extends ItemView {
                 
                 
                 const iconsContainer = option.createSpan({ cls: 'model-icons-container' });
-                iconsContainer.setCssProps({ 'display':  'flex' });
-                iconsContainer.setCssProps({ 'gap':  '4px' });
-                iconsContainer.setCssProps({ 'align-items':  'center' });
+                iconsContainer.addClass('nl-display-flex');
+                iconsContainer.addClass('nl-gap-4px');
+                iconsContainer.addClass('nl-align-items-center');
 
                 
                 if ((isOllama || isGemini) && model.capabilities?.includes('thinking')) {
@@ -2134,12 +2134,12 @@ export class ResponseView extends ItemView {
         searchInput.addEventListener('input', (e) => {
             const query = (e.target as HTMLInputElement).value.toLowerCase();
             itemsToFilter.forEach(obj => {
-                obj.itemEl.setCssProps({ 'display':  obj.name.includes(query) ? '' : 'none' });
+                obj.itemEl.toggleClass('nl-display-none', !(obj.name.includes(query)));
             });
             headersToFilter.forEach(headerObj => {
                 const hasVisibleItems = headerObj.items.some(item => item.style.display !== 'none');
-                headerObj.headerEl.setCssProps({ 'display':  hasVisibleItems ? '' : 'none' });
-                if (headerObj.separatorEl) headerObj.separatorEl.setCssProps({ 'display':  hasVisibleItems ? '' : 'none' });
+                headerObj.headerEl.toggleClass('nl-display-none', !(hasVisibleItems));
+                if (headerObj.separatorEl) headerObj.separatorEl.toggleClass('nl-display-none', !(hasVisibleItems));
             });
         });
 
@@ -2147,7 +2147,7 @@ export class ResponseView extends ItemView {
         const containerRect = this.containerEl.getBoundingClientRect();
 
         
-        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.addClass('nl-position-absolute');
         menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
         menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
 
@@ -2183,7 +2183,7 @@ export class ResponseView extends ItemView {
 
         
         setTimeout(() => {
-            indicator.setCssProps({ 'opacity':  '0' });
+            indicator.addClass('nl-opacity-0');
             setTimeout(() => indicator.remove(), 300);
         }, 5000);
     }
@@ -2548,9 +2548,9 @@ export class ResponseView extends ItemView {
         });
 
         const btnRect = ellipsisBtn.getBoundingClientRect();
-        menuEl.setCssProps({ 'position':  'absolute' });
+        menuEl.addClass('nl-position-absolute');
         menuEl.setCssProps({ 'top':  `${btnRect.bottom + 4}px` });
-        menuEl.setCssProps({ 'right':  '10px' });
+        menuEl.addClass('nl-right-10px');
 
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
@@ -2579,44 +2579,44 @@ export class ResponseView extends ItemView {
 
         const pickerEl = document.createElement('div');
         pickerEl.className = 'wallpaper-picker';
-        pickerEl.setCssProps({ 'position':  'absolute' });
-        pickerEl.setCssProps({ 'z-index':  '1000' });
+        pickerEl.addClass('nl-position-absolute');
+        pickerEl.addClass('nl-z-index-1000');
         pickerEl.setCssProps({ 'background':  'var(--background-primary, #ffffff)' });
         pickerEl.setCssProps({ 'border':  '1px solid var(--border-color, #e0e0e0)' });
-        pickerEl.setCssProps({ 'border-radius':  '8px' });
-        pickerEl.setCssProps({ 'padding':  '8px' });
-        pickerEl.setCssProps({ 'max-height':  '300px' });
-        pickerEl.setCssProps({ 'overflow-y':  'auto' });
-        pickerEl.setCssProps({ 'min-width':  '250px' });
+        pickerEl.addClass('nl-border-radius-8px');
+        pickerEl.addClass('nl-padding-8px');
+        pickerEl.addClass('nl-max-height-300px');
+        pickerEl.addClass('nl-overflow-y-auto');
+        pickerEl.addClass('nl-min-width-250px');
         pickerEl.classList.add('wallpaper-picker-shadow');
         pickerEl.setCssProps({ 'color':  'var(--text-normal, #000000)' });
 
         const btnRect = this.containerEl.querySelector('.header-ellipsis-btn')?.getBoundingClientRect();
         if (btnRect) {
             pickerEl.setCssProps({ 'top':  `${btnRect.bottom + 4}px` });
-            pickerEl.setCssProps({ 'right':  '10px' });
+            pickerEl.addClass('nl-right-10px');
         }
 
         const titleEl = pickerEl.createDiv({ cls: 'wallpaper-picker-title' });
         titleEl.textContent = 'Select Wallpaper Image';
-        titleEl.setCssProps({ 'font-weight':  'bold' });
-        titleEl.setCssProps({ 'margin-bottom':  '8px' });
-        titleEl.setCssProps({ 'padding':  '4px' });
+        titleEl.addClass('nl-font-weight-bold');
+        titleEl.addClass('nl-margin-bottom-8px');
+        titleEl.addClass('nl-padding-4px');
         titleEl.setCssProps({ 'color':  'var(--text-normal, #000000)' });
 
         for (const file of images) {
             const itemEl = pickerEl.createDiv({ cls: 'wallpaper-picker-item' });
             itemEl.textContent = file.path;
-            itemEl.setCssProps({ 'padding':  '6px 8px' });
-            itemEl.setCssProps({ 'cursor':  'pointer' });
-            itemEl.setCssProps({ 'border-radius':  '4px' });
+            itemEl.addClass('nl-padding-6px8px');
+            itemEl.addClass('nl-cursor-pointer');
+            itemEl.addClass('nl-border-radius-4px');
             itemEl.setCssProps({ 'color':  'var(--text-normal, #000000)' });
-            itemEl.setCssProps({ 'background':  'transparent' });
+            itemEl.addClass('nl-background-transparent');
             itemEl.addEventListener('mouseenter', () => {
                 itemEl.setCssProps({ 'background':  'var(--hover-bg, #e0e0e0)' });
             });
             itemEl.addEventListener('mouseleave', () => {
-                itemEl.setCssProps({ 'background':  'transparent' });
+                itemEl.addClass('nl-background-transparent');
             });
             itemEl.addEventListener('click', () => {
                 pickerEl.remove();
@@ -2693,25 +2693,25 @@ export class ResponseView extends ItemView {
         
         container.insertBefore(this.wallpaperEl, container.firstChild);
         
-        this.wallpaperEl.setCssProps({ 'position':  'absolute' });
-        this.wallpaperEl.setCssProps({ 'top':  '0' });
-        this.wallpaperEl.setCssProps({ 'left':  '0' });
-        this.wallpaperEl.setCssProps({ 'width':  '100%' });
-        this.wallpaperEl.setCssProps({ 'height':  '100%' });
-        this.wallpaperEl.setCssProps({ 'z-index':  '0' });
-        this.wallpaperEl.setCssProps({ 'pointer-events':  'none' });
-        this.wallpaperEl.setCssProps({ 'display':  'block' });
-        this.wallpaperEl.setCssProps({ 'overflow':  'hidden' });
+        this.wallpaperEl.addClass('nl-position-absolute');
+        this.wallpaperEl.addClass('nl-top-0');
+        this.wallpaperEl.addClass('nl-left-0');
+        this.wallpaperEl.addClass('nl-width-100');
+        this.wallpaperEl.addClass('nl-height-100');
+        this.wallpaperEl.addClass('nl-z-index-0');
+        this.wallpaperEl.addClass('nl-pointer-events-none');
+        this.wallpaperEl.addClass('nl-display-block');
+        this.wallpaperEl.addClass('nl-overflow-hidden');
 
         const wallpaperOpacity = this.settings.chatWallpaperOpacity ?? 0.5;
         this.wallpaperEl.setCssProps({ 'opacity':  wallpaperOpacity.toString() });
         
         
         const imgEl = this.wallpaperEl.createEl('img');
-        imgEl.setCssProps({ 'width':  '100%' });
-        imgEl.setCssProps({ 'height':  '100%' });
-        imgEl.setCssProps({ 'object-fit':  'cover' });
-        imgEl.setCssProps({ 'pointer-events':  'none' });
+        imgEl.addClass('nl-width-100');
+        imgEl.addClass('nl-height-100');
+        imgEl.addClass('nl-object-fit-cover');
+        imgEl.addClass('nl-pointer-events-none');
         
 
         const resourcePath = this.app.vault.adapter.getResourcePath(wpPath);
@@ -2741,7 +2741,7 @@ export class ResponseView extends ItemView {
                 (headerSection as HTMLElement).setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             } else if (headerSection) {
                 headerSection.classList.remove('liquid-glass-active');
-                (headerSection as HTMLElement).setCssProps({ 'background':  '' });
+                (headerSection as HTMLElement).addClass('nl-background-');
             }
             
             if (inputContainer && headerGlassFactor > 0) {
@@ -2749,7 +2749,7 @@ export class ResponseView extends ItemView {
                 (inputContainer as HTMLElement).setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             } else if (inputContainer) {
                 inputContainer.classList.remove('liquid-glass-active');
-                (inputContainer as HTMLElement).setCssProps({ 'background':  '' });
+                (inputContainer as HTMLElement).addClass('nl-background-');
             }
             
             if (responsesContainer && responseGlassFactor > 0) {
@@ -2764,8 +2764,8 @@ export class ResponseView extends ItemView {
                     (item as HTMLElement).setCssProps({ 'border-color':  `rgba(255, 255, 255, ${Math.min(0.5, responseGlassFactor)})` });
                 } else {
                     item.classList.remove('liquid-glass-active');
-                    (item as HTMLElement).setCssProps({ 'background':  '' });
-                    (item as HTMLElement).setCssProps({ 'border-color':  '' });
+                    (item as HTMLElement).addClass('nl-background-');
+                    (item as HTMLElement).addClass('nl-border-color-');
                 }
             });
 
@@ -2814,7 +2814,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         if (this.settings.aiChatHistoryEnabled) {
             const historyBtn = headerLeftControls.createDiv({ cls: 'header-history-btn' });
             setIcon(historyBtn, 'history');
-            historyBtn.setCssProps({ 'cursor':  'pointer' });
+            historyBtn.addClass('nl-cursor-pointer');
             historyBtn.setAttr('aria-label', 'View chat history');
             historyBtn.setAttr('tabindex', '0');
             historyBtn.addEventListener('click', (e) => {
@@ -2836,7 +2836,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         
         const systemInstructionsBtn = headerLeftControls.createDiv({ cls: 'header-system-instructions-btn' });
         setIcon(systemInstructionsBtn, 'wrench');
-        systemInstructionsBtn.setCssProps({ 'cursor':  'pointer' });
+        systemInstructionsBtn.addClass('nl-cursor-pointer');
         systemInstructionsBtn.setAttr('aria-label', 'System Instructions');
         systemInstructionsBtn.setAttr('tabindex', '0');
         
@@ -2851,7 +2851,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         
         const newChatBtn = headerLeftControls.createDiv({ cls: 'header-new-chat-btn' });
         setIcon(newChatBtn, 'plus');
-        newChatBtn.setCssProps({ 'cursor':  'pointer' });
+        newChatBtn.addClass('nl-cursor-pointer');
         newChatBtn.setAttr('aria-label', 'Start new chat');
         newChatBtn.setAttr('tabindex', '0');
         newChatBtn.addEventListener('click', (e) => {
@@ -2874,7 +2874,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         
         const ellipsisBtn = headerRightControls.createDiv({ cls: 'header-ellipsis-btn' });
         setIcon(ellipsisBtn, 'more-vertical');
-        ellipsisBtn.setCssProps({ 'cursor':  'pointer' });
+        ellipsisBtn.addClass('nl-cursor-pointer');
         ellipsisBtn.setAttr('aria-label', 'Menu options');
         ellipsisBtn.setAttr('tabindex', '0');
         ellipsisBtn.addEventListener('click', (e) => {
@@ -4863,30 +4863,30 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                     targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
                     
-                    targetEl.setCssProps({ 'background-color':  'var(--text-accent)' });
-                    targetEl.setCssProps({ 'opacity':  '0.3' });
+                    targetEl.addClass('nl-background-color-var--text-accent');
+                    targetEl.addClass('nl-opacity-03');
 
                     
                     const backArrow = targetEl.querySelector('.footnote-backref') as HTMLElement;
                     if (backArrow) {
-                        backArrow.setCssProps({ 'color':  'var(--text-accent)' });
-                        backArrow.setCssProps({ 'font-weight':  'bold' });
-                        backArrow.setCssProps({ 'transform':  'scale(1.3)' });
-                        backArrow.setCssProps({ 'display':  'inline-block' });
-                        backArrow.setCssProps({ 'transition':  'all 0.3s ease' });
-                        backArrow.setCssProps({ 'text-shadow':  '0 0 8px var(--text-accent)' });
+                        backArrow.addClass('nl-color-var--text-accent');
+                        backArrow.addClass('nl-font-weight-bold');
+                        backArrow.addClass('nl-transform-scale13');
+                        backArrow.addClass('nl-display-inline-block');
+                        backArrow.addClass('nl-transition-all03sease');
+                        backArrow.addClass('nl-text-shadow-008pxvar--text-accent');
 
                         setTimeout(() => {
-                            backArrow.setCssProps({ 'color':  '' });
-                            backArrow.setCssProps({ 'font-weight':  '' });
-                            backArrow.setCssProps({ 'transform':  '' });
-                            backArrow.setCssProps({ 'text-shadow':  '' });
+                            backArrow.addClass('nl-color-');
+                            backArrow.addClass('nl-font-weight-');
+                            backArrow.addClass('nl-transform-');
+                            backArrow.addClass('nl-text-shadow-');
                         }, 5000);
                     }
 
                     setTimeout(() => {
-                        targetEl.setCssProps({ 'background-color':  '' });
-                        targetEl.setCssProps({ 'opacity':  '' });
+                        targetEl.addClass('nl-background-color-');
+                        targetEl.addClass('nl-opacity-');
                     }, 1000);
                 }
             });
@@ -4977,11 +4977,11 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
                         if (refEl) {
                             refEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            refEl.setCssProps({ 'background-color':  'var(--text-accent)' });
-                            refEl.setCssProps({ 'opacity':  '0.3' });
+                            refEl.addClass('nl-background-color-var--text-accent');
+                            refEl.addClass('nl-opacity-03');
                             setTimeout(() => {
-                                refEl.setCssProps({ 'background-color':  '' });
-                                refEl.setCssProps({ 'opacity':  '' });
+                                refEl.addClass('nl-background-color-');
+                                refEl.addClass('nl-opacity-');
                             }, 500);
                         }
                     });
@@ -5027,7 +5027,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
             
             const sourcesContent = sourcesEl.createDiv({ cls: 'sources-content' });
-            sourcesContent.setCssProps({ 'display':  'none' }); 
+            sourcesContent.addClass('nl-display-none'); 
 
             
             const extractYouTubeId = (url: string): string | null => {
@@ -5180,7 +5180,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             });
 
             
-            sourcesHeader.setCssProps({ 'cursor':  'pointer' });
+            sourcesHeader.addClass('nl-cursor-pointer');
         }
     }
 
@@ -5198,7 +5198,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
             
             const toolsContent = toolsEl.createDiv({ cls: 'sources-content' });
-            toolsContent.setCssProps({ 'display':  'none' }); 
+            toolsContent.addClass('nl-display-none'); 
 
             
             const toolsByServer = new Map<string, string[]>();
@@ -5227,7 +5227,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             });
 
             
-            toolsHeader.setCssProps({ 'cursor':  'pointer' });
+            toolsHeader.addClass('nl-cursor-pointer');
         }
     }
 
@@ -5243,7 +5243,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
             
             const sourcesContent = webSourcesEl.createDiv({ cls: 'sources-content' });
-            sourcesContent.setCssProps({ 'display':  'none' }); 
+            sourcesContent.addClass('nl-display-none'); 
 
             const sourcesList = sourcesContent.createEl('ul');
             webResults.forEach(result => {
@@ -5267,7 +5267,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             });
 
             
-            sourcesHeader.setCssProps({ 'cursor':  'pointer' });
+            sourcesHeader.addClass('nl-cursor-pointer');
         }
     }
 
@@ -5292,7 +5292,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
         
         const sourcesContent = sourcesEl.createDiv({ cls: 'sources-content' });
-        sourcesContent.setCssProps({ 'display':  'none' }); 
+        sourcesContent.addClass('nl-display-none'); 
 
         
         const answerEl = responseEl.querySelector('.agent-final-answer-content') || responseEl.querySelector('.response-answer');
@@ -5387,7 +5387,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         });
 
         
-        sourcesHeader.setCssProps({ 'cursor':  'pointer' });
+        sourcesHeader.addClass('nl-cursor-pointer');
     }
 
 
@@ -5696,7 +5696,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             const thinkingChevron = thinkingHeader.createDiv({ cls: 'thinking-chevron', text: '▾' });
             thinkingChevron.setAttr('aria-label', 'Collapse reasoning');
             thinkingChevron.setAttr('tabindex', '0');
-            thinkingChevron.setCssProps({ 'cursor':  'pointer' });
+            thinkingChevron.addClass('nl-cursor-pointer');
             thinkingChevron.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const isCollapsed = thinkingContainer.classList.contains('collapsed');
@@ -6047,7 +6047,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 const autoMode = this.plugin.settings.codeExecutionAutoMode ?? false;
 
                 if (autoMode) {
-                    (pre as HTMLElement).setCssProps({ 'display':  'none' });
+                    (pre as HTMLElement).addClass('nl-display-none');
                     outputEl.classList.remove('hidden');
                     this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
                     return;
@@ -6069,25 +6069,25 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 const backBtn = document.createElement('button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
-                backBtn.setCssProps({ 'display':  'none' });
+                backBtn.addClass('nl-display-none');
                 setIcon(backBtn, 'code-2');
                 backBtn.addEventListener('click', () => {
-                    (pre as HTMLElement).setCssProps({ 'display':  '' });
+                    (pre as HTMLElement).addClass('nl-display-');
                     outputEl.classList.add('hidden');
                     outputEl.empty();
                     outputEl.className = 'code-exec-output hidden';
                     renderToggle.classList.remove('is-enabled');
                     renderToggle.setAttribute('aria-checked', 'false');
-                    backBtn.setCssProps({ 'display':  'none' });
+                    backBtn.addClass('nl-display-none');
                 });
 
                 renderToggle.addEventListener('click', async () => {
                     if (renderToggle.classList.contains('is-enabled')) return;
                     renderToggle.classList.add('is-enabled');
                     renderToggle.setAttribute('aria-checked', 'true');
-                    (pre as HTMLElement).setCssProps({ 'display':  'none' });
+                    (pre as HTMLElement).addClass('nl-display-none');
                     outputEl.classList.remove('hidden');
-                    backBtn.setCssProps({ 'display':  '' });
+                    backBtn.addClass('nl-display-');
                     await this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
                 });
 
@@ -6111,7 +6111,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
             if (autoMode) {
                 
-                (pre as HTMLElement).setCssProps({ 'display':  'none' });
+                (pre as HTMLElement).addClass('nl-display-none');
                 outputEl.classList.remove('hidden');
                 this.runCode(pre as HTMLElement, lang, outputEl, wrapper, true, question);
             } else {
@@ -6133,18 +6133,18 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 const backBtn = document.createElement('button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
-                backBtn.setCssProps({ 'display':  'none' });
+                backBtn.addClass('nl-display-none');
                 setIcon(backBtn, 'code-2');
                 backBtn.addEventListener('click', () => {
                     
-                    (pre as HTMLElement).setCssProps({ 'display':  '' });
+                    (pre as HTMLElement).addClass('nl-display-');
                     outputEl.classList.add('hidden');
                     outputEl.empty();
                     outputEl.className = 'code-exec-output hidden';
                     
                     runToggle.classList.remove('is-enabled');
                     runToggle.setAttribute('aria-checked', 'false');
-                    backBtn.setCssProps({ 'display':  'none' });
+                    backBtn.addClass('nl-display-none');
                     
                     wrapper.querySelector('.code-repair-toggle-row')?.remove();
                 });
@@ -6154,9 +6154,9 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                     runToggle.classList.add('is-enabled');
                     runToggle.setAttribute('aria-checked', 'true');
                     
-                    (pre as HTMLElement).setCssProps({ 'display':  'none' });
+                    (pre as HTMLElement).addClass('nl-display-none');
                     outputEl.classList.remove('hidden');
-                    backBtn.setCssProps({ 'display':  '' });
+                    backBtn.addClass('nl-display-');
                     await this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
                 });
 
@@ -6212,8 +6212,8 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             window.addEventListener('message', onMsg);
         } else if (result.isMarkdown && result.markdownContent) {
             outputEl.classList.add('code-exec-success');
-            outputEl.setCssProps({ 'font-family':  'var(--font-text)' });
-            outputEl.setCssProps({ 'padding':  '12px' });
+            outputEl.addClass('nl-font-family-var--font-text');
+            outputEl.addClass('nl-padding-12px');
             MarkdownRenderer.render(this.app, result.markdownContent, outputEl, '', this);
         } else if (result.success) {
             outputEl.classList.add('code-exec-success');
@@ -7141,7 +7141,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
         
         const adjustHeight = () => {
-            textArea.setCssProps({ 'height':  'auto' });
+            textArea.addClass('nl-height-auto');
             textArea.setCssProps({ 'height':  textArea.scrollHeight + 'px' });
         };
         textArea.addEventListener('input', adjustHeight);
@@ -7197,10 +7197,10 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         menu.className = 'context-file-menu';
         
         const rect = anchorEl.getBoundingClientRect();
-        menu.setCssProps({ 'position':  'fixed' });
+        menu.addClass('nl-position-fixed');
         menu.setCssProps({ 'left':  `${rect.left}px` });
-        menu.setCssProps({ 'z-index':  '9999' });
-        menu.setCssProps({ 'min-width':  '260px' });
+        menu.addClass('nl-z-index-9999');
+        menu.addClass('nl-min-width-260px');
         
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
@@ -7312,10 +7312,10 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
         
         const rect = anchorEl.getBoundingClientRect();
-        menu.setCssProps({ 'position':  'fixed' });
+        menu.addClass('nl-position-fixed');
         menu.setCssProps({ 'left':  `${rect.left}px` });
-        menu.setCssProps({ 'z-index':  '9999' });
-        menu.setCssProps({ 'min-width':  '260px' });
+        menu.addClass('nl-z-index-9999');
+        menu.addClass('nl-min-width-260px');
 
         
         const listContainer = document.createElement('div');
@@ -7464,7 +7464,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 const noResults = document.createElement('div');
                 noResults.className = 'context-file-menu-item';
                 noResults.textContent = 'No matches found';
-                noResults.setCssProps({ 'opacity':  '0.5' });
+                noResults.addClass('nl-opacity-05');
                 container.appendChild(noResults);
             }
         }
@@ -7743,7 +7743,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         
         if (optionType !== 'file') {
             if (this.contextMenuPreviewEl) {
-                this.contextMenuPreviewEl.setCssProps({ 'display':  'none' });
+                this.contextMenuPreviewEl.addClass('nl-display-none');
             }
             return;
         }
@@ -7796,16 +7796,16 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 const menuRect = this.contextMenuEl.getBoundingClientRect();
                 const previewHeight = 250; 
 
-                this.contextMenuPreviewEl.setCssProps({ 'position':  'fixed' });
+                this.contextMenuPreviewEl.addClass('nl-position-fixed');
                 this.contextMenuPreviewEl.setCssProps({ 'left':  `${menuRect.left}px` });
                 this.contextMenuPreviewEl.setCssProps({ 'bottom':  `${window.innerHeight - menuRect.top + 8}px` });
                 this.contextMenuPreviewEl.setCssProps({ 'width':  `${Math.max(menuRect.width, 400)}px` });
                 this.contextMenuPreviewEl.setCssProps({ 'max-height':  `${previewHeight}px` });
-                this.contextMenuPreviewEl.setCssProps({ 'display':  'block' });
+                this.contextMenuPreviewEl.addClass('nl-display-block');
             }
         } catch (error) {
                         if (this.contextMenuPreviewEl) {
-                this.contextMenuPreviewEl.setCssProps({ 'display':  'none' });
+                this.contextMenuPreviewEl.addClass('nl-display-none');
             }
         }
     }
@@ -8388,7 +8388,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 } else if (page === 0) {
                     sessionList.createDiv({ cls: 'no-sessions-message', text: 'No sessions yet.' });
                 }
-                paginationDiv.setCssProps({ 'display':  'none' });
+                paginationDiv.addClass('nl-display-none');
             } else {
                 
                 const fragment = document.createDocumentFragment();
@@ -8465,10 +8465,10 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                 
                 if (totalSessions > pageSize) {
-                    paginationDiv.setCssProps({ 'display':  'flex' });
+                    paginationDiv.addClass('nl-display-flex');
                     updatePagination();
                 } else {
-                    paginationDiv.setCssProps({ 'display':  'none' });
+                    paginationDiv.addClass('nl-display-none');
                 }
             }
         };
@@ -8808,7 +8808,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         });
 
         
-        capsule.setCssProps({ 'display':  'flex' });
+        capsule.addClass('nl-display-flex');
     }
 
     private reconstructActionData(savedActionData: SafeAny): SafeAny {
@@ -11018,7 +11018,7 @@ class CodeCanvasModal extends Modal {
         setIcon(saveIcon, 'save');
         saveBtn.createSpan({ text: 'Save' });
         saveBtn.setAttribute('aria-label', 'Save changes to response');
-        saveBtn.setCssProps({ 'display':  'none' });
+        saveBtn.addClass('nl-display-none');
 
         const codeArea = codePanel.createEl('textarea', { cls: 'code-canvas-editor' });
         codeArea.value = this.code;
@@ -11056,7 +11056,7 @@ class CodeCanvasModal extends Modal {
                     iframe.className = 'code-exec-iframe code-canvas-iframe';
                     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
                     iframe.srcdoc = result.htmlContent;
-                    previewArea.setCssProps({ 'padding':  '0' });
+                    previewArea.addClass('nl-padding-0');
                     previewArea.appendChild(iframe);
                     const onMsg = (e: MessageEvent) => {
                         if (e.data?.iframeHeight) {
@@ -11066,7 +11066,7 @@ class CodeCanvasModal extends Modal {
                     };
                     window.addEventListener('message', onMsg);
                 } else if (result.isMarkdown && result.markdownContent) {
-                    previewArea.setCssProps({ 'padding':  '' });
+                    previewArea.addClass('nl-padding-');
                     { const _comp = new Component();
                     await MarkdownRenderer.render(this.app, result.markdownContent, previewArea, '', _comp);
                     _comp.load(); }
@@ -11090,7 +11090,7 @@ class CodeCanvasModal extends Modal {
         codeArea.addEventListener('input', () => {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(render, 600);
-            saveBtn.setCssProps({ 'display':  codeArea.value !== this.code ? '' : 'none' });
+            saveBtn.toggleClass('nl-display-none', !(codeArea.value !== this.code));
             if (this.onUpdate) this.onUpdate(codeArea.value);
         });
 
@@ -11098,7 +11098,7 @@ class CodeCanvasModal extends Modal {
             const newCode = codeArea.value;
             if (this.onSave) this.onSave(newCode);
             this.code = newCode;
-            saveBtn.setCssProps({ 'display':  'none' });
+            saveBtn.addClass('nl-display-none');
             setIcon(saveIcon, 'check');
             setTimeout(() => setIcon(saveIcon, 'save'), 1500);
         });
@@ -11139,7 +11139,7 @@ class CodeCanvasModal extends Modal {
         setIcon(saveIcon, 'save');
         saveBtn.createSpan({ text: 'Save' });
         saveBtn.setAttribute('aria-label', 'Save changes to response');
-        saveBtn.setCssProps({ 'display':  'none' });
+        saveBtn.addClass('nl-display-none');
 
         const codeArea = codePanel.createEl('textarea', { cls: 'code-canvas-editor' });
         codeArea.value = this.code;
@@ -11210,7 +11210,7 @@ class CodeCanvasModal extends Modal {
         runBtn.addEventListener('click', run);
 
         codeArea.addEventListener('input', () => {
-            saveBtn.setCssProps({ 'display':  codeArea.value !== this.code ? '' : 'none' });
+            saveBtn.toggleClass('nl-display-none', !(codeArea.value !== this.code));
             if (this.onUpdate) this.onUpdate(codeArea.value);
         });
 
@@ -11218,7 +11218,7 @@ class CodeCanvasModal extends Modal {
             const newCode = codeArea.value;
             if (this.onSave) this.onSave(newCode);
             this.code = newCode;
-            saveBtn.setCssProps({ 'display':  'none' });
+            saveBtn.addClass('nl-display-none');
             setIcon(saveIcon, 'check');
             setTimeout(() => setIcon(saveIcon, 'save'), 1500);
         });

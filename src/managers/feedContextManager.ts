@@ -105,7 +105,7 @@ export class FeedEntrySelectModal extends Modal {
       }
       // Checkbox
       const checkbox = item.createEl('input', { type: 'checkbox', value: entry.link });
-      checkbox.setCssProps({ 'margin-right':  '8px' });
+      checkbox.addClass('nl-margin-right-8px');
       checkbox.onchange = () => {
         if (checkbox.checked) this.selectedUrls.add(entry.link!);
         else this.selectedUrls.delete(entry.link!);
@@ -144,7 +144,7 @@ export class FeedEntrySelectModal extends Modal {
     const query = this.searchInputEl.value.toLowerCase();
     this.entryItems.forEach(({ entry, itemEl }) => {
       const match = entry.title?.toLowerCase().includes(query);
-      itemEl.setCssProps({ 'display':  match ? '' : 'none' });
+      itemEl.toggleClass('nl-display-none', !(match));
     });
   }
 

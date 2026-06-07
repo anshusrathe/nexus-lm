@@ -82,12 +82,12 @@ export class FileCreationReviewModal extends Modal {
     header.createEl('h2', { text: `Create ${type}: ${folderName}` });
 
     const messageContainer = contentEl.createDiv({ cls: 'file-preview-scroll-container' });
-    messageContainer.setCssProps({ 'display':  'flex' });
-    messageContainer.setCssProps({ 'flex-direction':  'column' });
-    messageContainer.setCssProps({ 'align-items':  'center' });
-    messageContainer.setCssProps({ 'justify-content':  'center' });
-    messageContainer.setCssProps({ 'padding':  '40px 20px' });
-    messageContainer.setCssProps({ 'text-align':  'center' });
+    messageContainer.addClass('nl-display-flex');
+    messageContainer.addClass('nl-flex-direction-column');
+    messageContainer.addClass('nl-align-items-center');
+    messageContainer.addClass('nl-justify-content-center');
+    messageContainer.addClass('nl-padding-40px20px');
+    messageContainer.addClass('nl-text-align-center');
 
     messageContainer.createEl('div', {
       text: '📄',
@@ -102,8 +102,8 @@ export class FileCreationReviewModal extends Modal {
 
     if (targetPath) {
         const pathInfo = messageContainer.createEl('p', { cls: 'file-preview-path-info' });
-        pathInfo.setCssProps({ 'margin-top':  '15px' });
-        pathInfo.setCssProps({ 'font-weight':  'bold' });
+        pathInfo.addClass('nl-margin-top-15px');
+        pathInfo.addClass('nl-font-weight-bold');
         pathInfo.createSpan({ text: 'Target Path: ' });
         const linkSpan = pathInfo.createSpan();
         MarkdownRenderer.render(this.app, `[[${targetPath}]]`, linkSpan, '', this as SafeAny);
@@ -123,7 +123,7 @@ export class FileCreationReviewModal extends Modal {
       .onClick(() => {
         this.close();
       });
-    cancelBtn.buttonEl.setCssProps({ 'margin-left':  '10px' });
+    cancelBtn.buttonEl.addClass('nl-margin-left-10px');
   }
 
   private renderPlan() {
@@ -305,10 +305,10 @@ export async function handleFileCreationPrompt(
     const workspace = document.querySelector('.workspace') || document.body;
     spinner = document.createElement('div');
     spinner.className = 'loading-spinner visible';
-    spinner.setCssProps({ 'position':  'fixed' });
-    spinner.setCssProps({ 'top':  '18px' });
-    spinner.setCssProps({ 'right':  '32px' });
-    spinner.setCssProps({ 'z-index':  '9999' });
+    spinner.addClass('nl-position-fixed');
+    spinner.addClass('nl-top-18px');
+    spinner.addClass('nl-right-32px');
+    spinner.addClass('nl-z-index-9999');
     workspace.appendChild(spinner);
 
     // Create enhanced context for file creation

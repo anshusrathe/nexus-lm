@@ -1250,15 +1250,13 @@ await this.plugin.saveSettings();
     else apiKeyUrl = 'https://aistudio.google.com/app/apikey';
 
     // Style the control element to stack items vertically and align to the right
-    apiSetting.controlEl.setCssProps({ 'display': 'flex', 'flex-direction': 'column', 'align-items': 'flex-end'
-    });
+    apiSetting.controlEl.addClass('nl-display-flex', 'nl-flex-direction-column', 'nl-align-items-flex-end');
 
     const linkContainer = apiSetting.controlEl.createDiv({
       cls: 'setting-item-description'
     });
     
-    linkContainer.setCssProps({ 'max-width': '200px', 'text-align': 'right', 'margin-top': '4px', 'line-height': '1.2', 'white-space': 'normal', 'word-break': 'break-word'
-    });
+    linkContainer.addClass('nl-max-width-200px', 'nl-text-align-right', 'nl-margin-top-4px', 'nl-line-height-12', 'nl-white-space-normal', 'nl-word-break-break-word');
 
     linkContainer.createEl('a', {
       text: `Get your Free ${providerDisplayName} API key here`,
@@ -1528,9 +1526,9 @@ await this.plugin.saveSettings();
     const headerSetting = new Setting(headerEl).setName(type === 'embedding' ? 'Embedding indexes' : 'BM25 indexes').setHeading();
     
     // Ensure the setting item takes full width and has no extra padding
-    headerSetting.settingEl.setCssProps({ 'width': '100%' });
-    headerSetting.settingEl.setCssProps({ 'border-top': 'none' });
-    headerSetting.settingEl.setCssProps({ 'padding': '0' });
+    headerSetting.settingEl.addClass('nl-width-100');
+    headerSetting.settingEl.addClass('nl-border-top-none');
+    headerSetting.settingEl.addClass('nl-padding-0');
 
     if (type === 'embedding') {
       headerSetting.addButton(btn => {
@@ -1539,7 +1537,7 @@ await this.plugin.saveSettings();
            .onClick(() => this.showAddIndexDialog('embedding'));
         btn.buttonEl.addClass('mod-cta');
         // Add some horizontal padding to make the plus look better
-        btn.buttonEl.setCssProps({ 'padding': '0 10px' });
+        btn.buttonEl.addClass('nl-padding-010px');
       });
     }
 
@@ -1970,16 +1968,16 @@ await this.plugin.saveSettings();
     });
     // Results rendered inline (not absolute) to avoid clipping inside scrollable modal
     const searchResults = pickerEl.createDiv({ cls: 'index-excl-search-results' });
-    searchResults.setCssProps({ 'display': 'none' });
+    searchResults.addClass('nl-display-none');
 
     const allMdFiles = this.app.vault.getMarkdownFiles().map(f => f.path).sort();
 
     const renderSearchResults = (query: string) => {
       searchResults.empty();
-      if (!query.trim()) { searchResults.setCssProps({ 'display': 'none' }); return; }
+      if (!query.trim()) { searchResults.addClass('nl-display-none'); return; }
       const matches = allMdFiles.filter(p => p.toLowerCase().includes(query.toLowerCase())).slice(0, 20);
-      if (matches.length === 0) { searchResults.setCssProps({ 'display': 'none' }); return; }
-      searchResults.setCssProps({ 'display': 'block' });
+      if (matches.length === 0) { searchResults.addClass('nl-display-none'); return; }
+      searchResults.addClass('nl-display-block');
       for (const path of matches) {
         const item = searchResults.createDiv({ cls: 'index-excl-search-item' });
         const cb = item.createEl('input', { type: 'checkbox' });
@@ -2024,7 +2022,7 @@ await this.plugin.saveSettings();
         const selectAllCb = selectAllItem.createEl('input', { type: 'checkbox' });
         selectAllCb.checked = allPaths.every(p => pendingFolders.includes(p));
         const selectAllLabel = selectAllItem.createEl('span', { cls: 'index-excl-folder-label', text: 'Select All' });
-        selectAllLabel.setCssProps({ 'font-weight': 'bold' });
+        selectAllLabel.addClass('nl-font-weight-bold');
 
         selectAllCb.addEventListener('change', () => {
           if (selectAllCb.checked) {
@@ -2418,13 +2416,13 @@ await this.plugin.saveSettings();
              this.plugin.settings.saveYoutubeTranscripts = val;
              await this.plugin.saveSettings();
              // Show/hide folder setting based on toggle
-             folderSetting.settingEl.setCssProps({ 'display': val ? '' : 'none' });
+             folderSetting.settingEl.toggleClass('nl-display-none', !(val));
              new Notice(`YouTube transcripts will ${val ? 'be saved as files' : 'be used internally only'}`);
            })
       );
 
     // Initially hide/show folder setting based on current toggle value
-    folderSetting.settingEl.setCssProps({ 'display': (this.plugin.settings.saveYoutubeTranscripts ?? true) ? '' : 'none' });
+    folderSetting.settingEl.toggleClass('nl-display-none', !((this.plugin.settings.saveYoutubeTranscripts ?? true)));
 
     // Add PDF output directory setting
     new Setting(containerEl).setName('File output').setHeading();
@@ -2636,8 +2634,8 @@ if (this.validatePath(normalizedPath)) {
         cls: 'provider-model-count', 
         text: `${providerModels.length} models` 
       });
-      modelCount.setCssProps({ 'color': 'var(--text-muted)' });
-      modelCount.setCssProps({ 'font-size': '0.85em' });
+      modelCount.addClass('nl-color-var--text-muted');
+      modelCount.addClass('nl-font-size-085em');
 
       // Header Right: Verification Button / Spinner / Status
       const headerRight = header.createDiv({ cls: 'provider-header-right' });
@@ -2719,7 +2717,7 @@ if (this.validatePath(normalizedPath)) {
         emptyRow.createEl('td', { 
           text: 'No models added for this provider.',
           attr: { colspan: '5' }
-        }).setCssProps({ 'text-align': 'center' });
+        }).addClass('nl-text-align-center');
       }
 
       const addBtnContainer = content.createDiv({ cls: 'provider-add-button-container' });
@@ -3023,8 +3021,8 @@ if (this.validatePath(normalizedPath)) {
         cls: 'provider-model-count', 
         text: `${providerModels.length} models` 
       });
-      modelCount.setCssProps({ 'color': 'var(--text-muted)' });
-      modelCount.setCssProps({ 'font-size': '0.85em' });
+      modelCount.addClass('nl-color-var--text-muted');
+      modelCount.addClass('nl-font-size-085em');
 
       // Header Right: Verification Button / Spinner / Status
       const headerRight = header.createDiv({ cls: 'provider-header-right' });
@@ -3094,7 +3092,7 @@ if (this.validatePath(normalizedPath)) {
         emptyRow.createEl('td', { 
           text: 'No embedding models added for this provider.',
           attr: { colspan: '4' }
-        }).setCssProps({ 'text-align': 'center' });
+        }).addClass('nl-text-align-center');
       }
 
       const addBtnContainer = content.createDiv({ cls: 'provider-add-button-container' });
@@ -3362,7 +3360,7 @@ if (this.validatePath(normalizedPath)) {
       selectedIndex = -1;
 
       if (query.length === 0) {
-        suggestionsEl.setCssProps({ 'display': 'none' });
+        suggestionsEl.addClass('nl-display-none');
         return;
       }
 
@@ -3371,18 +3369,18 @@ if (this.validatePath(normalizedPath)) {
         .slice(0, 10); // Limit to 10 suggestions
 
       if (matches.length === 0) {
-        suggestionsEl.setCssProps({ 'display': 'none' });
+        suggestionsEl.addClass('nl-display-none');
         return;
       }
 
-      suggestionsEl.setCssProps({ 'display': 'block' });
+      suggestionsEl.addClass('nl-display-block');
       matches.forEach((match, idx) => {
         const suggestion = suggestionsEl.createDiv({ cls: 'autocomplete-suggestion' });
         suggestion.textContent = match;
         suggestion.addEventListener('click', () => {
           onSelect(match);
           input.value = '';
-          suggestionsEl.setCssProps({ 'display': 'none' });
+          suggestionsEl.addClass('nl-display-none');
         });
         suggestion.addEventListener('mouseenter', () => {
           selectedIndex = idx;
@@ -3408,16 +3406,16 @@ if (this.validatePath(normalizedPath)) {
         const selected = suggestions[selectedIndex] as HTMLElement;
         onSelect(selected.textContent || '');
         input.value = '';
-        suggestionsEl.setCssProps({ 'display': 'none' });
+        suggestionsEl.addClass('nl-display-none');
       } else if (e.key === 'Escape') {
-        suggestionsEl.setCssProps({ 'display': 'none' });
+        suggestionsEl.addClass('nl-display-none');
       }
     });
 
     input.addEventListener('blur', () => {
       // Delay to allow click on suggestion
       setTimeout(() => {
-        suggestionsEl.setCssProps({ 'display': 'none' });
+        suggestionsEl.addClass('nl-display-none');
       }, 200);
     });
   }
@@ -3533,8 +3531,8 @@ if (this.validatePath(normalizedPath)) {
 
           // Fade out and remove the card after a short delay
           setTimeout(() => {
-            card.setCssProps({ 'transition': 'opacity 0.4s' });
-            card.setCssProps({ 'opacity': '0' });
+            card.addClass('nl-transition-opacity04s');
+            card.addClass('nl-opacity-0');
             setTimeout(() => {
               card.remove();
               // If all cards gone, remove the whole wrapper
@@ -3597,9 +3595,9 @@ if (this.validatePath(normalizedPath)) {
         text: 'No MCP servers configured. Click "Add MCP Server" to get started.',
         attr: { colspan: '6' }
       });
-      emptyCell.setCssProps({ 'text-align': 'center' });
-      emptyCell.setCssProps({ 'font-style': 'italic' });
-      emptyCell.setCssProps({ 'color': 'var(--text-muted)' });
+      emptyCell.addClass('nl-text-align-center');
+      emptyCell.addClass('nl-font-style-italic');
+      emptyCell.addClass('nl-color-var--text-muted');
     }
     
     // Add new server button
@@ -3621,8 +3619,8 @@ if (this.validatePath(normalizedPath)) {
     // Transport cell
     const transportCell = row.createEl('td');
     transportCell.setText(server.transport.toUpperCase());
-    transportCell.setCssProps({ 'font-weight': '600' });
-    transportCell.setCssProps({ 'font-size': '0.85em' });
+    transportCell.addClass('nl-font-weight-600');
+    transportCell.addClass('nl-font-size-085em');
     
     // Command/URL cell
     const commandCell = row.createEl('td');
@@ -3631,10 +3629,10 @@ if (this.validatePath(normalizedPath)) {
     } else {
       commandCell.setText(server.url || '');
     }
-    commandCell.setCssProps({ 'font-family': 'monospace' });
-    commandCell.setCssProps({ 'font-size': '0.9em' });
-    commandCell.setCssProps({ 'word-break': 'break-all' });
-    commandCell.setCssProps({ 'white-space': 'normal' });
+    commandCell.addClass('nl-font-family-monospace');
+    commandCell.addClass('nl-font-size-09em');
+    commandCell.addClass('nl-word-break-break-all');
+    commandCell.addClass('nl-white-space-normal');
     
     // Arguments cell
     const argsCell = row.createEl('td');
@@ -3643,10 +3641,10 @@ if (this.validatePath(normalizedPath)) {
     } else {
       argsCell.setText(server.apiKey ? '🔑 API Key Set' : '-');
     }
-    argsCell.setCssProps({ 'font-family': 'monospace' });
-    argsCell.setCssProps({ 'font-size': '0.9em' });
-    argsCell.setCssProps({ 'word-break': 'break-all' });
-    argsCell.setCssProps({ 'white-space': 'normal' });
+    argsCell.addClass('nl-font-family-monospace');
+    argsCell.addClass('nl-font-size-09em');
+    argsCell.addClass('nl-word-break-break-all');
+    argsCell.addClass('nl-white-space-normal');
     
     // Status cell
     const statusCell = row.createEl('td');
@@ -3657,8 +3655,8 @@ if (this.validatePath(normalizedPath)) {
     
     // Actions cell
     const actionsCell = row.createEl('td');
-    actionsCell.setCssProps({ 'display': 'flex' });
-    actionsCell.setCssProps({ 'gap': '8px' });
+    actionsCell.addClass('nl-display-flex');
+    actionsCell.addClass('nl-gap-8px');
     
     // Edit button
     const editBtn = actionsCell.createEl('button', { 
@@ -3975,10 +3973,10 @@ class MCPServerModal extends Modal {
     
     // Buttons
     const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
-    buttonContainer.setCssProps({ 'display': 'flex' });
-    buttonContainer.setCssProps({ 'justify-content': 'flex-end' });
-    buttonContainer.setCssProps({ 'gap': '8px' });
-    buttonContainer.setCssProps({ 'margin-top': '16px' });
+    buttonContainer.addClass('nl-display-flex');
+    buttonContainer.addClass('nl-justify-content-flex-end');
+    buttonContainer.addClass('nl-gap-8px');
+    buttonContainer.addClass('nl-margin-top-16px');
     
     const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
     cancelBtn.addEventListener('click', () => this.close());
@@ -3989,8 +3987,8 @@ class MCPServerModal extends Modal {
 
   private updateViewMode(): void {
     if (this.isSchemaView) {
-      this.fieldsContainer.setCssProps({ 'display': 'none' });
-      this.schemaContainer.setCssProps({ 'display': 'block' });
+      this.fieldsContainer.addClass('nl-display-none');
+      this.schemaContainer.addClass('nl-display-block');
       
       // Try to populate schema from fields if empty or just switched
       const currentConfig = this.getCurrentConfigFromFields();
@@ -4000,8 +3998,8 @@ class MCPServerModal extends Modal {
         this.schemaInput.value = JSON.stringify(schemaFields, null, 2);
       }
     } else {
-      this.fieldsContainer.setCssProps({ 'display': 'block' });
-      this.schemaContainer.setCssProps({ 'display': 'none' });
+      this.fieldsContainer.addClass('nl-display-block');
+      this.schemaContainer.addClass('nl-display-none');
       
       // Try to populate fields from schema if schema was edited
       this.syncFieldsFromSchema();
@@ -4084,11 +4082,11 @@ class MCPServerModal extends Modal {
 
   private updateTransportFields(transport: 'stdio' | 'sse'): void {
     if (transport === 'stdio') {
-      this.stdioContainer.setCssProps({ 'display': 'block' });
-      this.sseContainer.setCssProps({ 'display': 'none' });
+      this.stdioContainer.addClass('nl-display-block');
+      this.sseContainer.addClass('nl-display-none');
     } else {
-      this.stdioContainer.setCssProps({ 'display': 'none' });
-      this.sseContainer.setCssProps({ 'display': 'block' });
+      this.stdioContainer.addClass('nl-display-none');
+      this.sseContainer.addClass('nl-display-block');
     }
   }
 

@@ -613,7 +613,7 @@ export class AITutorView extends ItemView {
       });
     
     startQAButton.buttonEl.addClass('start-qa-button');
-    startQAButton.buttonEl.setCssProps({ 'display':  'none' });
+    startQAButton.buttonEl.addClass('nl-display-none');
 
     
     const startMCQButton = new ButtonComponent(buttonContainer)
@@ -634,7 +634,7 @@ export class AITutorView extends ItemView {
       });
     
     startMCQButton.buttonEl.addClass('start-mcq-button');
-    startMCQButton.buttonEl.setCssProps({ 'display':  'none' });
+    startMCQButton.buttonEl.addClass('nl-display-none');
 
     
     if (!Platform.isMobile) {
@@ -656,7 +656,7 @@ export class AITutorView extends ItemView {
         });
       
       this.startConceptMapButton.buttonEl.addClass('start-conceptmap-button');
-      this.startConceptMapButton.buttonEl.setCssProps({ 'display':  'none' });
+      this.startConceptMapButton.buttonEl.addClass('nl-display-none');
     }
 
     
@@ -680,7 +680,7 @@ export class AITutorView extends ItemView {
         });
       
       startSlidesButton.buttonEl.addClass('start-slides-button');
-      startSlidesButton.buttonEl.setCssProps({ 'display':  'none' });
+      startSlidesButton.buttonEl.addClass('nl-display-none');
     }
 
     
@@ -936,12 +936,12 @@ export class AITutorView extends ItemView {
     searchInput.addEventListener('input', (e) => {
       const query = (e.target as HTMLInputElement).value.toLowerCase();
       itemsToFilter.forEach(obj => {
-        obj.itemEl.setCssProps({ 'display':  obj.name.includes(query) ? '' : 'none' });
+        obj.itemEl.toggleClass('nl-display-none', !(obj.name.includes(query)));
       });
       headersToFilter.forEach(headerObj => {
         const hasVisibleItems = headerObj.items.some(item => item.style.display !== 'none');
-        headerObj.headerEl.setCssProps({ 'display':  hasVisibleItems ? '' : 'none' });
-        if (headerObj.separatorEl) headerObj.separatorEl.setCssProps({ 'display':  hasVisibleItems ? '' : 'none' });
+        headerObj.headerEl.toggleClass('nl-display-none', !(hasVisibleItems));
+        if (headerObj.separatorEl) headerObj.separatorEl.toggleClass('nl-display-none', !(hasVisibleItems));
       });
     });
 
@@ -990,7 +990,7 @@ export class AITutorView extends ItemView {
       }
     }
 
-    this.contextBarContainer.setCssProps({ 'display':  'flex' });
+    this.contextBarContainer.addClass('nl-display-flex');
 
     let currentTokens = 0;
     const tokenEstimator = new TokenEstimator();
@@ -1011,7 +1011,7 @@ export class AITutorView extends ItemView {
     const percentage = Math.min(100, (currentTokens / maxTokens) * 100);
 
     
-    this.contextProgressBar.setCssProps({ 'transition':  'width 0.3s ease-out' });
+    this.contextProgressBar.addClass('nl-transition-width03sease-out');
     this.contextProgressBar.setCssProps({ 'width':  `${percentage}%` });
     
     
@@ -1046,7 +1046,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  'none' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
       const progressContainer = document.createElement('div');
@@ -1092,7 +1092,7 @@ export class AITutorView extends ItemView {
 
       
       progressContainer.remove();
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  '' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-'));
 
       this.renderQA();
       
@@ -1102,7 +1102,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  '' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-'));
       
       
       const progressContainer = this.container.querySelector('.qna-inline-progress');
@@ -1127,8 +1127,8 @@ export class AITutorView extends ItemView {
       const answerSection = questionContainer.createDiv({ cls: 'answer-section' });
       const answer = answerSection.createEl('textarea');
       answer.rows = 3;
-      answer.setCssProps({ 'width':  '100%' });
-      answer.setCssProps({ 'margin-bottom':  '10px' });
+      answer.addClass('nl-width-100');
+      answer.addClass('nl-margin-bottom-10px');
       answer.value = q.answer || '';
       
       answer.disabled = this.timerActive && this.timerType === 'qna' && !this.timerEndTime;
@@ -1242,7 +1242,7 @@ export class AITutorView extends ItemView {
 
 
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  'none' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
 
       const progressContainer = document.createElement('div');
@@ -1288,7 +1288,7 @@ export class AITutorView extends ItemView {
 
 
       progressContainer.remove();
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  '' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-'));
 
       this.renderMCQs();
 
@@ -1298,7 +1298,7 @@ export class AITutorView extends ItemView {
 
 
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  '' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-'));
 
 
       const progressContainer = this.container.querySelector('.mcq-inline-progress');
@@ -1687,7 +1687,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  'none' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
       const progressContainer = document.createElement('div');
@@ -1750,7 +1750,7 @@ export class AITutorView extends ItemView {
       
       
       progressContainer.remove();
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  '' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-'));
       this.renderInitial();
 
     } catch (error: unknown) {
@@ -1759,7 +1759,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  '' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-'));
       
       
       const progressContainer = this.container.querySelector('.concept-map-inline-progress');
@@ -1777,7 +1777,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button, .start-slides-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  'none' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
       const progressContainer = document.createElement('div');
@@ -1810,7 +1810,7 @@ export class AITutorView extends ItemView {
       }
 
       
-      progressFill.setCssProps({ 'width':  '0%' });
+      progressFill.addClass('nl-width-0');
       progressFill.setCssProps({ 'transition':  'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)' });
 
       let filePath: string;
@@ -1852,7 +1852,7 @@ export class AITutorView extends ItemView {
       this.saveSavedSlideshows();
 
       
-      progressFill.setCssProps({ 'width':  '100%' });
+      progressFill.addClass('nl-width-100');
       progressText.textContent = 'Complete!';
       progressPercentage.textContent = '100%';
 
@@ -1864,7 +1864,7 @@ export class AITutorView extends ItemView {
       
       setTimeout(() => {
         progressContainer.remove();
-        startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  '' }));
+        startButtons.forEach(btn => btn.addClass('nl-pointer-events-'));
         this.renderInitial();
       }, 1000);
 
@@ -1874,7 +1874,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button, .start-slides-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.setCssProps({ 'pointer-events':  '' }));
+      startButtons.forEach(btn => btn.addClass('nl-pointer-events-'));
       
       
       const progressContainer = this.container.querySelector('.slideshow-inline-progress');
@@ -2503,29 +2503,29 @@ export class AITutorView extends ItemView {
     
     this.timerContainer?.remove();
     this.timerContainer = this.container.createDiv({ cls: 'timer-fixed-container' });
-    this.timerContainer.setCssProps({ 'position':  'sticky' });
-    this.timerContainer.setCssProps({ 'top':  '0' });
-    this.timerContainer.setCssProps({ 'right':  '0' });
-    this.timerContainer.setCssProps({ 'display':  'flex' });
-    this.timerContainer.setCssProps({ 'justify-content':  'flex-end' });
-    this.timerContainer.setCssProps({ 'align-items':  'center' });
-    this.timerContainer.setCssProps({ 'z-index':  '10' });
+    this.timerContainer.addClass('nl-position-sticky');
+    this.timerContainer.addClass('nl-top-0');
+    this.timerContainer.addClass('nl-right-0');
+    this.timerContainer.addClass('nl-display-flex');
+    this.timerContainer.addClass('nl-justify-content-flex-end');
+    this.timerContainer.addClass('nl-align-items-center');
+    this.timerContainer.addClass('nl-z-index-10');
     this.timerContainer.setCssProps({ 'background':  'var(--background-primary, #fff)' });
-    this.timerContainer.setCssProps({ 'padding':  '8px 16px 0 0' });
-    this.timerContainer.setCssProps({ 'gap':  '8px' });
+    this.timerContainer.addClass('nl-padding-8px16px00');
+    this.timerContainer.addClass('nl-gap-8px');
 
     
     const timerIcon = this.timerContainer.createSpan({ cls: 'lucide-timer', attr: { 'aria-label': 'Set timer' } });
     setIcon(timerIcon, 'timer');
-    timerIcon.setCssProps({ 'cursor':  'pointer' });
+    timerIcon.addClass('nl-cursor-pointer');
     timerIcon.title = 'Set timer';
 
     
     const timerDisplay = this.timerContainer.createSpan({ cls: 'timer-countdown' });
-    timerDisplay.setCssProps({ 'font-weight':  'bold' });
-    timerDisplay.setCssProps({ 'font-size':  '1.1em' });
-    timerDisplay.setCssProps({ 'margin-left':  '8px' });
-    timerDisplay.setCssProps({ 'display':  'none' });
+    timerDisplay.addClass('nl-font-weight-bold');
+    timerDisplay.addClass('nl-font-size-11em');
+    timerDisplay.addClass('nl-margin-left-8px');
+    timerDisplay.addClass('nl-display-none');
 
     timerIcon.onclick = () => {
       if (this.timerActive) return; 
@@ -2541,7 +2541,7 @@ export class AITutorView extends ItemView {
     this.timerType = type;
     this.timerNoticeShown = false;
     this.timerEndTime = Date.now() + ms;
-    timerDisplay.setCssProps({ 'display':  '' });
+    timerDisplay.addClass('nl-display-');
     this.updateTimerDisplay(timerDisplay);
     this.timerInterval && window.clearInterval(this.timerInterval);
     this.timerInterval = window.setInterval(() => {
@@ -2921,8 +2921,8 @@ class TimerModal extends Modal {
     contentEl.empty();
     contentEl.createEl('h2', { text: 'Set Time Limit' });
     const input = contentEl.createEl('input', { type: 'text', placeholder: 'mm:ss (e.g., 05:00)' });
-    input.setCssProps({ 'width':  '100%' });
-    input.setCssProps({ 'margin-bottom':  '10px' });
+    input.addClass('nl-width-100');
+    input.addClass('nl-margin-bottom-10px');
     const submitBtn = contentEl.createEl('button', { text: 'Set Timer' });
     submitBtn.onclick = () => {
       const value = input.value.trim();

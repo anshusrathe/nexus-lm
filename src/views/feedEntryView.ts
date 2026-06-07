@@ -45,8 +45,8 @@ export class FeedEntryView extends ItemView {
              const container = this.containerEl.children[1] as HTMLElement; 
              container.empty(); 
              container.createEl('p', { text: 'No feed data loaded.', cls: 'no-entries-message' });
-             container.setCssProps({ 'text-align':  'center' });
-             container.setCssProps({ 'color':  'var(--text-muted)' });
+             container.addClass('nl-text-align-center');
+             container.addClass('nl-color-var--text-muted');
         }
         await super.setState(state, result);
     }
