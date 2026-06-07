@@ -82,12 +82,12 @@ export class FileCreationReviewModal extends Modal {
     header.createEl('h2', { text: `Create ${type}: ${folderName}` });
 
     const messageContainer = contentEl.createDiv({ cls: 'file-preview-scroll-container' });
-    messageContainer.style.display = 'flex';
-    messageContainer.style.flexDirection = 'column';
-    messageContainer.style.alignItems = 'center';
-    messageContainer.style.justifyContent = 'center';
-    messageContainer.style.padding = '40px 20px';
-    messageContainer.style.textAlign = 'center';
+    messageContainer.setCssStyles({ 'display': 'flex' });
+    messageContainer.setCssStyles({ 'flexDirection': 'column' });
+    messageContainer.setCssStyles({ 'alignItems': 'center' });
+    messageContainer.setCssStyles({ 'justifyContent': 'center' });
+    messageContainer.setCssStyles({ 'padding': '40px 20px' });
+    messageContainer.setCssStyles({ 'textAlign': 'center' });
 
     messageContainer.createEl('div', {
       text: '📄',
@@ -102,8 +102,8 @@ export class FileCreationReviewModal extends Modal {
 
     if (targetPath) {
         const pathInfo = messageContainer.createEl('p', { cls: 'file-preview-path-info' });
-        pathInfo.style.marginTop = '15px';
-        pathInfo.style.fontWeight = 'bold';
+        pathInfo.setCssStyles({ 'marginTop': '15px' });
+        pathInfo.setCssStyles({ 'fontWeight': 'bold' });
         pathInfo.createSpan({ text: 'Target Path: ' });
         const linkSpan = pathInfo.createSpan();
         MarkdownRenderer.render(this.app, `[[${targetPath}]]`, linkSpan, '', this as any);
@@ -123,7 +123,7 @@ export class FileCreationReviewModal extends Modal {
       .onClick(() => {
         this.close();
       });
-    cancelBtn.buttonEl.style.marginLeft = '10px';
+    cancelBtn.buttonEl.setCssStyles({ 'marginLeft': '10px' });
   }
 
   private renderPlan() {
@@ -305,10 +305,10 @@ export async function handleFileCreationPrompt(
     const workspace = document.querySelector('.workspace') || document.body;
     spinner = document.createElement('div');
     spinner.className = 'loading-spinner visible';
-    spinner.style.position = 'fixed';
-    spinner.style.top = '18px';
-    spinner.style.right = '32px';
-    spinner.style.zIndex = '9999';
+    spinner.setCssStyles({ 'position': 'fixed' });
+    spinner.setCssStyles({ 'top': '18px' });
+    spinner.setCssStyles({ 'right': '32px' });
+    spinner.setCssStyles({ 'zIndex': '9999' });
     workspace.appendChild(spinner);
 
     // Create enhanced context for file creation

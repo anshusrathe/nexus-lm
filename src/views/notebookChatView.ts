@@ -917,7 +917,7 @@ Rules:
     const leftControls = inputRow.createDiv({ cls: 'notebook-input-left-controls' });
     const plusBtn = leftControls.createDiv({ cls: 'context-menu-btn' });
     setIcon(plusBtn, 'plus');
-    plusBtn.style.cursor = 'pointer';
+    plusBtn.setCssStyles({ 'cursor': 'pointer' });
     plusBtn.setAttribute('aria-label', 'Add context');
     plusBtn.setAttribute('tabindex', '0');
     plusBtn.addEventListener('click', (e) => {
@@ -935,12 +935,12 @@ Rules:
     this.chatInput.inputEl.addEventListener('input', function () {
       const parent = this.parentElement;
       if (parent) {
-        parent.style.minHeight = parent.clientHeight + 'px';
+        parent.setCssStyles({ 'minHeight': parent.clientHeight + 'px' });
       }
-      this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+      this.setCssStyles({ 'height': 'auto' });
+      this.setCssStyles({ 'height': Math.min(this.scrollHeight, 200) + 'px' });
       if (parent) {
-        parent.style.minHeight = '';
+        parent.setCssStyles({ 'minHeight': '' });
       }
     });
 
@@ -1004,7 +1004,7 @@ Rules:
     const rightControls = inputRow.createDiv({ cls: 'notebook-input-right-controls' });
     const sendBtn = rightControls.createDiv({ cls: 'send-button-new' });
     setIcon(sendBtn, 'arrow-up');
-    sendBtn.style.cursor = 'pointer';
+    sendBtn.setCssStyles({ 'cursor': 'pointer' });
     sendBtn.setAttribute('aria-label', 'Send message');
     sendBtn.setAttribute('tabindex', '0');
     sendBtn.addEventListener('click', () => this.handleSendMessage());
@@ -1113,12 +1113,12 @@ Rules:
     this.chatInput.inputEl.addEventListener('input', function () {
       const parent = this.parentElement;
       if (parent) {
-        parent.style.minHeight = parent.clientHeight + 'px';
+        parent.setCssStyles({ 'minHeight': parent.clientHeight + 'px' });
       }
-      this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+      this.setCssStyles({ 'height': 'auto' });
+      this.setCssStyles({ 'height': Math.min(this.scrollHeight, 120) + 'px' });
       if (parent) {
-        parent.style.minHeight = '';
+        parent.setCssStyles({ 'minHeight': '' });
       }
     });
 
@@ -1488,7 +1488,7 @@ Rules:
         label.appendChild(checkbox);
         const nameSpan = document.createElement('span');
         nameSpan.textContent = ' ' + fileName;
-        nameSpan.style.fontWeight = 'bold';
+        nameSpan.setCssStyles({ 'fontWeight': 'bold' });
         label.appendChild(nameSpan);
 
         
@@ -1551,10 +1551,10 @@ Rules:
     menu.className = 'context-file-menu notebook-prefix-menu';
 
     const rect = anchorEl.getBoundingClientRect();
-    menu.style.position = 'fixed';
-    menu.style.left = `${rect.left}px`;
-    menu.style.zIndex = '9999';
-    menu.style.minWidth = '220px';
+    menu.setCssStyles({ 'position': 'fixed' });
+    menu.setCssStyles({ 'left': `${rect.left}px` });
+    menu.setCssStyles({ 'zIndex': '9999' });
+    menu.setCssStyles({ 'minWidth': '220px' });
 
     
     const prefixOptions = [
@@ -1569,12 +1569,12 @@ Rules:
 
       const labelSpan = document.createElement('span');
       labelSpan.textContent = opt.label;
-      labelSpan.style.fontWeight = '500';
+      labelSpan.setCssStyles({ 'fontWeight': '500' });
       item.appendChild(labelSpan);
 
       const descSpan = document.createElement('span');
       descSpan.textContent = opt.description;
-      descSpan.style.cssText = 'font-size: 0.85em; color: var(--text-muted); margin-left: 8px;';
+      descSpan.setCssStyles({ 'cssText': 'font-size: 0.85em; color: var(--text-muted); margin-left: 8px;' });
       item.appendChild(descSpan);
 
       item.addEventListener('click', async (e) => {
@@ -1605,7 +1605,7 @@ Rules:
 
     
     const menuHeight = menu.offsetHeight;
-    menu.style.top = `${rect.top - menuHeight - 8}px`;
+    menu.setCssStyles({ 'top': `${rect.top - menuHeight - 8}px` });
 
     this.contextMenuEl = menu;
 
@@ -1810,12 +1810,12 @@ Rules:
 
     
     const sliderContainer = sourcesHeader.createDiv({ cls: 'cag-history-slider-container' });
-    sliderContainer.style.display = (this.notebook.mode === 'cag' && this.sourceViewMode === 'notes') ? 'flex' : 'none';
-    sliderContainer.style.alignItems = 'center';
-    sliderContainer.style.gap = '8px';
-    sliderContainer.style.fontSize = '0.8em';
-    sliderContainer.style.color = 'var(--text-muted)';
-    sliderContainer.style.marginTop = '4px';
+    sliderContainer.setCssStyles({ 'display': (this.notebook.mode === 'cag' && this.sourceViewMode === 'notes') ? 'flex' : 'none' });
+    sliderContainer.setCssStyles({ 'alignItems': 'center' });
+    sliderContainer.setCssStyles({ 'gap': '8px' });
+    sliderContainer.setCssStyles({ 'fontSize': '0.8em' });
+    sliderContainer.setCssStyles({ 'color': 'var(--text-muted)' });
+    sliderContainer.setCssStyles({ 'marginTop': '4px' });
 
     const sliderLabel = sliderContainer.createSpan({ 
       text: `History: ${this.cagHistoryContextLength === 20 ? 'All' : this.cagHistoryContextLength}` 
@@ -1830,8 +1830,8 @@ Rules:
       },
       cls: 'cag-history-slider'
     });
-    slider.style.width = '60px';
-    slider.style.height = '4px';
+    slider.setCssStyles({ 'width': '60px' });
+    slider.setCssStyles({ 'height': '4px' });
     
     slider.addEventListener('input', (e) => {
       const val = parseInt((e.target as HTMLInputElement).value);
@@ -1889,7 +1889,7 @@ Rules:
         
         const nameSpan = document.createElement('span');
         nameSpan.textContent = ' ' + fileName;
-        nameSpan.style.fontWeight = 'bold';
+        nameSpan.setCssStyles({ 'fontWeight': 'bold' });
         label.appendChild(nameSpan);
 
         
@@ -1998,7 +1998,7 @@ Rules:
           
           const progressBarOuter = progressContainer.createDiv({ cls: 'rag-progress-bar-outer' });
           const progressBarInner = progressBarOuter.createDiv({ cls: 'rag-progress-bar-inner' });
-          progressBarInner.style.width = '0%';
+          progressBarInner.setCssStyles({ 'width': '0%' });
 
           
           progressContainer.createEl('span', { text: '0%', cls: 'rag-progress-text' });
@@ -2051,7 +2051,7 @@ Rules:
 
           
           if (progressBar) {
-            progressBar.style.width = `${percentage}%`;
+            progressBar.setCssStyles({ 'width': `${percentage}%` });
           }
 
           
@@ -2092,7 +2092,7 @@ Rules:
 
           
           if (progressBar) {
-            progressBar.style.width = `${percentage}%`;
+            progressBar.setCssStyles({ 'width': `${percentage}%` });
           }
 
           
@@ -2224,7 +2224,7 @@ Rules:
   
   private editUserMessage(messageContainer: HTMLElement, contentEl: HTMLElement, originalContent: string, actionsContainer: HTMLElement, saveSession: boolean) {
     contentEl.empty();
-    actionsContainer.style.display = 'none';
+    actionsContainer.setCssStyles({ 'display': 'none' });
 
     const editContainer = contentEl.createDiv({ cls: 'query-edit-container' });
     const textArea = editContainer.createEl('textarea', { cls: 'query-edit-textarea' });
@@ -2232,8 +2232,8 @@ Rules:
     textArea.rows = originalContent.split('\n').length;
 
     const adjustHeight = () => {
-      textArea.style.height = 'auto';
-      textArea.style.height = textArea.scrollHeight + 'px';
+      textArea.setCssStyles({ 'height': 'auto' });
+      textArea.setCssStyles({ 'height': textArea.scrollHeight + 'px' });
     };
     textArea.addEventListener('input', adjustHeight);
     setTimeout(adjustHeight, 0);
@@ -2245,7 +2245,7 @@ Rules:
       .onClick(() => {
         contentEl.empty();
         contentEl.createEl('p', { text: originalContent });
-        actionsContainer.style.display = '';
+        actionsContainer.setCssStyles({ 'display': '' });
       });
 
     new ButtonComponent(buttonContainer)
@@ -2270,7 +2270,7 @@ Rules:
         } else {
           contentEl.empty();
           contentEl.createEl('p', { text: originalContent });
-          actionsContainer.style.display = '';
+          actionsContainer.setCssStyles({ 'display': '' });
         }
       });
   }
@@ -2625,13 +2625,13 @@ Rules:
       query = `${query} ${urls}`.trim();
     }
     this.chatInput.setValue('');
-    this.chatInput.inputEl.style.height = '';
+    this.chatInput.inputEl.setCssStyles({ 'height': '' });
     
     
     
     const userMessageContainer = this.addMessage('user', originalQuery, false, [], false);
     const spinner = userMessageContainer.createDiv({ cls: 'loading-spinner' });
-    spinner.style.display = 'block';
+    spinner.setCssStyles({ 'display': 'block' });
     try {
       let cachedContext = '';
       
@@ -3639,23 +3639,23 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
           targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
           
-          targetEl.style.backgroundColor = 'var(--text-accent)';
-          targetEl.style.opacity = '0.3';
+          targetEl.setCssStyles({ 'backgroundColor': 'var(--text-accent)' });
+          targetEl.setCssStyles({ 'opacity': '0.3' });
 
           
           const backArrow = targetEl.querySelector('.footnote-backref') as HTMLElement;
           if (backArrow) {
-            backArrow.style.color = 'var(--text-accent)';
-            backArrow.style.fontWeight = 'bold';
+            backArrow.setCssStyles({ 'color': 'var(--text-accent)' });
+            backArrow.setCssStyles({ 'fontWeight': 'bold' });
           }
 
           
           setTimeout(() => {
-            targetEl.style.backgroundColor = '';
-            targetEl.style.opacity = '';
+            targetEl.setCssStyles({ 'backgroundColor': '' });
+            targetEl.setCssStyles({ 'opacity': '' });
             if (backArrow) {
-              backArrow.style.color = '';
-              backArrow.style.fontWeight = '';
+              backArrow.setCssStyles({ 'color': '' });
+              backArrow.setCssStyles({ 'fontWeight': '' });
             }
           }, 2000);
         }
@@ -3674,7 +3674,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         if (targetEl) {
           const tooltip = document.createElement('div');
           tooltip.classList.add('footnote-tooltip');
-          tooltip.style.cssText = `
+          tooltip.setCssStyles({ 'cssText': `
             position: fixed;
             background-color: var(--background-primary);
             border: 1px solid var(--background-modifier-border);
@@ -3684,7 +3684,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
             max-width: 300px;
             z-index: 1000;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          `;
+          ` });
 
           
           const clonedContent = targetEl.cloneNode(true) as HTMLElement;
@@ -3697,8 +3697,8 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
 
           
           const rect = refLink.getBoundingClientRect();
-          tooltip.style.left = `${rect.left}px`;
-          tooltip.style.top = `${rect.bottom + 5}px`;
+          tooltip.setCssStyles({ 'left': `${rect.left}px` });
+          tooltip.setCssStyles({ 'top': `${rect.bottom + 5}px` });
 
           
           const removeTooltip = () => {
@@ -3732,7 +3732,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
           backArrow.classList.add('footnote-backref');
           backArrow.textContent = ' ↩';
           backArrow.setAttribute('aria-label', 'Back to content');
-          backArrow.style.cssText = 'margin-left: 0.25em; cursor: pointer; text-decoration: none;';
+          backArrow.setCssStyles({ 'cssText': 'margin-left: 0.25em; cursor: pointer; text-decoration: none;' });
 
           backArrow.addEventListener('click', (e: MouseEvent) => {
             e.preventDefault();
@@ -3742,11 +3742,11 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
               refLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
               
-              refLink.style.backgroundColor = 'var(--text-accent)';
-              refLink.style.opacity = '0.3';
+              refLink.setCssStyles({ 'backgroundColor': 'var(--text-accent)' });
+              refLink.setCssStyles({ 'opacity': '0.3' });
               setTimeout(() => {
-                refLink.style.backgroundColor = '';
-                refLink.style.opacity = '';
+                refLink.setCssStyles({ 'backgroundColor': '' });
+                refLink.setCssStyles({ 'opacity': '' });
               }, 1000);
             }
           });
@@ -3772,19 +3772,19 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     
     const searchContainer = document.createElement('div');
     searchContainer.className = 'model-search-container';
-    searchContainer.style.position = 'sticky';
-    searchContainer.style.top = '0';
-    searchContainer.style.background = 'var(--background-primary)';
-    searchContainer.style.zIndex = '2';
-    searchContainer.style.padding = '8px';
-    searchContainer.style.borderBottom = '1px solid var(--background-modifier-border)';
+    searchContainer.setCssStyles({ 'position': 'sticky' });
+    searchContainer.setCssStyles({ 'top': '0' });
+    searchContainer.setCssStyles({ 'background': 'var(--background-primary)' });
+    searchContainer.setCssStyles({ 'zIndex': '2' });
+    searchContainer.setCssStyles({ 'padding': '8px' });
+    searchContainer.setCssStyles({ 'borderBottom': '1px solid var(--background-modifier-border)' });
 
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Search models...';
     searchInput.className = 'model-search-input';
-    searchInput.style.width = '100%';
-    searchInput.style.boxSizing = 'border-box';
+    searchInput.setCssStyles({ 'width': '100%' });
+    searchInput.setCssStyles({ 'boxSizing': 'border-box' });
     searchInput.addEventListener('keydown', (e) => e.stopPropagation());
     searchContainer.appendChild(searchInput);
     menuEl.appendChild(searchContainer);
@@ -3810,10 +3810,10 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         document.body.appendChild(menuEl);
         const btnRect = modelBtn.getBoundingClientRect();
         const menuRect = menuEl.getBoundingClientRect();
-        menuEl.style.position = 'absolute';
-        menuEl.style.left = `${btnRect.left}px`;
-        menuEl.style.top = `${btnRect.top - menuRect.height - 8}px`;
-        menuEl.style.zIndex = '1000';
+        menuEl.setCssStyles({ 'position': 'absolute' });
+        menuEl.setCssStyles({ 'left': `${btnRect.left}px` });
+        menuEl.setCssStyles({ 'top': `${btnRect.top - menuRect.height - 8}px` });
+        menuEl.setCssStyles({ 'zIndex': '1000' });
 
         setTimeout(() => {
           document.addEventListener('click', closeMenuNotice);
@@ -3898,12 +3898,12 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     searchInput.addEventListener('input', (e) => {
       const query = (e.target as HTMLInputElement).value.toLowerCase();
       itemsToFilter.forEach(obj => {
-        obj.itemEl.style.display = obj.name.includes(query) ? '' : 'none';
+        obj.itemEl.setCssStyles({ 'display': obj.name.includes(query) ? '' : 'none' });
       });
       headersToFilter.forEach(headerObj => {
         const hasVisibleItems = headerObj.items.some(item => item.style.display !== 'none');
-        headerObj.headerEl.style.display = hasVisibleItems ? '' : 'none';
-        if (headerObj.separatorEl) headerObj.separatorEl.style.display = hasVisibleItems ? '' : 'none';
+        headerObj.headerEl.setCssStyles({ 'display': hasVisibleItems ? '' : 'none' });
+        if (headerObj.separatorEl) headerObj.separatorEl.setCssStyles({ 'display': hasVisibleItems ? '' : 'none' });
       });
     });
 
@@ -3911,10 +3911,10 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     
     const btnRect = modelBtn.getBoundingClientRect();
     const menuRect = menuEl.getBoundingClientRect();
-    menuEl.style.position = 'absolute';
-    menuEl.style.left = `${btnRect.left}px`;
-    menuEl.style.top = `${btnRect.top - menuRect.height - 8}px`;
-    menuEl.style.zIndex = '1000';
+    menuEl.setCssStyles({ 'position': 'absolute' });
+    menuEl.setCssStyles({ 'left': `${btnRect.left}px` });
+    menuEl.setCssStyles({ 'top': `${btnRect.top - menuRect.height - 8}px` });
+    menuEl.setCssStyles({ 'zIndex': '1000' });
     setTimeout(() => {
       document.addEventListener('click', closeMenu);
     }, 0);
@@ -3952,7 +3952,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
       }
     }
 
-    this.contextBarContainer.style.display = 'flex';
+    this.contextBarContainer.setCssStyles({ 'display': 'flex' });
 
     let currentTokens = 0;
     let docsTokens = 0;
@@ -4001,8 +4001,8 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     const percentage = Math.min(100, (currentTokens / maxTokens) * 100);
 
     
-    this.contextProgressBar.style.transition = 'width 0.3s ease-out';
-    this.contextProgressBar.style.width = `${percentage}%`;
+    this.contextProgressBar.setCssStyles({ 'transition': 'width 0.3s ease-out' });
+    this.contextProgressBar.setCssStyles({ 'width': `${percentage}%` });
 
     
     if (this.notebook.mode === 'rag') {
@@ -4046,9 +4046,9 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
       
       const docsRatio = docsTokens / currentTokens;
       const splitPoint = docsRatio * 100;
-      this.contextProgressBar.style.background = `linear-gradient(to right, ${baseColor} ${splitPoint}%, var(--color-purple, #9b59b6) ${splitPoint}%)`;
+      this.contextProgressBar.setCssStyles({ 'background': `linear-gradient(to right, ${baseColor} ${splitPoint}%, var(--color-purple, #9b59b6) ${splitPoint}%)` });
     } else {
-      this.contextProgressBar.style.background = '';
+      this.contextProgressBar.setCssStyles({ 'background': '' });
     }
   }
 

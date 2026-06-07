@@ -395,7 +395,7 @@ export function triggerConfetti(element: HTMLElement) {
   for (let i = 0; i < confettiCount; i++) {
     const confetti = document.createElement('div');
     confetti.className = 'quiz-confetti';
-    confetti.style.cssText = `
+    confetti.setCssStyles({ 'cssText': `
       position: fixed;
       width: 10px;
       height: 10px;
@@ -405,7 +405,7 @@ export function triggerConfetti(element: HTMLElement) {
       pointer-events: none;
       z-index: 10000;
       border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
-    `;
+    ` });
     
     document.body.appendChild(confetti);
     
@@ -424,8 +424,8 @@ export function triggerConfetti(element: HTMLElement) {
       y = vy * elapsed + 0.5 * gravity * elapsed * elapsed;
       rotation = elapsed * 360;
       
-      confetti.style.transform = `translate(${x}px, ${y}px) rotate(${rotation}deg)`;
-      confetti.style.opacity = String(Math.max(0, 1 - elapsed / 1.5));
+      confetti.setCssStyles({ 'transform': `translate(${x}px, ${y}px) rotate(${rotation}deg)` });
+      confetti.setCssStyles({ 'opacity': String(Math.max(0, 1 - elapsed / 1.5)) });
       
       if (elapsed < 1.5) {
         requestAnimationFrame(animate);
@@ -944,8 +944,8 @@ export class FlashcardRenderer {
     for (let i = stackCount - 1; i >= 0; i--) {
       if (i > 0) {
         const stackCard = stackContainer.createDiv({ cls: 'flashcard-stack-card' });
-        stackCard.style.transform = `translateY(${i * 4}px) scale(${1 - i * 0.02})`;
-        stackCard.style.zIndex = String(stackCount - i);
+        stackCard.setCssStyles({ 'transform': `translateY(${i * 4}px) scale(${1 - i * 0.02})` });
+        stackCard.setCssStyles({ 'zIndex': String(stackCount - i) });
       }
     }
     

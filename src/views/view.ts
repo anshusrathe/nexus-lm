@@ -570,16 +570,16 @@ export class AITutorView extends ItemView {
         const startSlidesButton = this.container.querySelector('.start-slides-button') as HTMLElement;
         
         if (startQAButton) {
-          startQAButton.style.display = selectedPaths.length > 0 ? 'grid' : 'none';
+          startQAButton.setCssStyles({ 'display': selectedPaths.length > 0 ? 'grid' : 'none' });
         }
         if (startMCQButton) {
-          startMCQButton.style.display = selectedPaths.length > 0 ? 'grid' : 'none';
+          startMCQButton.setCssStyles({ 'display': selectedPaths.length > 0 ? 'grid' : 'none' });
         }
         if (startConceptMapButton) {
-          startConceptMapButton.style.display = selectedPaths.length > 0 ? 'grid' : 'none';
+          startConceptMapButton.setCssStyles({ 'display': selectedPaths.length > 0 ? 'grid' : 'none' });
         }
         if (startSlidesButton) {
-          startSlidesButton.style.display = selectedPaths.length > 0 ? 'grid' : 'none';
+          startSlidesButton.setCssStyles({ 'display': selectedPaths.length > 0 ? 'grid' : 'none' });
         }
         
         
@@ -613,7 +613,7 @@ export class AITutorView extends ItemView {
       });
     
     startQAButton.buttonEl.addClass('start-qa-button');
-    startQAButton.buttonEl.style.display = 'none';
+    startQAButton.buttonEl.setCssStyles({ 'display': 'none' });
 
     
     const startMCQButton = new ButtonComponent(buttonContainer)
@@ -634,7 +634,7 @@ export class AITutorView extends ItemView {
       });
     
     startMCQButton.buttonEl.addClass('start-mcq-button');
-    startMCQButton.buttonEl.style.display = 'none';
+    startMCQButton.buttonEl.setCssStyles({ 'display': 'none' });
 
     
     if (!Platform.isMobile) {
@@ -656,7 +656,7 @@ export class AITutorView extends ItemView {
         });
       
       this.startConceptMapButton.buttonEl.addClass('start-conceptmap-button');
-      this.startConceptMapButton.buttonEl.style.display = 'none';
+      this.startConceptMapButton.buttonEl.setCssStyles({ 'display': 'none' });
     }
 
     
@@ -680,7 +680,7 @@ export class AITutorView extends ItemView {
         });
       
       startSlidesButton.buttonEl.addClass('start-slides-button');
-      startSlidesButton.buttonEl.style.display = 'none';
+      startSlidesButton.buttonEl.setCssStyles({ 'display': 'none' });
     }
 
     
@@ -936,12 +936,12 @@ export class AITutorView extends ItemView {
     searchInput.addEventListener('input', (e) => {
       const query = (e.target as HTMLInputElement).value.toLowerCase();
       itemsToFilter.forEach(obj => {
-        obj.itemEl.style.display = obj.name.includes(query) ? '' : 'none';
+        obj.itemEl.setCssStyles({ 'display': obj.name.includes(query) ? '' : 'none' });
       });
       headersToFilter.forEach(headerObj => {
         const hasVisibleItems = headerObj.items.some(item => item.style.display !== 'none');
-        headerObj.headerEl.style.display = hasVisibleItems ? '' : 'none';
-        if (headerObj.separatorEl) headerObj.separatorEl.style.display = hasVisibleItems ? '' : 'none';
+        headerObj.headerEl.setCssStyles({ 'display': hasVisibleItems ? '' : 'none' });
+        if (headerObj.separatorEl) headerObj.separatorEl.setCssStyles({ 'display': hasVisibleItems ? '' : 'none' });
       });
     });
 
@@ -950,8 +950,8 @@ export class AITutorView extends ItemView {
     const containerRect = this.containerEl.getBoundingClientRect();
     
     
-    menuEl.style.right = `${containerRect.right - btnRect.right}px`;
-    menuEl.style.top = `${btnRect.bottom - containerRect.top + 5}px`;
+    menuEl.setCssStyles({ 'right': `${containerRect.right - btnRect.right}px` });
+    menuEl.setCssStyles({ 'top': `${btnRect.bottom - containerRect.top + 5}px` });
     
     
     const closeHandler = (e: MouseEvent) => {
@@ -990,7 +990,7 @@ export class AITutorView extends ItemView {
       }
     }
 
-    this.contextBarContainer.style.display = 'flex';
+    this.contextBarContainer.setCssStyles({ 'display': 'flex' });
 
     let currentTokens = 0;
     const tokenEstimator = new TokenEstimator();
@@ -1011,8 +1011,8 @@ export class AITutorView extends ItemView {
     const percentage = Math.min(100, (currentTokens / maxTokens) * 100);
 
     
-    this.contextProgressBar.style.transition = 'width 0.3s ease-out';
-    this.contextProgressBar.style.width = `${percentage}%`;
+    this.contextProgressBar.setCssStyles({ 'transition': 'width 0.3s ease-out' });
+    this.contextProgressBar.setCssStyles({ 'width': `${percentage}%` });
     
     
     this.contextLabel.setText(`${currentTokens.toLocaleString()} / ${maxTokens.toLocaleString()} tokens (${percentage.toFixed(1)}%)`);
@@ -1046,7 +1046,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.style.pointerEvents = 'none');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': 'none' }));
 
       
       const progressContainer = document.createElement('div');
@@ -1083,7 +1083,7 @@ export class AITutorView extends ItemView {
         notePaths, 
         qaSettings,
         (percentage, status) => {
-          progressFill.style.width = `${percentage}%`;
+          progressFill.setCssStyles({ 'width': `${percentage}%` });
           progressText.textContent = status;
           progressPercentage.textContent = `${percentage}%`;
         }
@@ -1092,7 +1092,7 @@ export class AITutorView extends ItemView {
 
       
       progressContainer.remove();
-      startButtons.forEach(btn => btn.style.pointerEvents = '');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': '' }));
 
       this.renderQA();
       
@@ -1102,7 +1102,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.style.pointerEvents = '');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': '' }));
       
       
       const progressContainer = this.container.querySelector('.qna-inline-progress');
@@ -1127,8 +1127,8 @@ export class AITutorView extends ItemView {
       const answerSection = questionContainer.createDiv({ cls: 'answer-section' });
       const answer = answerSection.createEl('textarea');
       answer.rows = 3;
-      answer.style.width = '100%';
-      answer.style.marginBottom = '10px';
+      answer.setCssStyles({ 'width': '100%' });
+      answer.setCssStyles({ 'marginBottom': '10px' });
       answer.value = q.answer || '';
       
       answer.disabled = this.timerActive && this.timerType === 'qna' && !this.timerEndTime;
@@ -1206,7 +1206,7 @@ export class AITutorView extends ItemView {
       const progressLabel = progressContainer.createDiv({ cls: 'relevance-progress-label' });
       
       
-      progressBar.style.width = `${relevanceScore}%`;
+      progressBar.setCssStyles({ 'width': `${relevanceScore}%` });
       progressLabel.setText(`Relevance Score: ${relevanceScore}%`);
 
       
@@ -1242,7 +1242,7 @@ export class AITutorView extends ItemView {
 
 
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.style.pointerEvents = 'none');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': 'none' }));
 
 
       const progressContainer = document.createElement('div');
@@ -1279,7 +1279,7 @@ export class AITutorView extends ItemView {
         notePaths, 
         mcqSettings,
         (percentage, status) => {
-          progressFill.style.width = `${percentage}%`;
+          progressFill.setCssStyles({ 'width': `${percentage}%` });
           progressText.textContent = status;
           progressPercentage.textContent = `${percentage}%`;
         }
@@ -1288,7 +1288,7 @@ export class AITutorView extends ItemView {
 
 
       progressContainer.remove();
-      startButtons.forEach(btn => btn.style.pointerEvents = '');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': '' }));
 
       this.renderMCQs();
 
@@ -1298,7 +1298,7 @@ export class AITutorView extends ItemView {
 
 
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.style.pointerEvents = '');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': '' }));
 
 
       const progressContainer = this.container.querySelector('.mcq-inline-progress');
@@ -1515,7 +1515,7 @@ export class AITutorView extends ItemView {
     const progressInterval = setInterval(() => {
       progress += Math.random() * 15;
       if (progress > 90) progress = 90;
-      progressFill.style.width = `${progress}%`;
+      progressFill.setCssStyles({ 'width': `${progress}%` });
     }, 200);
     
     
@@ -1687,7 +1687,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.style.pointerEvents = 'none');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': 'none' }));
 
       
       const progressContainer = document.createElement('div');
@@ -1724,7 +1724,7 @@ export class AITutorView extends ItemView {
       const conceptMapData = await this.conceptMapManager.generateConceptMap(
         notePaths,
         (percentage, status) => {
-          progressFill.style.width = `${percentage}%`;
+          progressFill.setCssStyles({ 'width': `${percentage}%` });
           progressText.textContent = status;
           progressPercentage.textContent = `${percentage}%`;
         }
@@ -1750,7 +1750,7 @@ export class AITutorView extends ItemView {
       
       
       progressContainer.remove();
-      startButtons.forEach(btn => btn.style.pointerEvents = '');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': '' }));
       this.renderInitial();
 
     } catch (error: unknown) {
@@ -1759,7 +1759,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.style.pointerEvents = '');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': '' }));
       
       
       const progressContainer = this.container.querySelector('.concept-map-inline-progress');
@@ -1777,7 +1777,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button, .start-slides-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.style.pointerEvents = 'none');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': 'none' }));
 
       
       const progressContainer = document.createElement('div');
@@ -1810,8 +1810,8 @@ export class AITutorView extends ItemView {
       }
 
       
-      progressFill.style.width = '0%';
-      progressFill.style.transition = 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+      progressFill.setCssStyles({ 'width': '0%' });
+      progressFill.setCssStyles({ 'transition': 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)' });
 
       let filePath: string;
 
@@ -1831,7 +1831,7 @@ export class AITutorView extends ItemView {
             percentage = 95;
           }
           
-          progressFill.style.width = `${percentage}%`;
+          progressFill.setCssStyles({ 'width': `${percentage}%` });
           progressText.textContent = message;
           progressPercentage.textContent = `${percentage}%`;
         }
@@ -1852,7 +1852,7 @@ export class AITutorView extends ItemView {
       this.saveSavedSlideshows();
 
       
-      progressFill.style.width = '100%';
+      progressFill.setCssStyles({ 'width': '100%' });
       progressText.textContent = 'Complete!';
       progressPercentage.textContent = '100%';
 
@@ -1864,7 +1864,7 @@ export class AITutorView extends ItemView {
       
       setTimeout(() => {
         progressContainer.remove();
-        startButtons.forEach(btn => btn.style.pointerEvents = '');
+        startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': '' }));
         this.renderInitial();
       }, 1000);
 
@@ -1874,7 +1874,7 @@ export class AITutorView extends ItemView {
       
       
       const startButtons = this.container.querySelectorAll('.start-qa-button, .start-mcq-button, .start-conceptmap-button, .start-slides-button') as NodeListOf<HTMLElement>;
-      startButtons.forEach(btn => btn.style.pointerEvents = '');
+      startButtons.forEach(btn => btn.setCssStyles({ 'pointerEvents': '' }));
       
       
       const progressContainer = this.container.querySelector('.slideshow-inline-progress');
@@ -2503,29 +2503,29 @@ export class AITutorView extends ItemView {
     
     this.timerContainer?.remove();
     this.timerContainer = this.container.createDiv({ cls: 'timer-fixed-container' });
-    this.timerContainer.style.position = 'sticky';
-    this.timerContainer.style.top = '0';
-    this.timerContainer.style.right = '0';
-    this.timerContainer.style.display = 'flex';
-    this.timerContainer.style.justifyContent = 'flex-end';
-    this.timerContainer.style.alignItems = 'center';
-    this.timerContainer.style.zIndex = '10';
-    this.timerContainer.style.background = 'var(--background-primary, #fff)';
-    this.timerContainer.style.padding = '8px 16px 0 0';
-    this.timerContainer.style.gap = '8px';
+    this.timerContainer.setCssStyles({ 'position': 'sticky' });
+    this.timerContainer.setCssStyles({ 'top': '0' });
+    this.timerContainer.setCssStyles({ 'right': '0' });
+    this.timerContainer.setCssStyles({ 'display': 'flex' });
+    this.timerContainer.setCssStyles({ 'justifyContent': 'flex-end' });
+    this.timerContainer.setCssStyles({ 'alignItems': 'center' });
+    this.timerContainer.setCssStyles({ 'zIndex': '10' });
+    this.timerContainer.setCssStyles({ 'background': 'var(--background-primary, #fff)' });
+    this.timerContainer.setCssStyles({ 'padding': '8px 16px 0 0' });
+    this.timerContainer.setCssStyles({ 'gap': '8px' });
 
     
     const timerIcon = this.timerContainer.createSpan({ cls: 'lucide-timer', attr: { 'aria-label': 'Set timer' } });
     setIcon(timerIcon, 'timer');
-    timerIcon.style.cursor = 'pointer';
+    timerIcon.setCssStyles({ 'cursor': 'pointer' });
     timerIcon.title = 'Set timer';
 
     
     const timerDisplay = this.timerContainer.createSpan({ cls: 'timer-countdown' });
-    timerDisplay.style.fontWeight = 'bold';
-    timerDisplay.style.fontSize = '1.1em';
-    timerDisplay.style.marginLeft = '8px';
-    timerDisplay.style.display = 'none';
+    timerDisplay.setCssStyles({ 'fontWeight': 'bold' });
+    timerDisplay.setCssStyles({ 'fontSize': '1.1em' });
+    timerDisplay.setCssStyles({ 'marginLeft': '8px' });
+    timerDisplay.setCssStyles({ 'display': 'none' });
 
     timerIcon.onclick = () => {
       if (this.timerActive) return; 
@@ -2541,7 +2541,7 @@ export class AITutorView extends ItemView {
     this.timerType = type;
     this.timerNoticeShown = false;
     this.timerEndTime = Date.now() + ms;
-    timerDisplay.style.display = '';
+    timerDisplay.setCssStyles({ 'display': '' });
     this.updateTimerDisplay(timerDisplay);
     this.timerInterval && window.clearInterval(this.timerInterval);
     this.timerInterval = window.setInterval(() => {
@@ -2921,8 +2921,8 @@ class TimerModal extends Modal {
     contentEl.empty();
     contentEl.createEl('h2', { text: 'Set Time Limit' });
     const input = contentEl.createEl('input', { type: 'text', placeholder: 'mm:ss (e.g., 05:00)' });
-    input.style.width = '100%';
-    input.style.marginBottom = '10px';
+    input.setCssStyles({ 'width': '100%' });
+    input.setCssStyles({ 'marginBottom': '10px' });
     const submitBtn = contentEl.createEl('button', { text: 'Set Timer' });
     submitBtn.onclick = () => {
       const value = input.value.trim();

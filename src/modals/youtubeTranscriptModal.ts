@@ -65,7 +65,7 @@ export class YouTubeTranscriptModal extends Modal {
                     .onChange(value => {
                         this.fileName = value.endsWith('.md') ? value : `${value}.md`;
                     });
-                text.inputEl.style.width = '100%';
+                text.inputEl.setCssStyles({ 'width': '100%' });
             });
 
         // Folder selection setting

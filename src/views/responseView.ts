@@ -231,7 +231,7 @@ class YouTubeURLModal extends Modal {
                     .onChange(value => {
                         this.youtubeUrl = value;
                     });
-                text.inputEl.style.width = '100%';
+                text.inputEl.setCssStyles({ 'width': '100%' });
                 
                 setTimeout(() => text.inputEl.focus(), 50);
             });
@@ -1026,13 +1026,13 @@ export class ResponseView extends ItemView {
         }
 
         if (this.contextCollapsed) {
-            fileTagsScrollWrapper.style.display = 'none';
+            fileTagsScrollWrapper.setCssStyles({ 'display': 'none' });
             if (toggleBtn) {
                 toggleBtn.empty();
                 toggleBtn.createSpan({ text: '▶', attr: { style: 'font-size:18px;user-select:none;' } });
             }
         } else {
-            fileTagsScrollWrapper.style.display = '';
+            fileTagsScrollWrapper.setCssStyles({ 'display': '' });
             if (toggleBtn) {
                 toggleBtn.empty();
                 toggleBtn.createSpan({ text: '▼', attr: { style: 'font-size:18px;user-select:none;' } });
@@ -1065,7 +1065,7 @@ export class ResponseView extends ItemView {
         if (this.settings.aiChatHistoryEnabled) {
             const historyBtn = headerLeftControls.createDiv({ cls: 'header-history-btn' });
             setIcon(historyBtn, 'history');
-            historyBtn.style.cursor = 'pointer';
+            historyBtn.setCssStyles({ 'cursor': 'pointer' });
             historyBtn.setAttr('aria-label', 'View chat history');
             historyBtn.setAttr('tabindex', '0');
             historyBtn.addEventListener('click', (e) => {
@@ -1087,7 +1087,7 @@ export class ResponseView extends ItemView {
         
         const systemInstructionsBtn = headerLeftControls.createDiv({ cls: 'header-system-instructions-btn' });
         setIcon(systemInstructionsBtn, 'wrench');
-        systemInstructionsBtn.style.cursor = 'pointer';
+        systemInstructionsBtn.setCssStyles({ 'cursor': 'pointer' });
         systemInstructionsBtn.setAttr('aria-label', 'System Instructions');
         systemInstructionsBtn.setAttr('tabindex', '0');
         
@@ -1102,7 +1102,7 @@ export class ResponseView extends ItemView {
         
         const newChatBtn = headerLeftControls.createDiv({ cls: 'header-new-chat-btn' });
         setIcon(newChatBtn, 'plus');
-        newChatBtn.style.cursor = 'pointer';
+        newChatBtn.setCssStyles({ 'cursor': 'pointer' });
         newChatBtn.setAttr('aria-label', 'Start new chat');
         newChatBtn.setAttr('tabindex', '0');
         newChatBtn.addEventListener('click', (e) => {
@@ -1125,7 +1125,7 @@ export class ResponseView extends ItemView {
         
         const ellipsisBtn = headerRightControls.createDiv({ cls: 'header-ellipsis-btn' });
         setIcon(ellipsisBtn, 'more-vertical');
-        ellipsisBtn.style.cursor = 'pointer';
+        ellipsisBtn.setCssStyles({ 'cursor': 'pointer' });
         ellipsisBtn.setAttr('aria-label', 'Menu options');
         ellipsisBtn.setAttr('tabindex', '0');
         ellipsisBtn.addEventListener('click', (e) => {
@@ -1184,7 +1184,7 @@ export class ResponseView extends ItemView {
         
         const capsuleBtn = leftControls.createDiv({ cls: 'context-menu-btn' });
         setIcon(capsuleBtn, 'plus');
-        capsuleBtn.style.cursor = 'pointer';
+        capsuleBtn.setCssStyles({ 'cursor': 'pointer' });
         capsuleBtn.setAttr('aria-label', 'Add context');
         capsuleBtn.setAttr('tabindex', '0');
         capsuleBtn.addEventListener('click', (e) => {
@@ -1207,7 +1207,7 @@ export class ResponseView extends ItemView {
         
         const sendBtn = inputRow.createDiv({ cls: 'send-button-new' });
         setIcon(sendBtn, 'arrow-up');
-        sendBtn.style.cursor = 'pointer';
+        sendBtn.setCssStyles({ 'cursor': 'pointer' });
         sendBtn.setAttr('aria-label', 'Send message');
         sendBtn.setAttr('tabindex', '0');
         sendBtn.setAttr('data-state', 'send'); 
@@ -1487,15 +1487,15 @@ export class ResponseView extends ItemView {
         
         const parent = textarea.parentElement;
         if (parent) {
-            parent.style.minHeight = parent.clientHeight + 'px';
+            parent.setCssStyles({ 'minHeight': parent.clientHeight + 'px' });
         }
 
-        textarea.style.height = 'auto';
-        textarea.style.height = textarea.scrollHeight + 'px';
+        textarea.setCssStyles({ 'height': 'auto' });
+        textarea.setCssStyles({ 'height': textarea.scrollHeight + 'px' });
 
         
         if (parent) {
-            parent.style.minHeight = '';
+            parent.setCssStyles({ 'minHeight': '' });
         }
     }
 
@@ -1539,14 +1539,14 @@ export class ResponseView extends ItemView {
 
             if (currentWidth > maxAllowedWidth) {
                 const ratio = maxAllowedWidth / currentWidth;
-                nameSpan.style.transform = `scale(${ratio})`;
-                nameSpan.style.width = `${currentWidth}px`; // Force span to maintain its natural width so scale works
-                nameSpan.style.marginLeft = `${(maxAllowedWidth - currentWidth) / 2}px`; // Center the scaled text
-                nameSpan.style.marginRight = `${(maxAllowedWidth - currentWidth) / 2}px`;
+                nameSpan.setCssStyles({ 'transform': `scale(${ratio})` });
+                nameSpan.setCssStyles({ 'width': `${currentWidth}px` }); // Force span to maintain its natural width so scale works
+                nameSpan.setCssStyles({ 'marginLeft': `${(maxAllowedWidth - currentWidth) / 2}px` }); // Center the scaled text
+                nameSpan.setCssStyles({ 'marginRight': `${(maxAllowedWidth - currentWidth) / 2}px` });
             } else {
-                nameSpan.style.transform = 'none';
-                nameSpan.style.width = 'auto';
-                nameSpan.style.margin = '0';
+                nameSpan.setCssStyles({ 'transform': 'none' });
+                nameSpan.setCssStyles({ 'width': 'auto' });
+                nameSpan.setCssStyles({ 'margin': '0' });
             }
         });
     }
@@ -1596,7 +1596,7 @@ export class ResponseView extends ItemView {
         const brainBtn = container.createDiv({ cls: 'header-ollama-thinking-btn' });
         this.thinkingBtnEl = brainBtn;
         setIcon(brainBtn, 'brain');
-        brainBtn.style.cursor = 'pointer';
+        brainBtn.setCssStyles({ 'cursor': 'pointer' });
         brainBtn.setAttr('aria-label', `${activeProvider === 'gemini' ? 'Gemini' : activeProvider === 'groq' ? 'Groq' : 'Ollama'} thinking controls`);
         brainBtn.setAttr('tabindex', '0');
         if (isActive) {
@@ -1683,9 +1683,9 @@ export class ResponseView extends ItemView {
 
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.style.position = 'absolute';
-        menuEl.style.top = `${btnRect.bottom - containerRect.top + 4}px`;
-        menuEl.style.right = `${containerRect.right - btnRect.right}px`;
+        menuEl.setCssStyles({ 'position': 'absolute' });
+        menuEl.setCssStyles({ 'top': `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssStyles({ 'right': `${containerRect.right - btnRect.right}px` });
 
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
@@ -1730,9 +1730,9 @@ export class ResponseView extends ItemView {
 
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.style.position = 'absolute';
-        menuEl.style.top = `${btnRect.bottom - containerRect.top + 4}px`;
-        menuEl.style.right = `${containerRect.right - btnRect.right}px`;
+        menuEl.setCssStyles({ 'position': 'absolute' });
+        menuEl.setCssStyles({ 'top': `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssStyles({ 'right': `${containerRect.right - btnRect.right}px` });
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-ollama-thinking-btn')) {
@@ -1780,9 +1780,9 @@ export class ResponseView extends ItemView {
 
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.style.position = 'absolute';
-        menuEl.style.top = `${btnRect.bottom - containerRect.top + 4}px`;
-        menuEl.style.right = `${containerRect.right - btnRect.right}px`;
+        menuEl.setCssStyles({ 'position': 'absolute' });
+        menuEl.setCssStyles({ 'top': `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssStyles({ 'right': `${containerRect.right - btnRect.right}px` });
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-ollama-thinking-btn')) {
@@ -1821,18 +1821,18 @@ export class ResponseView extends ItemView {
         
         const rect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
-        menuEl.style.position = 'absolute';
-        menuEl.style.top = `${rect.bottom - containerRect.top + 5}px`;
-        menuEl.style.left = `${rect.left - containerRect.left}px`;
-        menuEl.style.zIndex = '1000';
-        menuEl.style.minWidth = '250px';
-        menuEl.style.maxHeight = '400px';
-        menuEl.style.overflowY = 'auto';
-        menuEl.style.backgroundColor = 'var(--background-primary)';
-        menuEl.style.border = '1px solid var(--background-modifier-border)';
-        menuEl.style.borderRadius = '6px';
-        menuEl.style.boxShadow = 'var(--shadow-s)';
-        menuEl.style.padding = '4px';
+        menuEl.setCssStyles({ 'position': 'absolute' });
+        menuEl.setCssStyles({ 'top': `${rect.bottom - containerRect.top + 5}px` });
+        menuEl.setCssStyles({ 'left': `${rect.left - containerRect.left}px` });
+        menuEl.setCssStyles({ 'zIndex': '1000' });
+        menuEl.setCssStyles({ 'minWidth': '250px' });
+        menuEl.setCssStyles({ 'maxHeight': '400px' });
+        menuEl.setCssStyles({ 'overflowY': 'auto' });
+        menuEl.setCssStyles({ 'backgroundColor': 'var(--background-primary)' });
+        menuEl.setCssStyles({ 'border': '1px solid var(--background-modifier-border)' });
+        menuEl.setCssStyles({ 'borderRadius': '6px' });
+        menuEl.setCssStyles({ 'boxShadow': 'var(--shadow-s)' });
+        menuEl.setCssStyles({ 'padding': '4px' });
 
         const indexConfigs = this.settings.indexConfigurations || [];
         const embeddingIndexes = indexConfigs.filter(config => config.type === 'embedding');
@@ -1840,14 +1840,14 @@ export class ResponseView extends ItemView {
         if (embeddingIndexes.length === 0) {
             const emptyMsg = menuEl.createDiv({ cls: 'model-select-menu-item' });
             emptyMsg.createSpan({ text: 'No embedding indexes found' });
-            emptyMsg.style.cursor = 'default';
+            emptyMsg.setCssStyles({ 'cursor': 'default' });
         } else {
             embeddingIndexes.forEach((index, idx) => {
                 const itemEl = menuEl.createDiv({ cls: 'model-select-menu-item' });
-                itemEl.style.display = 'flex';
-                itemEl.style.flexDirection = 'column';
-                itemEl.style.padding = '8px 12px';
-                itemEl.style.gap = '2px';
+                itemEl.setCssStyles({ 'display': 'flex' });
+                itemEl.setCssStyles({ 'flexDirection': 'column' });
+                itemEl.setCssStyles({ 'padding': '8px 12px' });
+                itemEl.setCssStyles({ 'gap': '2px' });
 
                 if (this.settings.selectedEmbeddingIndexId === index.id) {
                     itemEl.classList.add('selected');
@@ -1855,35 +1855,35 @@ export class ResponseView extends ItemView {
 
                 
                 const topRow = itemEl.createDiv();
-                topRow.style.display = 'flex';
-                topRow.style.justifyContent = 'space-between';
-                topRow.style.alignItems = 'center';
-                topRow.style.width = '100%';
+                topRow.setCssStyles({ 'display': 'flex' });
+                topRow.setCssStyles({ 'justifyContent': 'space-between' });
+                topRow.setCssStyles({ 'alignItems': 'center' });
+                topRow.setCssStyles({ 'width': '100%' });
 
                 const leftInfo = topRow.createDiv();
-                leftInfo.style.display = 'flex';
-                leftInfo.style.alignItems = 'center';
-                leftInfo.style.gap = '8px';
+                leftInfo.setCssStyles({ 'display': 'flex' });
+                leftInfo.setCssStyles({ 'alignItems': 'center' });
+                leftInfo.setCssStyles({ 'gap': '8px' });
 
                 const nameSpan = leftInfo.createSpan();
                 nameSpan.textContent = index.name;
-                nameSpan.style.fontWeight = 'var(--font-semibold)';
+                nameSpan.setCssStyles({ 'fontWeight': 'var(--font-semibold)' });
 
                 const countSpan = leftInfo.createSpan();
                 countSpan.textContent = `(${index.fileCount || 0} files)`;
-                countSpan.style.fontSize = '0.8em';
-                countSpan.style.color = 'var(--text-muted)';
+                countSpan.setCssStyles({ 'fontSize': '0.8em' });
+                countSpan.setCssStyles({ 'color': 'var(--text-muted)' });
 
                 const checkbox = topRow.createEl('input', { type: 'checkbox' });
                 checkbox.checked = this.settings.selectedEmbeddingIndexId === index.id;
-                checkbox.style.pointerEvents = 'none'; 
+                checkbox.setCssStyles({ 'pointerEvents': 'none' }); 
 
                 
                 const bottomRow = itemEl.createDiv();
                 const modelSpan = bottomRow.createSpan();
                 modelSpan.textContent = index.model || 'Unknown model';
-                modelSpan.style.fontSize = '0.85em';
-                modelSpan.style.color = 'var(--text-muted)';
+                modelSpan.setCssStyles({ 'fontSize': '0.85em' });
+                modelSpan.setCssStyles({ 'color': 'var(--text-muted)' });
 
                 itemEl.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -2003,26 +2003,26 @@ export class ResponseView extends ItemView {
         modelGroups.forEach((group, groupIndex) => {
             
             const headerEl = modelList.createDiv({ cls: 'model-select-menu-header' });
-            headerEl.style.display = 'flex';
-            headerEl.style.justifyContent = 'space-between';
-            headerEl.style.alignItems = 'center';
-            headerEl.style.paddingRight = '8px';
+            headerEl.setCssStyles({ 'display': 'flex' });
+            headerEl.setCssStyles({ 'justifyContent': 'space-between' });
+            headerEl.setCssStyles({ 'alignItems': 'center' });
+            headerEl.setCssStyles({ 'paddingRight': '8px' });
 
             const headerTitle = headerEl.createSpan();
             headerTitle.textContent = group.label === 'Google Gemini' ? 'Gemini' : group.label;
 
             
             const modalitiesContainer = headerEl.createSpan({ cls: 'provider-modalities' });
-            modalitiesContainer.style.display = 'flex';
-            modalitiesContainer.style.gap = '4px';
-            modalitiesContainer.style.alignItems = 'center';
+            modalitiesContainer.setCssStyles({ 'display': 'flex' });
+            modalitiesContainer.setCssStyles({ 'gap': '4px' });
+            modalitiesContainer.setCssStyles({ 'alignItems': 'center' });
 
             const addModalityIcon = (iconName: string) => {
                 const iconEl = modalitiesContainer.createSpan();
                 setIcon(iconEl, iconName);
                 const svg = iconEl.querySelector('svg');
                 if (svg) {
-                    svg.style.opacity = '0.7';
+                    svg.setCssStyles({ 'opacity': '0.7' });
                 }
             };
 
@@ -2076,9 +2076,9 @@ export class ResponseView extends ItemView {
                 
                 
                 const iconsContainer = option.createSpan({ cls: 'model-icons-container' });
-                iconsContainer.style.display = 'flex';
-                iconsContainer.style.gap = '4px';
-                iconsContainer.style.alignItems = 'center';
+                iconsContainer.setCssStyles({ 'display': 'flex' });
+                iconsContainer.setCssStyles({ 'gap': '4px' });
+                iconsContainer.setCssStyles({ 'alignItems': 'center' });
 
                 
                 if ((isOllama || isGemini) && model.capabilities?.includes('thinking')) {
@@ -2125,12 +2125,12 @@ export class ResponseView extends ItemView {
         searchInput.addEventListener('input', (e) => {
             const query = (e.target as HTMLInputElement).value.toLowerCase();
             itemsToFilter.forEach(obj => {
-                obj.itemEl.style.display = obj.name.includes(query) ? '' : 'none';
+                obj.itemEl.setCssStyles({ 'display': obj.name.includes(query) ? '' : 'none' });
             });
             headersToFilter.forEach(headerObj => {
                 const hasVisibleItems = headerObj.items.some(item => item.style.display !== 'none');
-                headerObj.headerEl.style.display = hasVisibleItems ? '' : 'none';
-                if (headerObj.separatorEl) headerObj.separatorEl.style.display = hasVisibleItems ? '' : 'none';
+                headerObj.headerEl.setCssStyles({ 'display': hasVisibleItems ? '' : 'none' });
+                if (headerObj.separatorEl) headerObj.separatorEl.setCssStyles({ 'display': hasVisibleItems ? '' : 'none' });
             });
         });
 
@@ -2138,9 +2138,9 @@ export class ResponseView extends ItemView {
         const containerRect = this.containerEl.getBoundingClientRect();
 
         
-        menuEl.style.position = 'absolute';
-        menuEl.style.top = `${btnRect.bottom - containerRect.top + 4}px`;
-        menuEl.style.right = `${containerRect.right - btnRect.right}px`;
+        menuEl.setCssStyles({ 'position': 'absolute' });
+        menuEl.setCssStyles({ 'top': `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssStyles({ 'right': `${containerRect.right - btnRect.right}px` });
 
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
@@ -2174,7 +2174,7 @@ export class ResponseView extends ItemView {
 
         
         setTimeout(() => {
-            indicator.style.opacity = '0';
+            indicator.setCssStyles({ 'opacity': '0' });
             setTimeout(() => indicator.remove(), 300);
         }, 5000);
     }
@@ -2539,9 +2539,9 @@ export class ResponseView extends ItemView {
         });
 
         const btnRect = ellipsisBtn.getBoundingClientRect();
-        menuEl.style.position = 'absolute';
-        menuEl.style.top = `${btnRect.bottom + 4}px`;
-        menuEl.style.right = '10px';
+        menuEl.setCssStyles({ 'position': 'absolute' });
+        menuEl.setCssStyles({ 'top': `${btnRect.bottom + 4}px` });
+        menuEl.setCssStyles({ 'right': '10px' });
 
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
@@ -2570,44 +2570,44 @@ export class ResponseView extends ItemView {
 
         const pickerEl = document.createElement('div');
         pickerEl.className = 'wallpaper-picker';
-        pickerEl.style.position = 'absolute';
-        pickerEl.style.zIndex = '1000';
-        pickerEl.style.background = 'var(--background-primary, #ffffff)';
-        pickerEl.style.border = '1px solid var(--border-color, #e0e0e0)';
-        pickerEl.style.borderRadius = '8px';
-        pickerEl.style.padding = '8px';
-        pickerEl.style.maxHeight = '300px';
-        pickerEl.style.overflowY = 'auto';
-        pickerEl.style.minWidth = '250px';
+        pickerEl.setCssStyles({ 'position': 'absolute' });
+        pickerEl.setCssStyles({ 'zIndex': '1000' });
+        pickerEl.setCssStyles({ 'background': 'var(--background-primary, #ffffff)' });
+        pickerEl.setCssStyles({ 'border': '1px solid var(--border-color, #e0e0e0)' });
+        pickerEl.setCssStyles({ 'borderRadius': '8px' });
+        pickerEl.setCssStyles({ 'padding': '8px' });
+        pickerEl.setCssStyles({ 'maxHeight': '300px' });
+        pickerEl.setCssStyles({ 'overflowY': 'auto' });
+        pickerEl.setCssStyles({ 'minWidth': '250px' });
         pickerEl.classList.add('wallpaper-picker-shadow');
-        pickerEl.style.color = 'var(--text-normal, #000000)';
+        pickerEl.setCssStyles({ 'color': 'var(--text-normal, #000000)' });
 
         const btnRect = this.containerEl.querySelector('.header-ellipsis-btn')?.getBoundingClientRect();
         if (btnRect) {
-            pickerEl.style.top = `${btnRect.bottom + 4}px`;
-            pickerEl.style.right = '10px';
+            pickerEl.setCssStyles({ 'top': `${btnRect.bottom + 4}px` });
+            pickerEl.setCssStyles({ 'right': '10px' });
         }
 
         const titleEl = pickerEl.createDiv({ cls: 'wallpaper-picker-title' });
         titleEl.textContent = 'Select Wallpaper Image';
-        titleEl.style.fontWeight = 'bold';
-        titleEl.style.marginBottom = '8px';
-        titleEl.style.padding = '4px';
-        titleEl.style.color = 'var(--text-normal, #000000)';
+        titleEl.setCssStyles({ 'fontWeight': 'bold' });
+        titleEl.setCssStyles({ 'marginBottom': '8px' });
+        titleEl.setCssStyles({ 'padding': '4px' });
+        titleEl.setCssStyles({ 'color': 'var(--text-normal, #000000)' });
 
         for (const file of images) {
             const itemEl = pickerEl.createDiv({ cls: 'wallpaper-picker-item' });
             itemEl.textContent = file.path;
-            itemEl.style.padding = '6px 8px';
-            itemEl.style.cursor = 'pointer';
-            itemEl.style.borderRadius = '4px';
-            itemEl.style.color = 'var(--text-normal, #000000)';
-            itemEl.style.background = 'transparent';
+            itemEl.setCssStyles({ 'padding': '6px 8px' });
+            itemEl.setCssStyles({ 'cursor': 'pointer' });
+            itemEl.setCssStyles({ 'borderRadius': '4px' });
+            itemEl.setCssStyles({ 'color': 'var(--text-normal, #000000)' });
+            itemEl.setCssStyles({ 'background': 'transparent' });
             itemEl.addEventListener('mouseenter', () => {
-                itemEl.style.background = 'var(--hover-bg, #e0e0e0)';
+                itemEl.setCssStyles({ 'background': 'var(--hover-bg, #e0e0e0)' });
             });
             itemEl.addEventListener('mouseleave', () => {
-                itemEl.style.background = 'transparent';
+                itemEl.setCssStyles({ 'background': 'transparent' });
             });
             itemEl.addEventListener('click', () => {
                 pickerEl.remove();
@@ -2684,25 +2684,25 @@ export class ResponseView extends ItemView {
         
         container.insertBefore(this.wallpaperEl, container.firstChild);
         
-        this.wallpaperEl.style.position = 'absolute';
-        this.wallpaperEl.style.top = '0';
-        this.wallpaperEl.style.left = '0';
-        this.wallpaperEl.style.width = '100%';
-        this.wallpaperEl.style.height = '100%';
-        this.wallpaperEl.style.zIndex = '0';
-        this.wallpaperEl.style.pointerEvents = 'none';
-        this.wallpaperEl.style.display = 'block';
-        this.wallpaperEl.style.overflow = 'hidden';
+        this.wallpaperEl.setCssStyles({ 'position': 'absolute' });
+        this.wallpaperEl.setCssStyles({ 'top': '0' });
+        this.wallpaperEl.setCssStyles({ 'left': '0' });
+        this.wallpaperEl.setCssStyles({ 'width': '100%' });
+        this.wallpaperEl.setCssStyles({ 'height': '100%' });
+        this.wallpaperEl.setCssStyles({ 'zIndex': '0' });
+        this.wallpaperEl.setCssStyles({ 'pointerEvents': 'none' });
+        this.wallpaperEl.setCssStyles({ 'display': 'block' });
+        this.wallpaperEl.setCssStyles({ 'overflow': 'hidden' });
 
         const wallpaperOpacity = this.settings.chatWallpaperOpacity ?? 0.5;
-        this.wallpaperEl.style.opacity = wallpaperOpacity.toString();
+        this.wallpaperEl.setCssStyles({ 'opacity': wallpaperOpacity.toString() });
         
         
         const imgEl = this.wallpaperEl.createEl('img');
-        imgEl.style.width = '100%';
-        imgEl.style.height = '100%';
-        imgEl.style.objectFit = 'cover';
-        imgEl.style.pointerEvents = 'none';
+        imgEl.setCssStyles({ 'width': '100%' });
+        imgEl.setCssStyles({ 'height': '100%' });
+        imgEl.setCssStyles({ 'objectFit': 'cover' });
+        imgEl.setCssStyles({ 'pointerEvents': 'none' });
         
 
         const resourcePath = this.app.vault.adapter.getResourcePath(wpPath);
@@ -2729,18 +2729,18 @@ export class ResponseView extends ItemView {
             
             if (headerSection && headerGlassFactor > 0) {
                 headerSection.classList.add('liquid-glass-active');
-                (headerSection as HTMLElement).style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})`;
+                (headerSection as HTMLElement).setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             } else if (headerSection) {
                 headerSection.classList.remove('liquid-glass-active');
-                (headerSection as HTMLElement).style.background = '';
+                (headerSection as HTMLElement).setCssStyles({ 'background': '' });
             }
             
             if (inputContainer && headerGlassFactor > 0) {
                 inputContainer.classList.add('liquid-glass-active');
-                (inputContainer as HTMLElement).style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})`;
+                (inputContainer as HTMLElement).setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             } else if (inputContainer) {
                 inputContainer.classList.remove('liquid-glass-active');
-                (inputContainer as HTMLElement).style.background = '';
+                (inputContainer as HTMLElement).setCssStyles({ 'background': '' });
             }
             
             if (responsesContainer && responseGlassFactor > 0) {
@@ -2751,19 +2751,19 @@ export class ResponseView extends ItemView {
             responseItems.forEach((item) => {
                 if (responseGlassFactor > 0) {
                     item.classList.add('liquid-glass-active');
-                    (item as HTMLElement).style.background = `rgba(255, 255, 255, ${Math.min(0.95, responseGlassFactor)})`;
-                    (item as HTMLElement).style.borderColor = `rgba(255, 255, 255, ${Math.min(0.5, responseGlassFactor)})`;
+                    (item as HTMLElement).setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, responseGlassFactor)})` });
+                    (item as HTMLElement).setCssStyles({ 'borderColor': `rgba(255, 255, 255, ${Math.min(0.5, responseGlassFactor)})` });
                 } else {
                     item.classList.remove('liquid-glass-active');
-                    (item as HTMLElement).style.background = '';
-                    (item as HTMLElement).style.borderColor = '';
+                    (item as HTMLElement).setCssStyles({ 'background': '' });
+                    (item as HTMLElement).setCssStyles({ 'borderColor': '' });
                 }
             });
 
             
             if (queryInput && headerGlassFactor > 0) {
                 queryInput.classList.add('liquid-glass-active');
-queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})`;
+queryInput.setCssStyles({ 'background': `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             }
         } else {
             
@@ -2805,7 +2805,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
         if (this.settings.aiChatHistoryEnabled) {
             const historyBtn = headerLeftControls.createDiv({ cls: 'header-history-btn' });
             setIcon(historyBtn, 'history');
-            historyBtn.style.cursor = 'pointer';
+            historyBtn.setCssStyles({ 'cursor': 'pointer' });
             historyBtn.setAttr('aria-label', 'View chat history');
             historyBtn.setAttr('tabindex', '0');
             historyBtn.addEventListener('click', (e) => {
@@ -2827,7 +2827,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
         
         const systemInstructionsBtn = headerLeftControls.createDiv({ cls: 'header-system-instructions-btn' });
         setIcon(systemInstructionsBtn, 'wrench');
-        systemInstructionsBtn.style.cursor = 'pointer';
+        systemInstructionsBtn.setCssStyles({ 'cursor': 'pointer' });
         systemInstructionsBtn.setAttr('aria-label', 'System Instructions');
         systemInstructionsBtn.setAttr('tabindex', '0');
         
@@ -2842,7 +2842,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
         
         const newChatBtn = headerLeftControls.createDiv({ cls: 'header-new-chat-btn' });
         setIcon(newChatBtn, 'plus');
-        newChatBtn.style.cursor = 'pointer';
+        newChatBtn.setCssStyles({ 'cursor': 'pointer' });
         newChatBtn.setAttr('aria-label', 'Start new chat');
         newChatBtn.setAttr('tabindex', '0');
         newChatBtn.addEventListener('click', (e) => {
@@ -2865,7 +2865,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
         
         const ellipsisBtn = headerRightControls.createDiv({ cls: 'header-ellipsis-btn' });
         setIcon(ellipsisBtn, 'more-vertical');
-        ellipsisBtn.style.cursor = 'pointer';
+        ellipsisBtn.setCssStyles({ 'cursor': 'pointer' });
         ellipsisBtn.setAttr('aria-label', 'Menu options');
         ellipsisBtn.setAttr('tabindex', '0');
         ellipsisBtn.addEventListener('click', (e) => {
@@ -4854,30 +4854,30 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                     targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
                     
-                    targetEl.style.backgroundColor = 'var(--text-accent)';
-                    targetEl.style.opacity = '0.3';
+                    targetEl.setCssStyles({ 'backgroundColor': 'var(--text-accent)' });
+                    targetEl.setCssStyles({ 'opacity': '0.3' });
 
                     
                     const backArrow = targetEl.querySelector('.footnote-backref') as HTMLElement;
                     if (backArrow) {
-                        backArrow.style.color = 'var(--text-accent)';
-                        backArrow.style.fontWeight = 'bold';
-                        backArrow.style.transform = 'scale(1.3)';
-                        backArrow.style.display = 'inline-block';
-                        backArrow.style.transition = 'all 0.3s ease';
-                        backArrow.style.textShadow = '0 0 8px var(--text-accent)';
+                        backArrow.setCssStyles({ 'color': 'var(--text-accent)' });
+                        backArrow.setCssStyles({ 'fontWeight': 'bold' });
+                        backArrow.setCssStyles({ 'transform': 'scale(1.3)' });
+                        backArrow.setCssStyles({ 'display': 'inline-block' });
+                        backArrow.setCssStyles({ 'transition': 'all 0.3s ease' });
+                        backArrow.setCssStyles({ 'textShadow': '0 0 8px var(--text-accent)' });
 
                         setTimeout(() => {
-                            backArrow.style.color = '';
-                            backArrow.style.fontWeight = '';
-                            backArrow.style.transform = '';
-                            backArrow.style.textShadow = '';
+                            backArrow.setCssStyles({ 'color': '' });
+                            backArrow.setCssStyles({ 'fontWeight': '' });
+                            backArrow.setCssStyles({ 'transform': '' });
+                            backArrow.setCssStyles({ 'textShadow': '' });
                         }, 5000);
                     }
 
                     setTimeout(() => {
-                        targetEl.style.backgroundColor = '';
-                        targetEl.style.opacity = '';
+                        targetEl.setCssStyles({ 'backgroundColor': '' });
+                        targetEl.setCssStyles({ 'opacity': '' });
                     }, 1000);
                 }
             });
@@ -4897,7 +4897,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                 if (targetEl) {
                     const tooltip = document.createElement('div');
                     tooltip.classList.add('footnote-tooltip');
-                    tooltip.style.cssText = `
+                    tooltip.setCssStyles({ 'cssText': `
                         position: fixed;
                         background-color: var(--background-primary);
                         border: 1px solid var(--background-modifier-border);
@@ -4908,15 +4908,15 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                         box-shadow: 0 2px 8px rgba(0,0,0,0.15);
                         font-size: 0.9em;
                         pointer-events: none;
-                    `;
+                    ` });
 
                     
                     const text = targetEl.textContent?.replace(/↩/g, '').replace(/\[\^\d+\]:\s*/, '').trim() || '';
                     tooltip.textContent = text;
 
                     const rect = refLink.getBoundingClientRect();
-                    tooltip.style.left = rect.left + 'px';
-                    tooltip.style.top = (rect.bottom + 5) + 'px';
+                    tooltip.setCssStyles({ 'left': rect.left + 'px' });
+                    tooltip.setCssStyles({ 'top': (rect.bottom + 5) + 'px' });
 
                     document.body.appendChild(tooltip);
 
@@ -4951,7 +4951,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                     backArrow.classList.add('footnote-backref');
                     backArrow.textContent = ' ↩';
                     backArrow.setAttribute('aria-label', 'Back to content');
-                    backArrow.style.cssText = 'margin-left: 0.25em; cursor: pointer; text-decoration: none;';
+                    backArrow.setCssStyles({ 'cssText': 'margin-left: 0.25em; cursor: pointer; text-decoration: none;' });
 
                     this.registerDomEvent(backArrow, 'click', (e: MouseEvent) => {
                         e.preventDefault();
@@ -4968,11 +4968,11 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
 
                         if (refEl) {
                             refEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            refEl.style.backgroundColor = 'var(--text-accent)';
-                            refEl.style.opacity = '0.3';
+                            refEl.setCssStyles({ 'backgroundColor': 'var(--text-accent)' });
+                            refEl.setCssStyles({ 'opacity': '0.3' });
                             setTimeout(() => {
-                                refEl.style.backgroundColor = '';
-                                refEl.style.opacity = '';
+                                refEl.setCssStyles({ 'backgroundColor': '' });
+                                refEl.setCssStyles({ 'opacity': '' });
                             }, 500);
                         }
                     });
@@ -5018,7 +5018,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
 
             
             const sourcesContent = sourcesEl.createDiv({ cls: 'sources-content' });
-            sourcesContent.style.display = 'none'; 
+            sourcesContent.setCssStyles({ 'display': 'none' }); 
 
             
             const extractYouTubeId = (url: string): string | null => {
@@ -5166,12 +5166,12 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
             
             sourcesHeader.addEventListener('click', () => {
                 const isCollapsed = sourcesContent.style.display === 'none';
-                sourcesContent.style.display = isCollapsed ? 'block' : 'none';
+                sourcesContent.setCssStyles({ 'display': isCollapsed ? 'block' : 'none' });
                 toggleIcon.setText(isCollapsed ? '▼' : '▶'); 
             });
 
             
-            sourcesHeader.style.cursor = 'pointer';
+            sourcesHeader.setCssStyles({ 'cursor': 'pointer' });
         }
     }
 
@@ -5189,7 +5189,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
 
             
             const toolsContent = toolsEl.createDiv({ cls: 'sources-content' });
-            toolsContent.style.display = 'none'; 
+            toolsContent.setCssStyles({ 'display': 'none' }); 
 
             
             const toolsByServer = new Map<string, string[]>();
@@ -5213,12 +5213,12 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
             
             toolsHeader.addEventListener('click', () => {
                 const isCollapsed = toolsContent.style.display === 'none';
-                toolsContent.style.display = isCollapsed ? 'block' : 'none';
+                toolsContent.setCssStyles({ 'display': isCollapsed ? 'block' : 'none' });
                 toggleIcon.setText(isCollapsed ? '▼' : '▶'); 
             });
 
             
-            toolsHeader.style.cursor = 'pointer';
+            toolsHeader.setCssStyles({ 'cursor': 'pointer' });
         }
     }
 
@@ -5234,7 +5234,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
 
             
             const sourcesContent = webSourcesEl.createDiv({ cls: 'sources-content' });
-            sourcesContent.style.display = 'none'; 
+            sourcesContent.setCssStyles({ 'display': 'none' }); 
 
             const sourcesList = sourcesContent.createEl('ul');
             webResults.forEach(result => {
@@ -5253,12 +5253,12 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
             
             sourcesHeader.addEventListener('click', () => {
                 const isCollapsed = sourcesContent.style.display === 'none';
-                sourcesContent.style.display = isCollapsed ? 'block' : 'none';
+                sourcesContent.setCssStyles({ 'display': isCollapsed ? 'block' : 'none' });
                 toggleIcon.setText(isCollapsed ? '▼' : '▶');
             });
 
             
-            sourcesHeader.style.cursor = 'pointer';
+            sourcesHeader.setCssStyles({ 'cursor': 'pointer' });
         }
     }
 
@@ -5283,7 +5283,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
 
         
         const sourcesContent = sourcesEl.createDiv({ cls: 'sources-content' });
-        sourcesContent.style.display = 'none'; 
+        sourcesContent.setCssStyles({ 'display': 'none' }); 
 
         
         const answerEl = responseEl.querySelector('.agent-final-answer-content') || responseEl.querySelector('.response-answer');
@@ -5373,12 +5373,12 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
         
         sourcesHeader.addEventListener('click', () => {
             const isCollapsed = sourcesContent.style.display === 'none';
-            sourcesContent.style.display = isCollapsed ? 'block' : 'none';
+            sourcesContent.setCssStyles({ 'display': isCollapsed ? 'block' : 'none' });
             toggleIcon.setText(isCollapsed ? '▼' : '▶');
         });
 
         
-        sourcesHeader.style.cursor = 'pointer';
+        sourcesHeader.setCssStyles({ 'cursor': 'pointer' });
     }
 
 
@@ -5687,7 +5687,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
             const thinkingChevron = thinkingHeader.createDiv({ cls: 'thinking-chevron', text: '▾' });
             thinkingChevron.setAttr('aria-label', 'Collapse reasoning');
             thinkingChevron.setAttr('tabindex', '0');
-            thinkingChevron.style.cursor = 'pointer';
+            thinkingChevron.setCssStyles({ 'cursor': 'pointer' });
             thinkingChevron.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const isCollapsed = thinkingContainer.classList.contains('collapsed');
@@ -6038,7 +6038,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                 const autoMode = this.plugin.settings.codeExecutionAutoMode ?? false;
 
                 if (autoMode) {
-                    (pre as HTMLElement).style.display = 'none';
+                    (pre as HTMLElement).setCssStyles({ 'display': 'none' });
                     outputEl.classList.remove('hidden');
                     this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
                     return;
@@ -6060,25 +6060,25 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                 const backBtn = document.createElement('button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
-                backBtn.style.display = 'none';
+                backBtn.setCssStyles({ 'display': 'none' });
                 setIcon(backBtn, 'code-2');
                 backBtn.addEventListener('click', () => {
-                    (pre as HTMLElement).style.display = '';
+                    (pre as HTMLElement).setCssStyles({ 'display': '' });
                     outputEl.classList.add('hidden');
                     outputEl.empty();
                     outputEl.className = 'code-exec-output hidden';
                     renderToggle.classList.remove('is-enabled');
                     renderToggle.setAttribute('aria-checked', 'false');
-                    backBtn.style.display = 'none';
+                    backBtn.setCssStyles({ 'display': 'none' });
                 });
 
                 renderToggle.addEventListener('click', async () => {
                     if (renderToggle.classList.contains('is-enabled')) return;
                     renderToggle.classList.add('is-enabled');
                     renderToggle.setAttribute('aria-checked', 'true');
-                    (pre as HTMLElement).style.display = 'none';
+                    (pre as HTMLElement).setCssStyles({ 'display': 'none' });
                     outputEl.classList.remove('hidden');
-                    backBtn.style.display = '';
+                    backBtn.setCssStyles({ 'display': '' });
                     await this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
                 });
 
@@ -6102,7 +6102,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
 
             if (autoMode) {
                 
-                (pre as HTMLElement).style.display = 'none';
+                (pre as HTMLElement).setCssStyles({ 'display': 'none' });
                 outputEl.classList.remove('hidden');
                 this.runCode(pre as HTMLElement, lang, outputEl, wrapper, true, question);
             } else {
@@ -6124,18 +6124,18 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                 const backBtn = document.createElement('button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
-                backBtn.style.display = 'none';
+                backBtn.setCssStyles({ 'display': 'none' });
                 setIcon(backBtn, 'code-2');
                 backBtn.addEventListener('click', () => {
                     
-                    (pre as HTMLElement).style.display = '';
+                    (pre as HTMLElement).setCssStyles({ 'display': '' });
                     outputEl.classList.add('hidden');
                     outputEl.empty();
                     outputEl.className = 'code-exec-output hidden';
                     
                     runToggle.classList.remove('is-enabled');
                     runToggle.setAttribute('aria-checked', 'false');
-                    backBtn.style.display = 'none';
+                    backBtn.setCssStyles({ 'display': 'none' });
                     
                     wrapper.querySelector('.code-repair-toggle-row')?.remove();
                 });
@@ -6145,9 +6145,9 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                     runToggle.classList.add('is-enabled');
                     runToggle.setAttribute('aria-checked', 'true');
                     
-                    (pre as HTMLElement).style.display = 'none';
+                    (pre as HTMLElement).setCssStyles({ 'display': 'none' });
                     outputEl.classList.remove('hidden');
-                    backBtn.style.display = '';
+                    backBtn.setCssStyles({ 'display': '' });
                     await this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
                 });
 
@@ -6196,15 +6196,15 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
             
             const onMsg = (e: MessageEvent) => {
                 if (e.data?.iframeHeight && iframe.isConnected) {
-                    iframe.style.height = e.data.iframeHeight + 'px';
+                    iframe.setCssStyles({ 'height': e.data.iframeHeight + 'px' });
                     window.removeEventListener('message', onMsg);
                 }
             };
             window.addEventListener('message', onMsg);
         } else if (result.isMarkdown && result.markdownContent) {
             outputEl.classList.add('code-exec-success');
-            outputEl.style.fontFamily = 'var(--font-text)';
-            outputEl.style.padding = '12px';
+            outputEl.setCssStyles({ 'fontFamily': 'var(--font-text)' });
+            outputEl.setCssStyles({ 'padding': '12px' });
             MarkdownRenderer.render(this.app, result.markdownContent, outputEl, '', this);
         } else if (result.success) {
             outputEl.classList.add('code-exec-success');
@@ -6379,7 +6379,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
             errRow.className = 'code-exec-toggle-row mermaid-repair-row';
             const errLabel = document.createElement('span');
             errLabel.className = 'code-exec-label';
-            errLabel.style.color = 'var(--text-error, #f44336)';
+            errLabel.setCssStyles({ 'color': 'var(--text-error, #f44336)' });
             errLabel.textContent = `Repair failed: ${err?.message || String(err)}`;
             const retryBtn = document.createElement('button');
             retryBtn.className = 'code-block-btn';
@@ -7132,8 +7132,8 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
 
         
         const adjustHeight = () => {
-            textArea.style.height = 'auto';
-            textArea.style.height = textArea.scrollHeight + 'px';
+            textArea.setCssStyles({ 'height': 'auto' });
+            textArea.setCssStyles({ 'height': textArea.scrollHeight + 'px' });
         };
         textArea.addEventListener('input', adjustHeight);
         setTimeout(adjustHeight, 0); 
@@ -7188,10 +7188,10 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
         menu.className = 'context-file-menu';
         
         const rect = anchorEl.getBoundingClientRect();
-        menu.style.position = 'fixed';
-        menu.style.left = `${rect.left}px`;
-        menu.style.zIndex = '9999';
-        menu.style.minWidth = '260px';
+        menu.setCssStyles({ 'position': 'fixed' });
+        menu.setCssStyles({ 'left': `${rect.left}px` });
+        menu.setCssStyles({ 'zIndex': '9999' });
+        menu.setCssStyles({ 'minWidth': '260px' });
         
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
@@ -7252,11 +7252,11 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
         const menuHeight = menu.offsetHeight;
         
         if (anchorEl.classList.contains('capsule-more-tag')) {
-            menu.style.left = `${rect.right - menu.offsetWidth}px`;
+            menu.setCssStyles({ 'left': `${rect.right - menu.offsetWidth}px` });
         } else {
-            menu.style.left = `${rect.left}px`;
+            menu.setCssStyles({ 'left': `${rect.left}px` });
         }
-        menu.style.top = `${rect.top - menuHeight - 8}px`;
+        menu.setCssStyles({ 'top': `${rect.top - menuHeight - 8}px` });
         this.contextMenuEl = menu;
     }
 
@@ -7303,10 +7303,10 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
 
         
         const rect = anchorEl.getBoundingClientRect();
-        menu.style.position = 'fixed';
-        menu.style.left = `${rect.left}px`;
-        menu.style.zIndex = '9999';
-        menu.style.minWidth = '260px';
+        menu.setCssStyles({ 'position': 'fixed' });
+        menu.setCssStyles({ 'left': `${rect.left}px` });
+        menu.setCssStyles({ 'zIndex': '9999' });
+        menu.setCssStyles({ 'minWidth': '260px' });
 
         
         const listContainer = document.createElement('div');
@@ -7325,7 +7325,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
 
         
         const menuHeight = menu.offsetHeight;
-        menu.style.top = `${rect.top - menuHeight - 8}px`;
+        menu.setCssStyles({ 'top': `${rect.top - menuHeight - 8}px` });
 
         this.contextMenuEl = menu;
     }
@@ -7370,7 +7370,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                     const badgeSpan = document.createElement('span');
                     badgeSpan.className = 'feature-badge beta-badge';
                     badgeSpan.textContent = (opt as any).badge;
-                    badgeSpan.style.cssText = 'margin-left: 6px; padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;';
+                    badgeSpan.setCssStyles({ 'cssText': 'margin-left: 6px; padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;' });
 
                     item.appendChild(labelSpan);
                     item.appendChild(badgeSpan);
@@ -7455,7 +7455,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                 const noResults = document.createElement('div');
                 noResults.className = 'context-file-menu-item';
                 noResults.textContent = 'No matches found';
-                noResults.style.opacity = '0.5';
+                noResults.setCssStyles({ 'opacity': '0.5' });
                 container.appendChild(noResults);
             }
         }
@@ -7734,7 +7734,7 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
         
         if (optionType !== 'file') {
             if (this.contextMenuPreviewEl) {
-                this.contextMenuPreviewEl.style.display = 'none';
+                this.contextMenuPreviewEl.setCssStyles({ 'display': 'none' });
             }
             return;
         }
@@ -7787,16 +7787,16 @@ queryInput.style.background = `rgba(255, 255, 255, ${Math.min(0.95, headerGlassF
                 const menuRect = this.contextMenuEl.getBoundingClientRect();
                 const previewHeight = 250; 
 
-                this.contextMenuPreviewEl.style.position = 'fixed';
-                this.contextMenuPreviewEl.style.left = `${menuRect.left}px`;
-                this.contextMenuPreviewEl.style.bottom = `${window.innerHeight - menuRect.top + 8}px`;
-                this.contextMenuPreviewEl.style.width = `${Math.max(menuRect.width, 400)}px`;
-                this.contextMenuPreviewEl.style.maxHeight = `${previewHeight}px`;
-                this.contextMenuPreviewEl.style.display = 'block';
+                this.contextMenuPreviewEl.setCssStyles({ 'position': 'fixed' });
+                this.contextMenuPreviewEl.setCssStyles({ 'left': `${menuRect.left}px` });
+                this.contextMenuPreviewEl.setCssStyles({ 'bottom': `${window.innerHeight - menuRect.top + 8}px` });
+                this.contextMenuPreviewEl.setCssStyles({ 'width': `${Math.max(menuRect.width, 400)}px` });
+                this.contextMenuPreviewEl.setCssStyles({ 'maxHeight': `${previewHeight}px` });
+                this.contextMenuPreviewEl.setCssStyles({ 'display': 'block' });
             }
         } catch (error) {
                         if (this.contextMenuPreviewEl) {
-                this.contextMenuPreviewEl.style.display = 'none';
+                this.contextMenuPreviewEl.setCssStyles({ 'display': 'none' });
             }
         }
     }
@@ -7921,12 +7921,12 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     const toggleContainer = document.createElement('div');
                     toggleContainer.className = 'vault-citation-toggle-container';
-                    toggleContainer.style.cssText = 'margin-left: auto; display: flex; align-items: center; gap: 10px;';
+                    toggleContainer.setCssStyles({ 'cssText': 'margin-left: auto; display: flex; align-items: center; gap: 10px;' });
 
                     
                     const toggleLabel = document.createElement('span');
                     toggleLabel.textContent = 'Citations';
-                    toggleLabel.style.cssText = 'font-size: 0.85em; color: var(--text-muted);';
+                    toggleLabel.setCssStyles({ 'cssText': 'font-size: 0.85em; color: var(--text-muted);' });
 
                     const toggleSwitch = document.createElement('input');
                     toggleSwitch.type = 'checkbox';
@@ -7945,7 +7945,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     toggleContainer.appendChild(toggleSwitch);
                     item.appendChild(toggleContainer);
 
-                    item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;';
+                    item.setCssStyles({ 'cssText': 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
                 } else if (opt.hasToggle && opt.value === '@flash ') {
                     
                     const labelSpan = document.createElement('span');
@@ -7954,11 +7954,11 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     const toggleContainer = document.createElement('div');
                     toggleContainer.className = 'flash-citation-toggle-container';
-                    toggleContainer.style.cssText = 'margin-left: auto; display: flex; align-items: center; gap: 6px;';
+                    toggleContainer.setCssStyles({ 'cssText': 'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
 
                     const toggleLabel = document.createElement('span');
                     toggleLabel.textContent = 'Citations';
-                    toggleLabel.style.cssText = 'font-size: 0.85em; color: var(--text-muted);';
+                    toggleLabel.setCssStyles({ 'cssText': 'font-size: 0.85em; color: var(--text-muted);' });
 
                     const toggleSwitch = document.createElement('input');
                     toggleSwitch.type = 'checkbox';
@@ -7977,12 +7977,12 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     toggleContainer.appendChild(toggleSwitch);
                     item.appendChild(toggleContainer);
 
-                    item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;';
+                    item.setCssStyles({ 'cssText': 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
                     /* TEMPORARILY DISABLED - @agent mode
                     } else if (opt.hasToggle && opt.value === '@agent ') {
                         
                         const labelContainer = document.createElement('div');
-                        labelContainer.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+                        labelContainer.setCssStyles({ 'cssText': 'display: flex; align-items: center; gap: 6px;' });
                         
                         const labelSpan = document.createElement('span');
                         labelSpan.textContent = opt.label;
@@ -7993,7 +7993,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                             const badgeSpan = document.createElement('span');
                             badgeSpan.className = 'feature-badge beta-badge';
                             badgeSpan.textContent = opt.badge;
-                            badgeSpan.style.cssText = 'padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;';
+                            badgeSpan.setCssStyles({ 'cssText': 'padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;' });
                             labelContainer.appendChild(badgeSpan);
                         }
                         
@@ -8001,11 +8001,11 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                         
                         const toggleContainer = document.createElement('div');
                         toggleContainer.className = 'agent-ratelimit-toggle-container';
-                        toggleContainer.style.cssText = 'margin-left: auto; display: flex; align-items: center; gap: 6px;';
+                        toggleContainer.setCssStyles({ 'cssText': 'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
                         
                         const toggleLabel = document.createElement('span');
                         toggleLabel.textContent = 'Rate Limit';
-                        toggleLabel.style.cssText = 'font-size: 0.85em; color: var(--text-muted);';
+                        toggleLabel.setCssStyles({ 'cssText': 'font-size: 0.85em; color: var(--text-muted);' });
                         
                         const toggleSwitch = document.createElement('input');
                         toggleSwitch.type = 'checkbox';
@@ -8024,7 +8024,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                         toggleContainer.appendChild(toggleSwitch);
                         item.appendChild(toggleContainer);
                         
-                        item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;';
+                        item.setCssStyles({ 'cssText': 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
                     */ 
                 } else if (opt.hasToggle && opt.value === '@mcp ') {
                     
@@ -8034,11 +8034,11 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     const toggleContainer = document.createElement('div');
                     toggleContainer.className = 'mcp-ratelimit-toggle-container';
-                    toggleContainer.style.cssText = 'margin-left: auto; display: flex; align-items: center; gap: 6px;';
+                    toggleContainer.setCssStyles({ 'cssText': 'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
 
                     const toggleLabel = document.createElement('span');
                     toggleLabel.textContent = 'Delay Limit';
-                    toggleLabel.style.cssText = 'font-size: 0.85em; color: var(--text-muted);';
+                    toggleLabel.setCssStyles({ 'cssText': 'font-size: 0.85em; color: var(--text-muted);' });
 
                     const toggleSwitch = document.createElement('input');
                     toggleSwitch.type = 'checkbox';
@@ -8057,7 +8057,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     toggleContainer.appendChild(toggleSwitch);
                     item.appendChild(toggleContainer);
 
-                    item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;';
+                    item.setCssStyles({ 'cssText': 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
                 } else {
                     item.textContent = opt.label;
                 }
@@ -8379,7 +8379,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 } else if (page === 0) {
                     sessionList.createDiv({ cls: 'no-sessions-message', text: 'No sessions yet.' });
                 }
-                paginationDiv.style.display = 'none';
+                paginationDiv.setCssStyles({ 'display': 'none' });
             } else {
                 
                 const fragment = document.createDocumentFragment();
@@ -8456,10 +8456,10 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                 
                 if (totalSessions > pageSize) {
-                    paginationDiv.style.display = 'flex';
+                    paginationDiv.setCssStyles({ 'display': 'flex' });
                     updatePagination();
                 } else {
-                    paginationDiv.style.display = 'none';
+                    paginationDiv.setCssStyles({ 'display': 'none' });
                 }
             }
         };
@@ -8799,7 +8799,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         });
 
         
-        capsule.style.display = 'flex';
+        capsule.setCssStyles({ 'display': 'flex' });
     }
 
     private reconstructActionData(savedActionData: any): any {
@@ -11009,7 +11009,7 @@ class CodeCanvasModal extends Modal {
         setIcon(saveIcon, 'save');
         saveBtn.createSpan({ text: 'Save' });
         saveBtn.setAttribute('aria-label', 'Save changes to response');
-        saveBtn.style.display = 'none';
+        saveBtn.setCssStyles({ 'display': 'none' });
 
         const codeArea = codePanel.createEl('textarea', { cls: 'code-canvas-editor' });
         codeArea.value = this.code;
@@ -11047,17 +11047,17 @@ class CodeCanvasModal extends Modal {
                     iframe.className = 'code-exec-iframe code-canvas-iframe';
                     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
                     iframe.srcdoc = result.htmlContent;
-                    previewArea.style.padding = '0';
+                    previewArea.setCssStyles({ 'padding': '0' });
                     previewArea.appendChild(iframe);
                     const onMsg = (e: MessageEvent) => {
                         if (e.data?.iframeHeight) {
-                            iframe.style.height = e.data.iframeHeight + 'px';
+                            iframe.setCssStyles({ 'height': e.data.iframeHeight + 'px' });
                             window.removeEventListener('message', onMsg);
                         }
                     };
                     window.addEventListener('message', onMsg);
                 } else if (result.isMarkdown && result.markdownContent) {
-                    previewArea.style.padding = '';
+                    previewArea.setCssStyles({ 'padding': '' });
                     { const _comp = new Component();
                     await MarkdownRenderer.render(this.app, result.markdownContent, previewArea, '', _comp);
                     _comp.load(); }
@@ -11081,7 +11081,7 @@ class CodeCanvasModal extends Modal {
         codeArea.addEventListener('input', () => {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(render, 600);
-            saveBtn.style.display = codeArea.value !== this.code ? '' : 'none';
+            saveBtn.setCssStyles({ 'display': codeArea.value !== this.code ? '' : 'none' });
             if (this.onUpdate) this.onUpdate(codeArea.value);
         });
 
@@ -11089,7 +11089,7 @@ class CodeCanvasModal extends Modal {
             const newCode = codeArea.value;
             if (this.onSave) this.onSave(newCode);
             this.code = newCode;
-            saveBtn.style.display = 'none';
+            saveBtn.setCssStyles({ 'display': 'none' });
             setIcon(saveIcon, 'check');
             setTimeout(() => setIcon(saveIcon, 'save'), 1500);
         });
@@ -11130,7 +11130,7 @@ class CodeCanvasModal extends Modal {
         setIcon(saveIcon, 'save');
         saveBtn.createSpan({ text: 'Save' });
         saveBtn.setAttribute('aria-label', 'Save changes to response');
-        saveBtn.style.display = 'none';
+        saveBtn.setCssStyles({ 'display': 'none' });
 
         const codeArea = codePanel.createEl('textarea', { cls: 'code-canvas-editor' });
         codeArea.value = this.code;
@@ -11177,7 +11177,7 @@ class CodeCanvasModal extends Modal {
                 outputArea.appendChild(iframe);
                 const onMsg = (e: MessageEvent) => {
                     if (e.data?.iframeHeight && iframe.isConnected) {
-                        iframe.style.height = e.data.iframeHeight + 'px';
+                        iframe.setCssStyles({ 'height': e.data.iframeHeight + 'px' });
                         window.removeEventListener('message', onMsg);
                     }
                 };
@@ -11201,7 +11201,7 @@ class CodeCanvasModal extends Modal {
         runBtn.addEventListener('click', run);
 
         codeArea.addEventListener('input', () => {
-            saveBtn.style.display = codeArea.value !== this.code ? '' : 'none';
+            saveBtn.setCssStyles({ 'display': codeArea.value !== this.code ? '' : 'none' });
             if (this.onUpdate) this.onUpdate(codeArea.value);
         });
 
@@ -11209,7 +11209,7 @@ class CodeCanvasModal extends Modal {
             const newCode = codeArea.value;
             if (this.onSave) this.onSave(newCode);
             this.code = newCode;
-            saveBtn.style.display = 'none';
+            saveBtn.setCssStyles({ 'display': 'none' });
             setIcon(saveIcon, 'check');
             setTimeout(() => setIcon(saveIcon, 'save'), 1500);
         });

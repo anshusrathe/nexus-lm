@@ -191,13 +191,13 @@ vegaEmbed('#vis',${spec},{renderer:'svg',actions:false}).then(()=>{
 function buildChartJsHtml(spec: string): string {
     return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<style>html,body{margin:0;padding:8px;background:transparent;}canvas{max-width:100%;display:block;}</style>
+<style>html,body{margin:0;padding:8px;background:transparent;}canvas{max-width:100%;display:block;}.error-text{color:red;padding:8px;}</style>
 </head><body><canvas id="c"></canvas>
 <script>
 try{
   const chart=new Chart(document.getElementById('c'),${spec});
   setTimeout(()=>parent.postMessage({iframeHeight:document.body.scrollHeight},'*'),200);
-}catch(e){const p=document.createElement('pre');p.style.color='red';p.style.padding='8px';p.textContent=e.message;document.body.empty();document.body.appendChild(p);
+}catch(e){const p=document.createElement('pre');p.className='error-text';p.textContent=e.message;document.body.empty();document.body.appendChild(p);
   parent.postMessage({iframeHeight:document.body.scrollHeight},'*');}
 </script>
 </body></html>`;
