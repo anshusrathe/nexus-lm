@@ -133,7 +133,7 @@ export class GeminiFileAPIService {
      * Get metadata for an uploaded file using REST API
      * @param fileUri The URI of the uploaded file
      */
-    async getFileMetadata(fileUri: string): Promise<any> {
+    async getFileMetadata(fileUri: string): Promise<SafeAny> {
         if (!this.apiKey) {
                         return null;
         }

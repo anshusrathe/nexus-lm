@@ -231,9 +231,9 @@ export class NvidiaService {
   async generateContentWithTools(
     model: string,
     messages: ChatMessage[],
-    tools: any[],
+    tools: SafeAny[],
     options: GenerationOptions | undefined,
-    executeToolCallback: (toolCalls: any[]) => Promise<any[]>,
+    executeToolCallback: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
     let allMessages = [...messages];
@@ -306,7 +306,7 @@ export class NvidiaService {
         
         // Add tool results to conversation
         for (const toolCall of toolCalls) {
-          const result = toolResults.find((r: any) => r.toolCallId === toolCall.id);
+          const result = toolResults.find((r: SafeAny) => r.toolCallId === toolCall.id);
           const resultContent = result?.success !== false ? result?.content || '' : `Error: ${result?.error || 'Tool execution failed'}`;
           
           allMessages.push({

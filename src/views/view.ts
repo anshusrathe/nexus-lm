@@ -289,7 +289,7 @@ export class FolderSuggester {
 
   private getAvailableFolders(): string[] {
     const allFolders = this.app.vault.getAllLoadedFiles()
-      .filter((f: TAbstractFile) => (f as any).children !== undefined) 
+      .filter((f: TAbstractFile) => (f as SafeAny).children !== undefined) 
       .map((f: TAbstractFile) => f.path)
       .filter((path: string) => path !== '' && !path.startsWith('.'));
     return allFolders;
@@ -516,8 +516,8 @@ export class AITutorView extends ItemView {
       apiKey = this.settings.nvidiaApiKey;
     } else if (provider === 'opencode') {
       apiKey = this.settings.openCodeApiKey;
-    } else if (this.settings.customProviders?.some((p: any) => p.id === provider)) {
-      const cp = this.settings.customProviders.find((p: any) => p.id === provider);
+    } else if (this.settings.customProviders?.some((p: SafeAny) => p.id === provider)) {
+      const cp = this.settings.customProviders.find((p: SafeAny) => p.id === provider);
       apiKey = cp?.apiKey || '';
     } else {
       apiKey = this.settings.geminiApiKey || this.settings.apiKey;
@@ -769,7 +769,7 @@ export class AITutorView extends ItemView {
   private async invalidateNotebookCache(notebookId: string) {
     this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
       if (leaf.view && leaf.view.getViewType && leaf.view.getViewType() === VIEW_TYPE_NOTEBOOK_CHAT) {
-        const view: any = leaf.view;
+        const view: SafeAny = leaf.view;
         if (view.notebook && view.notebook.id === notebookId && typeof view.externalInvalidateContextCache === 'function') {
           view.externalInvalidateContextCache();
         }
@@ -849,7 +849,7 @@ export class AITutorView extends ItemView {
     const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_NOTEBOOK_CHAT);
     for (const leaf of leaves) {
       const viewState = leaf.getViewState();
-      const notebook = (viewState.state as unknown as any)?.notebook;
+      const notebook = (viewState.state as unknown as SafeAny)?.notebook;
       if (notebook?.id === notebookId) {
         return leaf;
       }
@@ -1519,13 +1519,13 @@ export class AITutorView extends ItemView {
     }, 200);
     
     
-    (dialog as unknown as any)._progressInterval = progressInterval;
+    (dialog as unknown as SafeAny)._progressInterval = progressInterval;
   }
   
   private hideMCQProgressDialog() {
     if (this._mcqProgressDialog) {
       
-      const interval = (this._mcqProgressDialog as unknown as any)._progressInterval;
+      const interval = (this._mcqProgressDialog as unknown as SafeAny)._progressInterval;
       if (interval) {
         clearInterval(interval);
       }
@@ -1535,7 +1535,7 @@ export class AITutorView extends ItemView {
     }
   }
   
-  private showMCQEvaluationError(error: any) {
+  private showMCQEvaluationError(error: SafeAny) {
     this.hideMCQProgressDialog();
     this._mcqEvaluationInProgress = false;
     
@@ -1770,7 +1770,7 @@ export class AITutorView extends ItemView {
   }
 
   
-  async generateSlideshow(notePaths: string[], settings: any) {
+  async generateSlideshow(notePaths: string[], settings: SafeAny) {
     try {
       
       const selectedNotesContainer = this.noteSuggester?.['selectedNotesContainer'] as HTMLElement;
@@ -2098,10 +2098,10 @@ export class AITutorView extends ItemView {
           }
   }
 
-  private parseConceptMapFromMarkdown(content: string, defaultName: string): any {
+  private parseConceptMapFromMarkdown(content: string, defaultName: string): SafeAny {
     const lines = content.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     
-    const conceptMapData: any = {
+    const conceptMapData: SafeAny = {
       noteName: defaultName,
       innerCircle: [],
       outerCircle: [],
@@ -2609,7 +2609,7 @@ class QASettingsModal extends Modal {
     private saveDirectory: string;
     private customPrompt: string = '';
 
-    constructor(app: any, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: QASettings) => void) {
+    constructor(app: SafeAny, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: QASettings) => void) {
         super(app);
         this.initialSelectedPaths = initialSelectedPaths;
         this.onSubmit = onSubmit;
@@ -2715,7 +2715,7 @@ class MCQSettingsModal extends Modal {
   private correctMarks: number = 1;
   private incorrectMarks: number = 0;
 
-  constructor(app: any, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: MCQSettings) => void) {
+  constructor(app: SafeAny, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: MCQSettings) => void) {
     super(app);
     this.initialSelectedPaths = initialSelectedPaths;
     this.onSubmit = onSubmit;
@@ -2851,7 +2851,7 @@ class MindmapSettingsModal extends Modal {
   private customPrompt: string = '';
   private saveDirectory: string;
 
-  constructor(app: any, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: { customPrompt: string; saveDirectory: string }) => void) {
+  constructor(app: SafeAny, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: { customPrompt: string; saveDirectory: string }) => void) {
     super(app);
     this.initialSelectedPaths = initialSelectedPaths;
     this.onSubmit = onSubmit;
@@ -2912,7 +2912,7 @@ class MindmapSettingsModal extends Modal {
 
 class TimerModal extends Modal {
   private onSubmit: (ms: number) => void;
-  constructor(app: any, onSubmit: (ms: number) => void) {
+  constructor(app: SafeAny, onSubmit: (ms: number) => void) {
     super(app);
     this.onSubmit = onSubmit;
   }

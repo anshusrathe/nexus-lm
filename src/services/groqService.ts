@@ -334,7 +334,7 @@ export class GroqService {
     messages: ChatMessage[],
     options?: GenerationOptions
   ): Promise<string> {
-    const body: any = {
+    const body: SafeAny = {
       model,
       messages,
       temperature: options?.temperature ?? 0.7,
@@ -387,7 +387,7 @@ export class GroqService {
     options: GenerationOptions | undefined,
     onChunk: (chunk: string) => void
   ): Promise<string> {
-    const body: any = {
+    const body: SafeAny = {
       model,
       messages,
       temperature: options?.temperature ?? 0.7,
@@ -484,7 +484,7 @@ export class GroqService {
       return;
     }
 
-    const requestBody: any = {
+    const requestBody: SafeAny = {
       model,
       messages,
       stream: true,
@@ -552,7 +552,7 @@ export class GroqService {
     options: GenerationOptions | undefined,
     headers: Record<string, string>
   ): Promise<void> {
-    const body: any = {
+    const body: SafeAny = {
       model,
       messages,
       stream: false,
@@ -638,7 +638,7 @@ export class GroqService {
     const isCompoundModel = isGroqWebSearchCapable(model) && !isGroqGptOssModel(model);
     const isGptOssModel = isGroqGptOssModel(model);
     
-    const requestBody: any = {
+    const requestBody: SafeAny = {
       model,
       messages,
       temperature: options?.temperature ?? 0.7,
@@ -957,9 +957,9 @@ export class GroqService {
   async generateContentWithTools(
     model: string,
     messages: ChatMessage[],
-    tools: any[],
+    tools: SafeAny[],
     options: GenerationOptions,
-    executeToolsCallback: (toolCalls: any[]) => Promise<any[]>,
+    executeToolsCallback: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
     let fullContent = '';
@@ -1041,7 +1041,7 @@ export class GroqService {
             content: toolResult.success 
               ? toolResult.content 
               : `Error: ${toolResult.error}`
-          } as any);
+          } as SafeAny);
         }
         
         
@@ -1067,7 +1067,7 @@ export class GroqService {
                 conversationMessages.push({
           role: 'user',
           content: 'You have already called some tools and received results. Please now synthesise a complete, direct answer to the original question using all the tool results above. Do not call any more tools — just write the final answer.'
-        } as any);
+        } as SafeAny);
         continue;
       }
 

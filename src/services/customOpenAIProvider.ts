@@ -24,7 +24,7 @@ export class CustomOpenAIProvider extends BaseProvider {
         this.apiKey = apiKey;
     }
 
-    private sanitizeMessages(messages: any[]): any[] {
+    private sanitizeMessages(messages: SafeAny[]): SafeAny[] {
         return messages.filter(msg => {
             const hasTextContent = typeof msg.content === 'string' && msg.content.trim().length > 0;
             const hasArrayContent = Array.isArray(msg.content) && msg.content.length > 0;
@@ -47,7 +47,7 @@ export class CustomOpenAIProvider extends BaseProvider {
             if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
                 if (msg.content === '' || msg.content === null) {
                     const newMsg = { ...msg };
-                    delete (newMsg as unknown as any).content;
+                    delete (newMsg as unknown as SafeAny).content;
                     return newMsg;
                 }
             }
@@ -67,7 +67,7 @@ export class CustomOpenAIProvider extends BaseProvider {
         // Wait for rate limit clearance if needed (conservative estimate)
         await RateLimitManager.getInstance().waitForClearance(this.id, modelId, 1000);
 
-        const body: any = {
+        const body: SafeAny = {
             model: modelId,
             messages: this.sanitizeMessages(messages),
             stream: false
@@ -145,7 +145,7 @@ export class CustomOpenAIProvider extends BaseProvider {
         };
 
         const buildBody = (stream: boolean) => {
-            const body: any = { 
+            const body: SafeAny = { 
                 model: modelId, 
                 messages: this.sanitizeMessages(messages), 
                 stream 
@@ -199,13 +199,13 @@ export class CustomOpenAIProvider extends BaseProvider {
     async generateContentWithTools(
         modelId: string,
         messages: UnifiedMessage[],
-        tools: any[],
+        tools: SafeAny[],
         options: UnifiedGenerationOptions & { toolChoice?: string },
-        executeToolsCallback?: (toolCalls: any[]) => Promise<any[]>,
+        executeToolsCallback?: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
         streamCallback?: (chunk: string) => void
     ): Promise<{ content: string; totalTokens?: number }> {
         let fullContent = '';
-        let conversationMessages = [...messages] as unknown as any[];
+        let conversationMessages = [...messages] as unknown as SafeAny[];
         let totalTokens = 0;
         let toolRoundsExecuted = 0;
         const MAX_CONTINUATION_NUDGES = 3;
@@ -216,7 +216,7 @@ export class CustomOpenAIProvider extends BaseProvider {
             if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
             await RateLimitManager.getInstance().waitForClearance(this.id, modelId, 1000);
 
-            const requestBody: any = {
+            const requestBody: SafeAny = {
                 model: modelId,
                 messages: this.sanitizeMessages(conversationMessages),
                 stream: false

@@ -28,7 +28,7 @@ export class WebSearchService {
     }
 
     // New method to provide the Google Search tool configuration for Gemini API.
-    public getGoogleSearchToolConfig(): any {
+    public getGoogleSearchToolConfig(): SafeAny {
         return {
             googleSearch: {}, // This object enables Google Search grounding for the Gemini model.
         };
@@ -44,7 +44,7 @@ export class WebSearchService {
         const response = await requestUrl({ url });
         const data = response.json;
         if (!data.items) return [];
-        return data.items.map((item: any) => ({
+        return data.items.map((item: SafeAny) => ({
             title: item.title,
             link: item.link,
             snippet: item.snippet,

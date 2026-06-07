@@ -3,13 +3,13 @@ import OramaWorker from 'web-worker:../workers/oramaWorker';
 export interface OramaRequest {
     type: 'INIT' | 'SEARCH' | 'INSERT' | 'INSERT_BATCH' | 'SAVE' | 'LOAD' | 'REMOVE' | 'CLEAR' | 'CLEAR_FILE' | 'GET_METADATA';
     instanceId: string;
-    payload?: any;
+    payload?: SafeAny;
 }
 
 export interface OramaResponse {
     success: boolean;
     instanceId: string;
-    payload?: any;
+    payload?: SafeAny;
     error?: string;
 }
 
@@ -53,7 +53,7 @@ export class OramaWorkerManager {
         };
     }
 
-    private sendRequest(request: OramaRequest, transferables: Transferable[] = []): Promise<any> {
+    private sendRequest(request: OramaRequest, transferables: Transferable[] = []): Promise<SafeAny> {
         this.initWorker();
         const requestId = Math.random().toString(36).substring(2, 10);
         return new Promise((resolve, reject) => {
@@ -62,11 +62,11 @@ export class OramaWorkerManager {
         });
     }
 
-    public async init(instanceId: string, schema: any, metadata?: any): Promise<void> {
+    public async init(instanceId: string, schema: SafeAny, metadata?: SafeAny): Promise<void> {
         await this.sendRequest({ type: 'INIT', instanceId, payload: { schema, metadata } });
     }
 
-    public async load(instanceId: string, data: ArrayBuffer, schema: any, compressed: boolean = true): Promise<any> {
+    public async load(instanceId: string, data: ArrayBuffer, schema: SafeAny, compressed: boolean = true): Promise<SafeAny> {
         return await this.sendRequest({ 
             type: 'LOAD', 
             instanceId, 
@@ -74,19 +74,19 @@ export class OramaWorkerManager {
         }, [data]);
     }
 
-    public async save(instanceId: string, compress: boolean = true, metadata?: any, documents?: any[]): Promise<{ data: Uint8Array | string, compressed: boolean, metadata?: any }> {
+    public async save(instanceId: string, compress: boolean = true, metadata?: SafeAny, documents?: SafeAny[]): Promise<{ data: Uint8Array | string, compressed: boolean, metadata?: SafeAny }> {
         return await this.sendRequest({ type: 'SAVE', instanceId, payload: { compress, metadata, documents } });
     }
 
-    public async insert(instanceId: string, document: any): Promise<void> {
+    public async insert(instanceId: string, document: SafeAny): Promise<void> {
         await this.sendRequest({ type: 'INSERT', instanceId, payload: { document } });
     }
 
-    public async insertBatch(instanceId: string, documents: any[]): Promise<void> {
+    public async insertBatch(instanceId: string, documents: SafeAny[]): Promise<void> {
         await this.sendRequest({ type: 'INSERT_BATCH', instanceId, payload: { documents } });
     }
 
-    public async search(instanceId: string, params: any): Promise<any> {
+    public async search(instanceId: string, params: SafeAny): Promise<SafeAny> {
         return await this.sendRequest({ type: 'SEARCH', instanceId, payload: { params } });
     }
 
@@ -102,7 +102,7 @@ export class OramaWorkerManager {
         await this.sendRequest({ type: 'CLEAR_FILE', instanceId, payload: { path } });
     }
 
-    public async getMetadata(instanceId: string): Promise<any> {
+    public async getMetadata(instanceId: string): Promise<SafeAny> {
         return await this.sendRequest({ type: 'GET_METADATA', instanceId });
     }
 

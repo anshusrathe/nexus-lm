@@ -667,7 +667,7 @@ export class EmbeddingsManager {
                                 return await this.getGeminiEmbedding(contentForEmbedding, embeddingModel, geminiApiKey);
             }
         } catch (error: unknown) {
-            const err = error as unknown as any;
+            const err = error as unknown as SafeAny;
             if (err.status && err.json) {
                 throw new Error(`Failed to generate embedding: ${err.json?.error?.message || err.message}`);
             }
@@ -741,11 +741,11 @@ export class EmbeddingsManager {
             });
             
             if (response.status >= 400) {
-                const resJson = response.json as unknown as any;
+                const resJson = response.json as unknown as SafeAny;
                 throw new Error(`${provider.name} API error: ${resJson?.error?.message || response.status}`);
             }
             
-            const resJson = response.json as unknown as any;
+            const resJson = response.json as unknown as SafeAny;
             if (!resJson || !resJson.data || !resJson.data[0] || !resJson.data[0].embedding) {
                 throw new Error(`Invalid response from ${provider.name} API`);
             }
@@ -784,11 +784,11 @@ export class EmbeddingsManager {
             });
             
             if (response.status >= 400) {
-                const errJson = response.json as unknown as any;
+                const errJson = response.json as unknown as SafeAny;
                 throw new Error(`${provider.name} batch API error: ${errJson?.error?.message || response.status}`);
             }
             
-            const resJson = response.json as unknown as any;
+            const resJson = response.json as unknown as SafeAny;
             if (!resJson || !resJson.data || !Array.isArray(resJson.data)) {
                 throw new Error(`Invalid batch response from ${provider.name} API`);
             }
@@ -1076,7 +1076,7 @@ export class EmbeddingsManager {
         try {
                         
             const baseUrl = 'https://integrate.api.nvidia.com';
-            const requestBody: any = {
+            const requestBody: SafeAny = {
                 input: texts,
                 model: modelId,
                 input_type: isQuery ? 'query' : 'passage'
@@ -1947,7 +1947,7 @@ export class EmbeddingsManager {
     async detectChanges(indexId: string): Promise<{ hasChanges: boolean; newFiles: number; modifiedFiles: number; deletedFiles: number }> {
         try {
             // Resolve config to know type and exclusions
-            const indexConfig = this.settings.indexConfigurations?.find((c: any) => c.id === indexId);
+            const indexConfig = this.settings.indexConfigurations?.find((c: SafeAny) => c.id === indexId);
             const isBM25 = indexConfig?.type === 'bm25';
 
             // Use the already loaded index if possible, otherwise we have to return "no changes" to avoid freezing
@@ -2077,7 +2077,7 @@ export class EmbeddingsManager {
                 limit: limit * 5
             });
 
-            const bm25Results = (bm25SearchResponse.results?.hits || []).map((hit: { document: any, score: number }) => ({
+            const bm25Results = (bm25SearchResponse.results?.hits || []).map((hit: { document: SafeAny, score: number }) => ({
                 path: hit.document.path,
                 chunkIndex: hit.document.chunkIndex,
                 content: hit.document.content || '',
@@ -2128,7 +2128,7 @@ export class EmbeddingsManager {
                     cleanQuery: temporalQuery.cleanQuery
                 } : undefined
             };
-        } catch (error: any) {
+        } catch (error: SafeAny) {
                         return { results: [], temporalContext: undefined };
         }
     }
@@ -2141,7 +2141,7 @@ export class EmbeddingsManager {
         if (indexId) {
             // Per-index exclusions (embedding indexes)
             const indexConfig = this.settings.indexConfigurations?.find(
-                (c: any) => c.id === indexId
+                (c: SafeAny) => c.id === indexId
             );
             excludedFolders = indexConfig?.excludedFolders || [];
             excludedFiles = indexConfig?.excludedFiles || [];
@@ -2527,7 +2527,7 @@ export class EmbeddingsManager {
                     similarity: 0.4
                 });
 
-                const fusedResults = (hybridSearchResponse.results?.hits || []).map((hit: { document: any, score: number }) => ({
+                const fusedResults = (hybridSearchResponse.results?.hits || []).map((hit: { document: SafeAny, score: number }) => ({
                     path: hit.document.path,
                     chunkIndex: hit.document.chunkIndex,
                     content: hit.document.content || '',
@@ -2593,7 +2593,7 @@ export class EmbeddingsManager {
                 this.settings.embeddingModel = originalEmbeddingModel;
             }
         } catch (error: unknown) {
-            const err = error as unknown as any;
+            const err = error as unknown as SafeAny;
             if (err?.message?.includes('DIMENSION_MISMATCH')) {
                 new Notice(`[Nexus] Embedding dimension mismatch. Please click "Rebuild Index" in settings to update "${this.loadedIndexId || 'the index'}" for the current model.`);
                                 throw new Error('Dimension mismatch. Please rebuild the index.');
@@ -2675,7 +2675,7 @@ export class EmbeddingsManager {
                 });
 
                 const vectorResults: Array<{path: string, chunkIndex: number, content: string, similarity: number, lastModified: number}> = 
-                    (vectorSearchResponse.results?.hits || []).map((hit: { document: any, score: number }) => ({
+                    (vectorSearchResponse.results?.hits || []).map((hit: { document: SafeAny, score: number }) => ({
                         path: hit.document.path,
                         chunkIndex: hit.document.chunkIndex,
                         content: hit.document.content || '',
@@ -2734,7 +2734,7 @@ export class EmbeddingsManager {
                 this.settings.embeddingModel = originalEmbeddingModel;
             }
         } catch (error: unknown) {
-            const err = error as unknown as any;
+            const err = error as unknown as SafeAny;
             if (err?.message?.includes('DIMENSION_MISMATCH')) {
                 new Notice(`[Nexus] Embedding dimension mismatch. Please click "Rebuild Index" in settings to update "${this.loadedIndexId || 'the index'}" for the current model.`);
                             }

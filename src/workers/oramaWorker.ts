@@ -6,22 +6,22 @@ interface OramaWorkerMessage {
     type: 'INIT' | 'SEARCH' | 'INSERT' | 'INSERT_BATCH' | 'SAVE' | 'LOAD' | 'REMOVE' | 'CLEAR' | 'CLEAR_FILE' | 'GET_METADATA';
     instanceId: string;
     id?: string;
-    payload?: any;
+    payload?: SafeAny;
 }
 
 interface OramaWorkerResponse {
     success: boolean;
     instanceId: string;
     id?: string;
-    payload?: any;
+    payload?: SafeAny;
     error?: string;
 }
 
-const ctx: Worker = self as unknown as any;
+const ctx: Worker = self as unknown as SafeAny;
 const instances: Map<string, AnyOrama> = new Map();
 const schemas: Map<string, AnySchema> = new Map();
-const metadatas: Map<string, any> = new Map();
-const shadowDocsMap: Map<string, any[]> = new Map();
+const metadatas: Map<string, SafeAny> = new Map();
+const shadowDocsMap: Map<string, SafeAny[]> = new Map();
 
 const tokenizerConfig = {
     allowDuplicates: true,
@@ -45,7 +45,7 @@ function createDb(schema: AnySchema) {
 
 
 function buildSchema(dimension: number = 0) {
-    const schema: any = {
+    const schema: SafeAny = {
         id: 'string',
         path: 'string',
         chunkIndex: 'number',
@@ -88,7 +88,7 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
                     let binaryData = payload.data;
                     if (payload.compressed) binaryData = fflate.unzlibSync(new Uint8Array(binaryData));
                     
-                    let decoded: any;
+                    let decoded: SafeAny;
                     
                     // Format Detection: Check if it starts with '{' (JSON) or something else (MsgPack)
                     const firstByte = new Uint8Array(binaryData)[0];
@@ -98,7 +98,7 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
                                                 decoded = decode(binaryData);
                     }
                     
-                    let shadowDocs: any[] = [];
+                    let shadowDocs: SafeAny[] = [];
                     
                     if (decoded.type === 'orama-state') {
                         // NEW Container format
@@ -129,7 +129,7 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
                         shadowDocs = [];
                         for (const doc of docs) {
                             const meta = doc.metadata || {};
-                            const oramaDoc: any = {
+                            const oramaDoc: SafeAny = {
                                 id: `${doc.path}:${doc.chunkIndex}`,
                                 path: doc.path,
                                 chunkIndex: doc.chunkIndex,
@@ -165,7 +165,7 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
                         success: true, instanceId, id, 
                         payload: { metadata: metadatas.get(instanceId), documents: shadowDocs } 
                     });
-                } catch (e: any) {
+                } catch (e: SafeAny) {
                                         throw new Error(`Load failed: ${e.message}`);
                 }
                 break;
@@ -176,7 +176,7 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
                 const metadata = { ...(payload?.metadata || metadatas.get(instanceId) || {}) };
                 
                 // Track dimension
-                const currentSchema: any = schemas.get(instanceId);
+                const currentSchema: SafeAny = schemas.get(instanceId);
                 if (currentSchema?.embedding) {
                     const match = currentSchema.embedding.match(/vector\[(\d+)\]/);
                     if (match) metadata.dimension = parseInt(match[1]);
@@ -207,7 +207,7 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
                 // Defensive check for vector dimension mismatch
                 if (payload.params.mode === 'vector' || payload.params.vector) {
                     const queryVector = payload.params.vector?.value || payload.params.vector;
-                    const schema: any = schemas.get(instanceId);
+                    const schema: SafeAny = schemas.get(instanceId);
                     if (schema?.embedding) {
                         const match = schema.embedding.match(/vector\[(\d+)\]/);
                         const expectedDim = match ? parseInt(match[1]) : 0;
@@ -247,7 +247,7 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
                 if (db) {
                     await remove(db, payload.docId);
                     const shadow = shadowDocsMap.get(instanceId) || [];
-                    shadowDocsMap.set(instanceId, shadow.filter((d: any) => `${d.path}:${d.chunkIndex}` !== payload.docId));
+                    shadowDocsMap.set(instanceId, shadow.filter((d: SafeAny) => `${d.path}:${d.chunkIndex}` !== payload.docId));
                 }
                 ctx.postMessage({ success: true, instanceId, id });
                 break;
@@ -262,11 +262,11 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
             case 'CLEAR_FILE':
                 if (db) {
                     const shadow = shadowDocsMap.get(instanceId) || [];
-                    const docsToRemove = shadow.filter((d: any) => d.path === payload.path);
+                    const docsToRemove = shadow.filter((d: SafeAny) => d.path === payload.path);
                     for (const doc of docsToRemove) {
                         await remove(db, `${doc.path}:${doc.chunkIndex}`);
                     }
-                    shadowDocsMap.set(instanceId, shadow.filter((d: any) => d.path !== payload.path));
+                    shadowDocsMap.set(instanceId, shadow.filter((d: SafeAny) => d.path !== payload.path));
                 }
                 ctx.postMessage({ success: true, instanceId, id });
                 break;

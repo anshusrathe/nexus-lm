@@ -44,9 +44,9 @@ export interface MCQSettings {
 
 export class MCQManager {
   private settings: AISettings;
-  private app: any;
+  private app: SafeAny;
 
-  constructor(app: any, settings: AISettings) {
+  constructor(app: SafeAny, settings: AISettings) {
     this.app = app;
     this.settings = settings;
   }
@@ -169,7 +169,7 @@ export class MCQManager {
 ${mcqSettings.customPrompt ? `Additional context for MCQ generation: ${mcqSettings.customPrompt}\n\n` : ''}${formattedContent ? `Here's the content:\n\n${formattedContent}\n\n` : ''}Generate exactly ${mcqSettings.numMCQs} MCQs now:`;
 
         // Build message parts with multimodal inputs
-        const messageParts: any[] = [{ text: prompt }];
+        const messageParts: SafeAny[] = [{ text: prompt }];
         
         // Add multimodal inputs (images, PDFs, audio, video) for inline data
         const inlineInputs = multimodalInputs.filter(input => input.type === 'inline' && input.data);
@@ -646,7 +646,7 @@ export class MCQSettingsModal extends Modal {
   private correctMarks: number = 1;
   private incorrectMarks: number = 0;
 
-  constructor(app: any, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: MCQSettings) => void) {
+  constructor(app: SafeAny, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: MCQSettings) => void) {
     super(app);
     this.initialSelectedPaths = initialSelectedPaths;
     this.onSubmit = onSubmit;

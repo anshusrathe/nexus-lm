@@ -24,7 +24,7 @@ export interface TemporalQuery {
 export async function parseTemporalQuery(
     query: string, 
     referenceDate: Date = new Date(),
-    settings?: any
+    settings?: SafeAny
 ): Promise<TemporalQuery> {
             
     // Try fast regex-based parsing first (covers common patterns like "this week", "yesterday", etc.)
@@ -369,7 +369,7 @@ function parseFlexibleDate(dateStr: string): Date | null {
  * - "documents I edited last summer"
  * - "notes from when I was on vacation in july"
  */
-async function parseTemporalQueryAI(query: string, referenceDate: Date, settings?: any): Promise<TemporalQuery> {
+async function parseTemporalQueryAI(query: string, referenceDate: Date, settings?: SafeAny): Promise<TemporalQuery> {
     const lowerQuery = query.toLowerCase();
     
     // Quick heuristic check: Does the query contain temporal FILE FILTERING indicators?
@@ -472,7 +472,7 @@ Rules:
 JSON:`;
 
     try {
-        let response: any;
+        let response: SafeAny;
         let content: string = '';
 
         // Use provider-specific API calls

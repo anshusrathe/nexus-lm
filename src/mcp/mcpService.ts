@@ -1,7 +1,7 @@
 import { Notice, requestUrl, Platform } from 'obsidian';
 
 
-const child_process = (!Platform.isMobile && (window as unknown as any).require) ? (window as unknown as any).require('child_process') : null;
+const child_process = (!Platform.isMobile && (window as unknown as SafeAny).require) ? (window as unknown as SafeAny).require('child_process') : null;
 const spawn = child_process?.spawn;
 type ChildProcess = import('child_process').ChildProcess; 
 
@@ -816,7 +816,7 @@ export class MCPService {
                 connection.process.kill();
             }
             if (connection.eventSource) {
-                (connection.eventSource as unknown as any).close();
+                (connection.eventSource as unknown as SafeAny).close();
             }
         } catch (error) {
                     }

@@ -66,7 +66,7 @@ export class OpenRouterService {
     messages: ChatMessage[],
     options?: GenerationOptions
   ): Promise<string> {
-    const body: any = {
+    const body: SafeAny = {
       model,
       messages,
       temperature: options?.temperature ?? 0.7,
@@ -127,7 +127,7 @@ export class OpenRouterService {
     };
 
     const buildBody = (stream: boolean) => {
-      const body: any = { model, messages, stream };
+      const body: SafeAny = { model, messages, stream };
       if (options?.temperature !== undefined) body.temperature = options.temperature;
       if (options?.topP !== undefined) body.top_p = options.topP;
       if (options?.maxTokens !== undefined) body.max_tokens = options.maxTokens;
@@ -180,7 +180,7 @@ export class OpenRouterService {
     }
   }
 
-  private async handleRequestUrlError(response: any): Promise<never> {
+  private async handleRequestUrlError(response: SafeAny): Promise<never> {
     const errorData = response.json || {};
     const message = errorData.error?.message || `HTTP ${response.status}`;
     throw new OpenRouterApiError(message, response.status);
@@ -189,9 +189,9 @@ export class OpenRouterService {
   async generateContentWithTools(
     model: string,
     messages: ChatMessage[],
-    tools: any[],
+    tools: SafeAny[],
     options: GenerationOptions,
-    executeToolsCallback: (toolCalls: any[]) => Promise<any[]>,
+    executeToolsCallback: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
     let fullContent = '';
@@ -205,7 +205,7 @@ export class OpenRouterService {
     while (true) {
       if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
       
-      const body: any = {
+      const body: SafeAny = {
         model,
         messages: conversationMessages,
         temperature: options.temperature ?? 0.7,
@@ -263,7 +263,7 @@ export class OpenRouterService {
             tool_call_id: toolCall.id,
             name: toolCall.function.name,
             content: toolResult.success ? toolResult.content : `Error: ${toolResult.error}`
-          } as any);
+          } as SafeAny);
         }
         continue;
       }
@@ -279,7 +279,7 @@ export class OpenRouterService {
         conversationMessages.push({
           role: 'user',
           content: 'Please synthesise a final answer based on the tool results above.'
-        } as any);
+        } as SafeAny);
         continue;
       }
       break;

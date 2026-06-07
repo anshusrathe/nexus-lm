@@ -220,7 +220,7 @@ async function getAIEditForSelection(query: string, selectedText: string, settin
             { role: 'user', content: userPrompt }
         ];
 
-        const result = await ollamaService.generateContent(settings.model, messages as unknown as any);
+        const result = await ollamaService.generateContent(settings.model, messages as unknown as SafeAny);
         const trimmedResult = result.trim();
         if (trimmedResult && trimmedResult.length > 0) {
             return trimmedResult;
@@ -238,7 +238,7 @@ async function getAIEditForSelection(query: string, selectedText: string, settin
             { role: 'user', content: userPrompt }
         ];
 
-        const result = await openRouterService.generateContent(settings.model, messages as unknown as any);
+        const result = await openRouterService.generateContent(settings.model, messages as unknown as SafeAny);
         const trimmedResult = result.trim();
         if (trimmedResult && trimmedResult.length > 0) {
             return trimmedResult;
@@ -256,7 +256,7 @@ async function getAIEditForSelection(query: string, selectedText: string, settin
             { role: 'user', content: userPrompt }
         ];
 
-        const result = await nvidiaService.generateContent(settings.model, messages as unknown as any);
+        const result = await nvidiaService.generateContent(settings.model, messages as unknown as SafeAny);
         const trimmedResult = result.trim();
         if (trimmedResult && trimmedResult.length > 0) {
             return trimmedResult;

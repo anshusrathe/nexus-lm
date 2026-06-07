@@ -27,7 +27,7 @@ export class OpenCodeProvider extends BaseProvider {
     ): Promise<UnifiedResponse> {
         await RateLimitManager.getInstance().waitForClearance(this.id, modelId, 1000);
 
-        const body: any = {
+        const body: SafeAny = {
             model: modelId,
             messages: messages,
             stream: false
@@ -102,7 +102,7 @@ export class OpenCodeProvider extends BaseProvider {
         };
 
         const buildBody = (stream: boolean) => {
-            const body: any = { model: modelId, messages, stream };
+            const body: SafeAny = { model: modelId, messages, stream };
             if (options?.temperature !== undefined) body.temperature = options.temperature;
             if (options?.topP !== undefined) body.top_p = options.topP;
             if (options?.maxTokens !== undefined) body.max_tokens = options.maxTokens;
@@ -149,13 +149,13 @@ export class OpenCodeProvider extends BaseProvider {
     async generateContentWithTools(
         modelId: string,
         messages: UnifiedMessage[],
-        tools: any[],
+        tools: SafeAny[],
         options: UnifiedGenerationOptions & { toolChoice?: string },
-        executeToolsCallback?: (toolCalls: any[]) => Promise<any[]>,
+        executeToolsCallback?: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
         streamCallback?: (chunk: string) => void
     ): Promise<{ content: string; totalTokens?: number }> {
         let fullContent = '';
-        let conversationMessages = [...messages] as any[];
+        let conversationMessages = [...messages] as SafeAny[];
         let totalTokens = 0;
         let toolRoundsExecuted = 0;
         const MAX_CONTINUATION_NUDGES = 3;
@@ -166,7 +166,7 @@ export class OpenCodeProvider extends BaseProvider {
             if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
             await RateLimitManager.getInstance().waitForClearance(this.id, modelId, 1000);
 
-            const requestBody: any = {
+            const requestBody: SafeAny = {
                 model: modelId,
                 messages: conversationMessages,
                 stream: false

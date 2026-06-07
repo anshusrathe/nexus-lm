@@ -18,12 +18,12 @@ export class MCPServerSelectionModal extends Modal {
     private resourceContainers = new Map<string, HTMLElement>();
     private toolContainers = new Map<string, HTMLElement>();
     private submitBtn: HTMLButtonElement | null = null;
-    private mcpService: any;
+    private mcpService: SafeAny;
     private availableServers: MCPServerConfig[];
     private onSubmit: (selection: MCPServerSelection) => void;
     private mcpAutoConnect: boolean;
 
-    constructor(app: App, mcpService: any, availableServers: MCPServerConfig[], onSubmit: (selection: MCPServerSelection) => void, mcpAutoConnect = true) {
+    constructor(app: App, mcpService: SafeAny, availableServers: MCPServerConfig[], onSubmit: (selection: MCPServerSelection) => void, mcpAutoConnect = true) {
         super(app);
         this.mcpService = mcpService;
         this.availableServers = availableServers.filter(s => !s.disabled);
@@ -195,7 +195,7 @@ export class MCPServerSelectionModal extends Modal {
                 container.createEl('p', { text: 'No resources available', cls: 'mcp-empty-hint' });
                 return;
             }
-            resources.forEach((resource: any) => {
+            resources.forEach((resource: SafeAny) => {
                 const item = container.createDiv({ cls: 'mcp-selectable-item' });
                 const cb = item.createEl('input', { type: 'checkbox' });
                 const id = `resource-${serverId}-${resource.uri}`;
@@ -229,7 +229,7 @@ export class MCPServerSelectionModal extends Modal {
                 container.createEl('p', { text: 'No tools available', cls: 'mcp-empty-hint' });
                 return;
             }
-            tools.forEach((tool: any) => {
+            tools.forEach((tool: SafeAny) => {
                 const item = container.createDiv({ cls: 'mcp-selectable-item' });
                 const cb = item.createEl('input', { type: 'checkbox' });
                 const id = `tool-${serverId}-${tool.name}`;

@@ -233,7 +233,7 @@ export default class AIPlugin extends Plugin {
         this.addCommand({
             id: 'edit-selection',
             name: 'Nexuslm: Edit selection',
-            editorCallback: (editor: Editor, view: MarkdownView | any) => {
+            editorCallback: (editor: Editor, view: MarkdownView | SafeAny) => {
                 openEditSelectionModal(this.app, this.settings);
             }
         });
@@ -257,7 +257,7 @@ export default class AIPlugin extends Plugin {
                                 
                                 const vault = this.app.vault;
                                 const arrayBuffer = await vault.readBinary(activeFile!);
-                                const pdfjsLib = (window as any).pdfjsLib;
+                                const pdfjsLib = (window as SafeAny).pdfjsLib;
                                 if (!pdfjsLib) throw new Error('PDF.js library not loaded.');
                                 const pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                                 const numPages = pdfDocument.numPages;

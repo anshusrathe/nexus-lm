@@ -61,7 +61,7 @@ export class YouTubeTranscriptService {
      * This approach does NOT require scraping the YouTube page for an API key,
      * which was the source of the 429 / bot-detection redirect errors.
      */
-    private async getPlayerResponse(videoId: string): Promise<any> {
+    private async getPlayerResponse(videoId: string): Promise<SafeAny> {
         const response = await requestUrl({
             url: 'https://www.youtube.com/youtubei/v1/player',
             method: 'POST',
@@ -85,14 +85,14 @@ export class YouTubeTranscriptService {
         return response.json;
     }
 
-    private extractCaptionTrackUrl(playerResponse: any, lang: string): string {
+    private extractCaptionTrackUrl(playerResponse: SafeAny, lang: string): string {
         const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
         if (!tracks || tracks.length === 0) {
             throw new Error('No captions available for this video');
         }
-        const track = tracks.find((t: any) => t.languageCode === lang);
+        const track = tracks.find((t: SafeAny) => t.languageCode === lang);
         if (!track) {
-            const available = tracks.map((t: any) => t.languageCode).join(', ');
+            const available = tracks.map((t: SafeAny) => t.languageCode).join(', ');
             throw new Error(`Language ${lang} not available. Available: ${available}`);
         }
         return track.baseUrl.replace(/&fmt=\w+$/, '');
@@ -148,7 +148,7 @@ export class YouTubeTranscriptService {
             throw new Error('No captions available for this video');
         }
 
-        const availableLanguages = tracks.map((t: any) => t.languageCode);
+        const availableLanguages = tracks.map((t: SafeAny) => t.languageCode);
 
         let selectedLanguage = preferredLanguages.find(l => availableLanguages.includes(l))
             ?? availableLanguages[0];
@@ -177,7 +177,7 @@ export class YouTubeTranscriptService {
             throw new Error('No captions available for this video');
         }
 
-        const availableLanguages = tracks.map((t: any) => t.languageCode);
+        const availableLanguages = tracks.map((t: SafeAny) => t.languageCode);
         const selectedLanguage = preferredLanguages.find(l => availableLanguages.includes(l))
             ?? availableLanguages[0];
 

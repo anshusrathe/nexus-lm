@@ -110,7 +110,7 @@ export class SlideManager {
     notePaths: string[],
     slideSettings: SlideSettings,
     onProgress?: (message: string) => void
-  ): Promise<any> {
+  ): Promise<SafeAny> {
     // Legacy redirect to Zen mode
     return this.generateZenSlideshow(notePaths, slideSettings, onProgress);
   }
@@ -146,7 +146,7 @@ export class SlideManager {
         { temperature: 0.7, maxTokens: 8192 }
       );
       return response.text;
-    } catch (error: any) {
+    } catch (error: SafeAny) {
             throw new Error(`${provider} API error: ${error.message || 'Unknown error'}`);
     }
   }
@@ -158,7 +158,7 @@ export class SlideManager {
       
       const result = await model.generateContent(prompt);
       return result.response.text();
-    } catch (error: any) {
+    } catch (error: SafeAny) {
             throw new Error(`Gemini API error: ${error.message || 'Unknown error'}`);
     }
   }
@@ -176,7 +176,7 @@ export class SlideManager {
         { temperature: 0.7, maxTokens: 8192 }
       );
       return responseText;
-    } catch (error: any) {
+    } catch (error: SafeAny) {
             throw new Error(`Groq API error: ${error.message || 'Unknown error'}`);
     }
   }
@@ -194,7 +194,7 @@ export class SlideManager {
         { temperature: 0.7, maxTokens: 8192 }
       );
       return responseText;
-    } catch (error: any) {
+    } catch (error: SafeAny) {
             throw new Error(`OpenRouter API error: ${error.message || 'Unknown error'}`);
     }
   }
@@ -212,7 +212,7 @@ export class SlideManager {
         { temperature: 0.7, maxTokens: 8192 }
       );
       return responseText;
-    } catch (error: any) {
+    } catch (error: SafeAny) {
             throw new Error(`Ollama API error: ${error.message || 'Unknown error'}`);
     }
   }
@@ -230,7 +230,7 @@ export class SlideManager {
         { temperature: 0.7, maxTokens: 8192 }
       );
       return responseText;
-    } catch (error: any) {
+    } catch (error: SafeAny) {
             throw new Error(`NVIDIA API error: ${error.message || 'Unknown error'}`);
     }
   }
@@ -1098,7 +1098,7 @@ export class ZenSlideshowModal extends Modal {
     };
     
         modalEl.addEventListener('wheel', wheelHandler, { passive: false });
-        (this as any).wheelHandler = wheelHandler;
+        (this as SafeAny).wheelHandler = wheelHandler;
       }
 
   private async initializeVoices(): Promise<void> {

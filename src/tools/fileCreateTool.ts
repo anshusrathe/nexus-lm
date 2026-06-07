@@ -42,7 +42,7 @@ interface EnhancedFileCreationContext {
   webSearchEnabled: boolean;
   webSearchService?: WebSearchService;
   settings: AISettings;
-  chatHistory: any[];
+  chatHistory: SafeAny[];
   progressCallback?: (message: string, snippet?: string) => void;
 }
 
@@ -74,7 +74,7 @@ export class FileCreationReviewModal extends Modal {
 
   private renderSpecializedPlan(type: 'Canvas' | 'Excalidraw') {
     const { contentEl } = this;
-    const plan = this.plan as any;
+    const plan = this.plan as SafeAny;
     const folderName = plan.folderName || 'New Files';
     const targetPath = plan.targetPath;
 
@@ -106,7 +106,7 @@ export class FileCreationReviewModal extends Modal {
         pathInfo.setCssProps({ 'font-weight':  'bold' });
         pathInfo.createSpan({ text: 'Target Path: ' });
         const linkSpan = pathInfo.createSpan();
-        MarkdownRenderer.render(this.app, `[[${targetPath}]]`, linkSpan, '', this as any);
+        MarkdownRenderer.render(this.app, `[[${targetPath}]]`, linkSpan, '', this as SafeAny);
     }
 
     const footer = contentEl.createDiv({ cls: 'file-preview-footer' });
@@ -130,7 +130,7 @@ export class FileCreationReviewModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     
-    const plan = this.plan as any;
+    const plan = this.plan as SafeAny;
     const isCanvas = plan && plan.nodes && plan.edges;
     const isExcalidraw = plan && (plan.type === 'excalidraw' || (plan.elements && !Array.isArray(plan.files)));
 
@@ -295,7 +295,7 @@ export async function handleFileCreationPrompt(
   contextFiles: Array<{ path: string; content: string; basename: string }> = [],
   webSearchEnabled: boolean = false,
   webSearchService?: WebSearchService,
-  chatHistory: any[] = [],
+  chatHistory: SafeAny[] = [],
   progressCallback?: (message: string, snippet?: string) => void
 ) {
   // Add spinner to top right of the workspace
@@ -474,7 +474,7 @@ CRITICAL:
       );
     } else if (UnifiedProviderManager.getInstance().hasProvider(context.settings.provider)) {
       const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(context.settings.provider)!;
-      const convertedHistory: UnifiedMessage[] = (context.chatHistory || []).map((h: any) => ({
+      const convertedHistory: UnifiedMessage[] = (context.chatHistory || []).map((h: SafeAny) => ({
         role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
         content: h.parts[0].text
       }));
@@ -722,7 +722,7 @@ ORIGINAL REQUEST: ${context.userPrompt}`;
     const genAI = new GoogleGenerativeAI(context.settings.geminiApiKey || context.settings.apiKey);
     
     // Configure model with web search if enabled
-    const modelConfig: any = { model: context.settings.model };
+    const modelConfig: SafeAny = { model: context.settings.model };
     if (context.webSearchEnabled && context.webSearchService) {
       modelConfig.tools = [context.webSearchService.getGoogleSearchToolConfig()];
     }
@@ -905,7 +905,7 @@ function findAllJSONObjects(text: string): string[] {
 /**
  * Validates that the plan has the required structure.
  */
-function isValidPlan(plan: any): boolean {
+function isValidPlan(plan: SafeAny): boolean {
   if (!plan || typeof plan !== 'object') return false;
   if (!plan.folderName || typeof plan.folderName !== 'string') return false;
   if (!Array.isArray(plan.files)) return false;
@@ -924,12 +924,12 @@ function isValidPlan(plan: any): boolean {
 /**
  * Sanitizes and normalizes the plan.
  */
-function sanitizePlan(plan: any): FileCreationPlan {
+function sanitizePlan(plan: SafeAny): FileCreationPlan {
   // Clean the folder name to remove any unwanted characters
   plan.folderName = plan.folderName.replace(/[:;"'`]/g, '').trim();
   
   // Ensure all files have .md extension for Obsidian if no extension specified
-  plan.files = plan.files.map((file: any) => {
+  plan.files = plan.files.map((file: SafeAny) => {
     // Default to .md extension
     if (!file.extension || file.extension === '') {
       file.extension = 'md';
@@ -1026,8 +1026,8 @@ function parseMarkdownToDiagramNodes(markdown: string): DiagramNode[] {
  * Calculates a hierarchical tree layout for the nodes.
  */
 function applyTreeLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', layoutType: 'tree' | 'timeline' | 'sideways' = 'tree') {
-    const nodes: any[] = [];
-    const edges: any[] = [];
+    const nodes: SafeAny[] = [];
+    const edges: SafeAny[] = [];
     
     // Layout Constants
     const config = {
@@ -1092,9 +1092,9 @@ function applyTreeLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', la
     return { nodes, edges };
 }
 
-function applyTimelineLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', config: any) {
-    const nodes: any[] = [];
-    const edges: any[] = [];
+function applyTimelineLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', config: SafeAny) {
+    const nodes: SafeAny[] = [];
+    const edges: SafeAny[] = [];
     const verticalOffset = 150;
 
     let currentX = 0;
@@ -1131,9 +1131,9 @@ function applyTimelineLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw'
     return { nodes, edges };
 }
 
-function applySidewaysLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', config: any) {
-    const nodes: any[] = [];
-    const edges: any[] = [];
+function applySidewaysLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', config: SafeAny) {
+    const nodes: SafeAny[] = [];
+    const edges: SafeAny[] = [];
     const sHGap = 150; // Special gap for sideways
     const sVGap = 40;
 
@@ -1188,7 +1188,7 @@ function applySidewaysLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw'
 /**
  * Converts the layout into Obsidian Canvas JSON format.
  */
-function convertToCanvasJSON(layout: { nodes: any[], edges: any[] }): string {
+function convertToCanvasJSON(layout: { nodes: SafeAny[], edges: SafeAny[] }): string {
     const canvasData = {
         nodes: layout.nodes.map(n => ({
             id: n.id,
@@ -1213,8 +1213,8 @@ function convertToCanvasJSON(layout: { nodes: any[], edges: any[] }): string {
 /**
  * Converts the layout into Excalidraw JSON format.
  */
-function convertToExcalidrawJSON(layout: { nodes: any[], edges: any[] }): string {
-    const elements: any[] = [];
+function convertToExcalidrawJSON(layout: { nodes: SafeAny[], edges: SafeAny[] }): string {
+    const elements: SafeAny[] = [];
     const seed = Math.floor(Math.random() * 100000);
 
     layout.nodes.forEach((n, idx) => {

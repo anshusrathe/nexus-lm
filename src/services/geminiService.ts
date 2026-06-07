@@ -41,7 +41,7 @@ export class GeminiService {
   /**
    * Get a generative model instance
    */
-  getGenerativeModel(config: { model: string; generationConfig?: any; tools?: any[] }): GenerativeModel {
+  getGenerativeModel(config: { model: string; generationConfig?: SafeAny; tools?: SafeAny[] }): GenerativeModel {
     return this.genAI.getGenerativeModel(config);
   }
   
@@ -51,15 +51,15 @@ export class GeminiService {
    */
   private async makeDirectApiCall(
     model: string,
-    contents: any[],
-    generationConfig?: any,
-    tools?: any[],
+    contents: SafeAny[],
+    generationConfig?: SafeAny,
+    tools?: SafeAny[],
     abortSignal?: AbortSignal
-  ): Promise<{ response: any; headers: Headers }> {
-    const apiKey = (this.genAI as unknown as any)._apiKey;
+  ): Promise<{ response: SafeAny; headers: Headers }> {
+    const apiKey = (this.genAI as unknown as SafeAny)._apiKey;
     const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
     
-    const requestBody: any = {
+    const requestBody: SafeAny = {
       contents,
       generationConfig: generationConfig || {
         temperature: 0.7,
@@ -97,7 +97,7 @@ export class GeminiService {
   async generateContentWithHeaders(
     model: string,
     prompt: string,
-    generationConfig?: any,
+    generationConfig?: SafeAny,
     abortSignal?: AbortSignal
   ): Promise<string> {
     const contents = [{ role: 'user', parts: [{ text: prompt }] }];
@@ -126,8 +126,8 @@ export class GeminiService {
     });
     
     const chat = modelInstance.startChat({
-      history: (config.history as unknown as any) || [],
-      generationConfig: config.generationConfig as unknown as any
+      history: (config.history as unknown as SafeAny) || [],
+      generationConfig: config.generationConfig as unknown as SafeAny
     });
     
     // Provide a method to capture headers on next API call
@@ -165,10 +165,10 @@ export class GeminiService {
    */
   async generateContentWithTools(
     model: string,
-    messages: any[],
-    tools: any[],
+    messages: SafeAny[],
+    tools: SafeAny[],
     options: GeminiGenerationOptions,
-    executeToolsCallback: (toolCalls: any[]) => Promise<any[]>,
+    executeToolsCallback: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
     onThinkingChunk?: (text: string) => void,
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
@@ -214,8 +214,8 @@ export class GeminiService {
       const response = result.response;
 
       // Track tokens
-      if ((response as unknown as any).usageMetadata) {
-        const usage = (response as unknown as any).usageMetadata;
+      if ((response as unknown as SafeAny).usageMetadata) {
+        const usage = (response as unknown as SafeAny).usageMetadata;
         totalTokens = (usage.promptTokenCount || 0) + (usage.candidatesTokenCount || 0);
       }
 
@@ -223,7 +223,7 @@ export class GeminiService {
       if (!candidate) break;
 
       // Extract and emit thought parts for thinking models
-      const thoughtParts = candidate.content.parts?.filter((part: any) => part.thought === true);
+      const thoughtParts = candidate.content.parts?.filter((part: SafeAny) => part.thought === true);
       if (thoughtParts?.length > 0 && onThinkingChunk) {
         for (const thought of thoughtParts) {
           if (thought.text) onThinkingChunk(thought.text);
@@ -237,13 +237,13 @@ export class GeminiService {
       });
 
       // Check for function calls
-      const functionCalls = candidate.content.parts?.filter((part: any) => part.functionCall);
+      const functionCalls = candidate.content.parts?.filter((part: SafeAny) => part.functionCall);
 
       if (functionCalls && functionCalls.length > 0) {
                 toolRoundsExecuted++;
 
         // Convert Gemini function calls to OpenAI format for the callback
-        const toolCalls = functionCalls.map((fc: any, index: number) => ({
+        const toolCalls = functionCalls.map((fc: SafeAny, index: number) => ({
           id: `call_${index}`,
           type: 'function',
           function: {
@@ -274,7 +274,7 @@ export class GeminiService {
       }
 
       // No function calls — this is the synthesis turn
-      const textPart = candidate.content.parts?.find((part: any) => part.text && part.thought !== true);
+      const textPart = candidate.content.parts?.find((part: SafeAny) => part.text && part.thought !== true);
       if (textPart && textPart.text) {
         fullContent = textPart.text;
         if (streamCallback) {
@@ -305,12 +305,12 @@ export class GeminiService {
    * This handles injected tool history (assistant+tool pairs) correctly by
    * building proper model/functionCall + user/functionResponse turn pairs.
    */
-  private convertMessagesToGeminiContents(messages: any[]): {
+  private convertMessagesToGeminiContents(messages: SafeAny[]): {
     systemInstruction: string | null;
-    contents: any[];
+    contents: SafeAny[];
   } {
     let systemInstruction: string | null = null;
-    const contents: any[] = [];
+    const contents: SafeAny[] = [];
 
     for (const msg of messages) {
       if (msg.role === 'system') {
@@ -372,7 +372,7 @@ export class GeminiService {
   /**
    * Convert OpenAI-style tools to Gemini format
    */
-  private convertToolsToGeminiFormat(tools: any[]): any[] {
+  private convertToolsToGeminiFormat(tools: SafeAny[]): SafeAny[] {
     return tools.map(tool => {
       // Deep-clone and strip fields Gemini rejects: $schema, additionalProperties
       const parameters = this.sanitizeSchemaForGemini(tool.function.parameters);
@@ -393,11 +393,11 @@ export class GeminiService {
    * - additionalProperties
    * - $defs / definitions (not supported)
    */
-  private sanitizeSchemaForGemini(schema: any): any {
+  private sanitizeSchemaForGemini(schema: SafeAny): SafeAny {
     if (!schema || typeof schema !== 'object') return schema;
     if (Array.isArray(schema)) return schema.map(item => this.sanitizeSchemaForGemini(item));
 
-    const cleaned: any = {};
+    const cleaned: SafeAny = {};
     for (const key of Object.keys(schema)) {
       if (key === '$schema' || key === 'additionalProperties' || key === '$defs' || key === 'definitions') continue;
       cleaned[key] = this.sanitizeSchemaForGemini(schema[key]);

@@ -203,7 +203,7 @@ export class YouTubeChatService {
                 const response = result.response;
                 return response.text();
             }
-        } catch (error: any) {
+        } catch (error: SafeAny) {
             if (error.status === 400 && error.message?.includes('Invalid `file_uri`')) {
                 throw new Error('The YouTube URL might be invalid or inaccessible to the Gemini API. Ensure it is a public video.');
             }

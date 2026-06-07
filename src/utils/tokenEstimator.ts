@@ -28,7 +28,7 @@ export class TokenEstimator {
   estimate(
     query: string,
     vaultContext: string = '',
-    chatHistory: any[] = [],
+    chatHistory: SafeAny[] = [],
     taskType: TaskType = TaskType.BASIC_CHAT
   ): number {
     let total = 0;
@@ -108,11 +108,11 @@ export class TokenEstimator {
   /**
    * Extracts content from a message object
    */
-  private extractContent(msg: any): string {
+  private extractContent(msg: SafeAny): string {
     if (typeof msg === 'string') return msg;
     if (msg.content) return msg.content;
     if (msg.parts && Array.isArray(msg.parts)) {
-      return msg.parts.map((p: any) => p.text || '').join(' ');
+      return msg.parts.map((p: SafeAny) => p.text || '').join(' ');
     }
     return '';
   }

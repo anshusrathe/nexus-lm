@@ -209,7 +209,7 @@ export class NotebookChatView extends ItemView {
               const contextParts: string[] = [];
               results.forEach(result => {
                 const file = this.app.vault.getAbstractFileByPath(result.path);
-                const fileName = file && 'basename' in file ? (file as any).basename : result.path.split('/').pop();
+                const fileName = file && 'basename' in file ? (file as SafeAny).basename : result.path.split('/').pop();
                 contextParts.push(`--- From: ${fileName} ---\n${result.content}\n`);
               });
               return contextParts.join('\n');
@@ -457,7 +457,7 @@ Rules:
         fileContents.push(`=== DOCUMENT OVERVIEWS ===`);
         documentSummaries.forEach((ds, idx) => {
           const file = this.app.vault.getAbstractFileByPath(ds.path);
-          const fileName = file && 'basename' in file ? (file as any).basename : ds.path.split('/').pop();
+          const fileName = file && 'basename' in file ? (file as SafeAny).basename : ds.path.split('/').pop();
           fileContents.push(`[${fileName}]: ${ds.summary}`);
         });
         fileContents.push(`=== RELEVANT Info ===\n`);
@@ -469,7 +469,7 @@ Rules:
       
       sortedFiles.forEach(([filePath, fileResults]) => {
         const file = this.app.vault.getAbstractFileByPath(filePath);
-        const fileName = file && 'basename' in file ? (file as any).basename : filePath.split('/').pop();
+        const fileName = file && 'basename' in file ? (file as SafeAny).basename : filePath.split('/').pop();
 
         
         const contentParts = fileResults.map(r => r.content).join('\n\n');
@@ -634,7 +634,7 @@ Rules:
   }
 
   
-  getState(): any {
+  getState(): SafeAny {
     return {
       notebook: this.notebook,
       currentSessionId: this.currentSession?.id || null
@@ -642,7 +642,7 @@ Rules:
   }
 
   
-  async setState(state: any, result: any) {
+  async setState(state: SafeAny, result: SafeAny) {
     
     if (state && state.notebook && (!this.notebook || this.notebook.id !== state.notebook.id)) {
       this.notebook = state.notebook;
@@ -954,7 +954,7 @@ Rules:
       'Keyword based → For facts use this. Keyword-filled query excels, fast'
     ];
     let promptIndex = 0;
-    let placeholderInterval: any = null;
+    let placeholderInterval: SafeAny = null;
     let isInputActive = false;
     const setNextPlaceholder = () => {
       if (!isInputActive && document.activeElement !== this.chatInput.inputEl) {
@@ -1468,7 +1468,7 @@ Rules:
       
       validSourcePaths.forEach(path => {
         const file = this.app.vault.getAbstractFileByPath(path);
-        const fileName = file && 'basename' in file ? (file as any).basename : path.split('/').pop();
+        const fileName = file && 'basename' in file ? (file as SafeAny).basename : path.split('/').pop();
         const row = list.createDiv({ cls: 'source-row' });
         const label = row.createEl('label', { cls: 'source-label' });
         const checkbox = document.createElement('input');
@@ -1869,7 +1869,7 @@ Rules:
       
       validSourcePaths.forEach(path => {
         const file = this.app.vault.getAbstractFileByPath(path);
-        const fileName = file && 'basename' in file ? (file as any).basename : path.split('/').pop();
+        const fileName = file && 'basename' in file ? (file as SafeAny).basename : path.split('/').pop();
         const row = list.createDiv({ cls: 'source-row' });
         const label = row.createEl('label', { cls: 'source-label' });
         const checkbox = document.createElement('input');
@@ -2113,7 +2113,7 @@ Rules:
     }
   }
 
-  private addMessage(role: 'user' | 'assistant', content: string, save = true, webResults: any[] = [], pushToMessages: boolean = true, sourceMapping?: string[]): HTMLElement {
+  private addMessage(role: 'user' | 'assistant', content: string, save = true, webResults: SafeAny[] = [], pushToMessages: boolean = true, sourceMapping?: string[]): HTMLElement {
     
     let displayContent = content;
     if (role === 'assistant' && displayContent.trim().toLowerCase().startsWith('assistant:')) {
@@ -2659,7 +2659,7 @@ Rules:
       }
       let prompt = '';
       let assistantResponse = '';
-      let webResults: any[] = [];
+      let webResults: SafeAny[] = [];
 
       
       if (useQuizForThisQuery) {
@@ -2807,7 +2807,7 @@ Rules:
       prompt = this.buildPromptWithHistory(query, cachedContext, modelMaxTokens);
       if (this.settings.notebookProvider === 'gemini') {
           const genAI = new GoogleGenerativeAI(this.settings.geminiApiKey || this.settings.apiKey);
-          const modelOptions: any = { model: this.settings.notebookModel };
+          const modelOptions: SafeAny = { model: this.settings.notebookModel };
           
           
           if (selectedWebs.length > 0) {
@@ -3074,7 +3074,7 @@ Rules:
               
               const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(this.settings.notebookProvider)!;
               
-              const unifiedMessages: any[] = [
+              const unifiedMessages: SafeAny[] = [
                 { role: 'system', content: this.buildGroqSystemPrompt(cachedContext) + (webSourceContext || '') },
                 ...this.messages.slice(-(this.notebook.contextLength !== undefined ? this.notebook.contextLength : 3)).map(m => ({
                     role: m.role === 'user' ? 'user' : 'assistant',
@@ -3095,7 +3095,7 @@ Rules:
                   }
                 );
                 assistantResponse = response.text;
-              } catch (error: any) {
+              } catch (error: SafeAny) {
                 new Notice(`${this.settings.notebookProvider} API error: ${error.message || 'Unknown error'}`);
                 throw error;
               }
@@ -4139,7 +4139,7 @@ class RenameSessionModal extends Modal {
   private initialName: string;
   private onSubmit: (newName: string) => void;
 
-  constructor(app: any, initialName: string, onSubmit: (newName: string) => void) {
+  constructor(app: SafeAny, initialName: string, onSubmit: (newName: string) => void) {
     super(app);
     this.initialName = initialName;
     this.onSubmit = onSubmit;
@@ -4178,7 +4178,7 @@ class SessionSelectModal extends Modal {
   private onSelect: (sessionIds: string[]) => void;
   private selectedSessions: Set<string> = new Set();
 
-  constructor(app: any, sessions: NotebookChatSessionMeta[], onSelect: (sessionIds: string[]) => void) {
+  constructor(app: SafeAny, sessions: NotebookChatSessionMeta[], onSelect: (sessionIds: string[]) => void) {
     super(app);
     this.sessions = sessions;
     this.onSelect = onSelect;
@@ -4232,13 +4232,13 @@ class SessionSelectModal extends Modal {
 
 
 class SearchResultsModal extends Modal {
-  private results: any[];
-  private onAdd: (results: any[]) => void;
+  private results: SafeAny[];
+  private onAdd: (results: SafeAny[]) => void;
   private isLoading: boolean;
   private error: string | null;
   private selectedResults: Set<number> = new Set();
 
-  constructor(app: any, results: any[], onAdd: (results: any[]) => void, isLoading = false, error: string | null = null) {
+  constructor(app: SafeAny, results: SafeAny[], onAdd: (results: SafeAny[]) => void, isLoading = false, error: string | null = null) {
     super(app);
     this.results = results;
     this.onAdd = onAdd;

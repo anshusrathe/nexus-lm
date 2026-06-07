@@ -26,7 +26,7 @@ export async function verifyModel(model: CustomModel, settings: AISettings): Pro
   const provider = model.provider;
   let url = '';
   let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  let body: any = {};
+  let body: SafeAny = {};
 
   if (provider === 'gemini') {
     const key = settings.geminiApiKey || settings.apiKey;
@@ -141,7 +141,7 @@ export async function verifyEmbeddingModel(model: CustomEmbeddingModel, settings
   const provider = model.provider;
   let url = '';
   let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  let body: any = {};
+  let body: SafeAny = {};
 
   if (provider === 'gemini') {
     const key = settings.geminiApiKey || settings.apiKey;
@@ -487,7 +487,7 @@ async function fetchOllamaModels(baseUrl: string, apiKey?: string): Promise<Mode
 
         if (showResponse.status === 200) {
           const showData = showResponse.json as { 
-            model_info?: Record<string, any>; 
+            model_info?: Record<string, SafeAny>; 
             details?: { family?: string; families?: string[] };
             capabilities?: string[];
           };
@@ -786,10 +786,10 @@ async function fetchOpenCodeModels(apiKey: string): Promise<ModelDiscoveryResult
       return { provider: 'opencode', models: [], error: `API error: ${response.status}` };
     }
 
-    const data = response.json as any;
+    const data = response.json as SafeAny;
     const models: DiscoveredModel[] = (data.data || [])
-      .filter((m: any) => m.id)
-      .map((m: any) => ({
+      .filter((m: SafeAny) => m.id)
+      .map((m: SafeAny) => ({
         id: m.id,
         name: formatModelName(m.id),
         tokenLimit: extractGenericTokenLimit(m) ?? inferContextWindow(m.id, false)
@@ -822,7 +822,7 @@ export interface ModelDiscoveryConfig {
  * Extracts the token limit from a generic OpenAI-compatible API model entry
  * using a cascading check over known field locations across different providers.
  */
-function extractGenericTokenLimit(m: Record<string, any>): number | null {
+function extractGenericTokenLimit(m: Record<string, SafeAny>): number | null {
   return m.context_window ?? m.max_model_len ?? m.context_length ?? m.max_model_length ??
          m.metadata?.context_window ?? m.metadata?.max_model_len ??
          m.metadata?.context_length ?? m.metadata?.max_model_length ?? null;
@@ -858,7 +858,7 @@ async function fetchCustomProviderModels(provider: { id: string; name: string; b
       return { provider: provider.id, models: [], error: `API error: ${response.status}` };
     }
 
-    const data = response.json as { data: any[] };
+    const data = response.json as { data: SafeAny[] };
     if (!data.data || !Array.isArray(data.data)) {
       return { provider: provider.id, models: [] };
     }
@@ -964,7 +964,7 @@ export async function discoverModels(config: ModelDiscoveryConfig): Promise<Mode
 /**
  * Converts discovery results to CustomModel format.
  */
-export function toCustomModels(result: ModelDiscoveryResult): CustomModel[] | any[] {
+export function toCustomModels(result: ModelDiscoveryResult): CustomModel[] | SafeAny[] {
   return result.models.map(m => ({
     provider: result.provider,
     id: m.id,

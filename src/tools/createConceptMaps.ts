@@ -31,18 +31,18 @@ export interface SavedConceptMap {
 
 export class ConceptMapManager {
   private settings: AISettings;
-  private app: any;
+  private app: SafeAny;
   private clickedNodeId: string | null = null;
   private clickedThemeIdx: number | null = null;
   private themeNodeOverlay: HTMLElement | null = null;
-  private holdTimer: any = null;
+  private holdTimer: SafeAny = null;
   private isHolding: boolean = false;
   private firedThemeNode: SVGElement | null = null;
   private zoomAnchorX: number | null = null;
   private zoomAnchorY: number | null = null;
-  private mouseMoveTimeout: any = null;
+  private mouseMoveTimeout: SafeAny = null;
 
-  constructor(app: any, settings: AISettings) {
+  constructor(app: SafeAny, settings: AISettings) {
     this.app = app;
     this.settings = settings;
   }
@@ -246,7 +246,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
         const model = genAI.getGenerativeModel({ model: modelId });
         
         // Build message parts with multimodal inputs
-        const messageParts: any[] = [{ text: prompt }];
+        const messageParts: SafeAny[] = [{ text: prompt }];
         
         // Add multimodal inputs (images, PDFs, audio, video) for inline data
         const inlineInputs = multimodalInputs.filter(input => input.type === 'inline' && input.data);
@@ -1472,7 +1472,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     type: 'inner' | 'outer',
     color: string,
     themeIdx: number,
-    themeColor: any,
+    themeColor: SafeAny,
     textPositions: Array<{ x: number; y: number; width: number; height: number; label: string }>,
     relationNodePositions: Array<{ x: number; y: number }>,
     allNodePositions: Array<{ x: number; y: number }>,
@@ -1480,7 +1480,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     centerY: number,
     themes: Array<{ nodes: string[]; reason: string }>,
     nodeThemeMap: Map<string, number>,
-    themeColors: Array<any>,
+    themeColors: Array<SafeAny>,
     relations: Array<{ from: string; to: string; reason: string }>
   ) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -1918,7 +1918,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
   private renderMarkdownTooltip(text: string, container: HTMLElement) {
     container.empty();
     // Use Obsidian's MarkdownRenderer for safe rendering
-    MarkdownRenderer.render(this.app, text, container, '', null as any);
+    MarkdownRenderer.render(this.app, text, container, '', null as SafeAny);
   }
 
   private checkTooltipNodeOverlap(
@@ -2122,8 +2122,8 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
 
       // Find the modal instance through the DOM
       const modalEl = modal.closest('.modal') as HTMLElement;
-      const modalInstance = (modalEl as any)?._modalInstance || 
-                           (window as any).activeConceptMapModal;
+      const modalInstance = (modalEl as SafeAny)?._modalInstance || 
+                           (window as SafeAny).activeConceptMapModal;
       
       if (modalInstance && modalInstance.zoomLevel > targetZoom) {
         // Smoothly zoom out to fit theme
@@ -2712,7 +2712,7 @@ export class ConceptMapModal extends Modal {
   private onConfirm: (name: string) => void;
   private conceptMapName: string = '';
 
-  constructor(app: any, onConfirm: (name: string) => void) {
+  constructor(app: SafeAny, onConfirm: (name: string) => void) {
     super(app);
     this.onConfirm = onConfirm;
   }
@@ -2771,7 +2771,7 @@ export class ConceptMapVisualizationModal extends Modal {
   private lastPanPoint = { x: 0, y: 0 };
   private zoomAnchorX: number | null = null;
   private zoomAnchorY: number | null = null;
-  private mouseMoveTimeout: any = null;
+  private mouseMoveTimeout: SafeAny = null;
   private helpContainer: HTMLElement | null = null;
   
   // Mobile touch properties
@@ -2779,11 +2779,11 @@ export class ConceptMapVisualizationModal extends Modal {
   private lastTouchDistance: number = 0;
   private lastTapTime: number = 0;
   private lastTapTarget: HTMLElement | null = null;
-  private longPressTimeout: any = null;
+  private longPressTimeout: SafeAny = null;
   private activeNode: HTMLElement | null = null;
   private isNodeHighlighted: boolean = false;
 
-  constructor(app: any, conceptMapData: ConceptMapData, name: string) {
+  constructor(app: SafeAny, conceptMapData: ConceptMapData, name: string) {
     super(app);
     this.conceptMapData = conceptMapData;
     this.name = name;
@@ -2796,7 +2796,7 @@ export class ConceptMapVisualizationModal extends Modal {
     
     // Add modal class for styling and store reference for auto-zoom
     modalEl.addClass('concept-map-modal');
-    (window as any).activeConceptMapModal = this;
+    (window as SafeAny).activeConceptMapModal = this;
 
     // Create body
     const body = contentEl.createDiv({ cls: 'concept-map-modal-body' });
@@ -3340,7 +3340,7 @@ export class ConceptMapVisualizationModal extends Modal {
     
     // Store overlay for cleanup
     this.activeNode = target;
-    (target as any)._highlightOverlay = overlay;
+    (target as SafeAny)._highlightOverlay = overlay;
   }
 
   private showThematicOverlay(target: HTMLElement) {
@@ -3481,8 +3481,8 @@ export class ConceptMapVisualizationModal extends Modal {
     }
     
     // Clear highlight overlay
-    if (this.activeNode && (this.activeNode as any)._highlightOverlay) {
-      (this.activeNode as any)._highlightOverlay.remove();
+    if (this.activeNode && (this.activeNode as SafeAny)._highlightOverlay) {
+      (this.activeNode as SafeAny)._highlightOverlay.remove();
     }
     
     // Clear mobile overlays
@@ -3504,6 +3504,6 @@ export class ConceptMapVisualizationModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     // Clean up global reference
-    (window as any).activeConceptMapModal = null;
+    (window as SafeAny).activeConceptMapModal = null;
   }
 }

@@ -108,7 +108,7 @@ export class MCPToolCallingService {
      * re-invoking the MCP server. This prevents duplicate executions when a
      * fallback model re-requests a tool that already ran.
      */
-    async executeToolCall(toolCall: Record<string, any>): Promise<MCPToolResult> {
+    async executeToolCall(toolCall: Record<string, SafeAny>): Promise<MCPToolResult> {
         try {
             // Parse the tool name to extract server and tool.
             // Format: <sanitizedServerName>__<toolName>

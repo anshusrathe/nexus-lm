@@ -51,7 +51,7 @@ interface Response {
     id?: string;
     sessionId?: string;
     fileActionIds?: string[]; 
-    fileActionData?: { [actionId: string]: any }; 
+    fileActionData?: { [actionId: string]: SafeAny }; 
     
     modelName?: string; 
     totalTokens?: number; 
@@ -99,7 +99,7 @@ interface FileActionState {
     fileName: string;
     status: 'processing' | 'completed' | 'failed' | 'accepted' | 'rejected';
     element: HTMLElement;
-    data?: any; 
+    data?: SafeAny; 
     error?: string;
     isApplied?: boolean; 
     originalFileContent?: string; 
@@ -883,7 +883,7 @@ export class ResponseView extends ItemView {
 
     // Throttled answer rendering
     private lastAnswerRenderTime: number = 0;
-    private answerRenderTimeout: any | null = null;
+    private answerRenderTimeout: SafeAny | null = null;
 
     
     private currentStreamingAnswerEl: HTMLElement | null = null;
@@ -951,7 +951,7 @@ export class ResponseView extends ItemView {
             const view = leaf.view;
             if (view instanceof ResponseView) {
                 
-                const viewWithSession = view as any;
+                const viewWithSession = view as SafeAny;
                 if (viewWithSession.currentSessionId === sessionId) {
                     return leaf;
                 }
@@ -1281,7 +1281,7 @@ export class ResponseView extends ItemView {
             'Use prefix @mcp to use MCP servers and tools...'
         ];
         let promptIndex = 0;
-        let placeholderInterval: any = null;
+        let placeholderInterval: SafeAny = null;
         let isInputActive = false;
         const setNextPlaceholder = () => {
             if (!isInputActive && document.activeElement !== this.queryInput) {
@@ -2396,7 +2396,7 @@ export class ResponseView extends ItemView {
                         isBlank = true;
                     } else if (result && typeof result === 'object') {
                         
-                        const r = result as any;
+                        const r = result as SafeAny;
                         const text = r.answer ?? r.response ?? r.content ?? r.text ?? r.message;
                         if (typeof text === 'string' && text.trim() === '') {
                             isBlank = true;
@@ -2442,7 +2442,7 @@ export class ResponseView extends ItemView {
      * Checks if a response is actually an error message disguised as success
      * Services sometimes catch errors and return error messages instead of throwing
      */
-    private isErrorResponse(result: any, operationName: string): string | false {
+    private isErrorResponse(result: SafeAny, operationName: string): string | false {
         
         const errorPatterns = [
             'encountered a temporary rate limit',
@@ -3308,12 +3308,12 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         if (chev) chev.setText(collapsed ? '▸' : '▾');
     }
 
-    private extractGeminiAnswerTextFromResponse(response: any): string {
+    private extractGeminiAnswerTextFromResponse(response: SafeAny): string {
         const parts = response?.candidates?.[0]?.content?.parts;
         if (!Array.isArray(parts)) return response?.text?.() || '';
         return parts
-            .filter((part: any) => typeof part?.text === 'string' && part.text.trim().length > 0 && part?.thought !== true)
-            .map((part: any) => part.text)
+            .filter((part: SafeAny) => typeof part?.text === 'string' && part.text.trim().length > 0 && part?.thought !== true)
+            .map((part: SafeAny) => part.text)
             .join('');
     }
 
@@ -3719,7 +3719,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                         }
                         this.currentProgressResponseEl = null;
                         this.currentProgressEl = null;
-                    } catch (ytError: any) {
+                    } catch (ytError: SafeAny) {
                         
                         if (progressResponseEl && progressEl) {
                             this.finalizeResponse(
@@ -3795,7 +3795,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
                                 
                                 query = finalPrompt;
-                            } catch (transcriptError: any) {
+                            } catch (transcriptError: SafeAny) {
                                 
                                 if (!this.settings.autoModeEnabled) {
                                     new Notice(transcriptError.message || 'Failed to extract YouTube transcript.');
@@ -3892,7 +3892,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                                 
                                 
 
-                            } catch (saveError: any) {
+                            } catch (saveError: SafeAny) {
                                 
                                 if (!this.settings.autoModeEnabled) {
                                     new Notice(`Failed to save transcript: ${saveError.message}`);
@@ -3902,7 +3902,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                                 return;
                             }
 
-                        } catch (transcriptError: any) {
+                        } catch (transcriptError: SafeAny) {
                             
                             
                             if (!this.settings.autoModeEnabled) {
@@ -4174,8 +4174,8 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
                             
                             const vaultSearchResponse = isFlashSearch
-                                ? await (this.plugin as any).searchVaultBM25Only(cleanQuery, searchLimit)
-                                : await (this.plugin as any).searchVault(cleanQuery, searchLimit);
+                                ? await (this.plugin as SafeAny).searchVaultBM25Only(cleanQuery, searchLimit)
+                                : await (this.plugin as SafeAny).searchVault(cleanQuery, searchLimit);
 
                             const vaultSearchResults = vaultSearchResponse.results;
                             temporalContext = vaultSearchResponse.temporalContext;
@@ -4220,7 +4220,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                                 return;
                             }
                             this.updateProcessingUI(1, 1, `Found ${relevantVaultContent.length} relevant items.`);
-                        } catch (error: any) {
+                        } catch (error: SafeAny) {
                                                         const errorMessage = error instanceof Error ? error.message : 'Unknown error during vault search';
 
                             
@@ -4426,7 +4426,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                         
                         
                         
-                        let chatHistory: any[] = [];
+                        let chatHistory: SafeAny[] = [];
                         if (isVaultWideSearch) {
                             const fullChatHistory = this.getChatHistory();
                             
@@ -4744,7 +4744,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                     this.currentProgressEl = null;
                 }
 
-        } catch (error: any) {
+        } catch (error: SafeAny) {
             errorOccurred = true;
                         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
@@ -5058,7 +5058,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 }
 
                 
-                const source = sources.find(s => s.path === path) as any;
+                const source = sources.find(s => s.path === path) as SafeAny;
                 if (source && source.url) {
                     return source.url;
                 }
@@ -5073,8 +5073,8 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 }
 
                 
-                if (source && (source as any).content) {
-                    const sourceMatch = (source as any).content.match(/Source:\s*(https?:\/\/[^\s\n]+)/);
+                if (source && (source as SafeAny).content) {
+                    const sourceMatch = (source as SafeAny).content.match(/Source:\s*(https?:\/\/[^\s\n]+)/);
                     if (sourceMatch) {
                         return sourceMatch[1];
                     }
@@ -5092,7 +5092,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
                     if (isYouTubeSource(source.path)) {
                         
-                        getYouTubeUrl(source.path, (source as any).content).then(url => {
+                        getYouTubeUrl(source.path, (source as SafeAny).content).then(url => {
                             if (url) {
                                 const videoId = extractYouTubeId(url);
                                 if (videoId) {
@@ -5135,7 +5135,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
                     if (isYouTubeSource(source.path)) {
                         
-                        getYouTubeUrl(source.path, (source as any).content).then(url => {
+                        getYouTubeUrl(source.path, (source as SafeAny).content).then(url => {
                             if (url) {
                                 const videoId = extractYouTubeId(url);
                                 if (videoId) {
@@ -5503,7 +5503,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                     if (!dirPath) {
                         try {
                             await this.app.vault.createFolder(directory);
-                        } catch (error: any) {
+                        } catch (error: SafeAny) {
                             new Notice(`Failed to create directory: ${directory}`);
                                                         return;
                         }
@@ -5544,7 +5544,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
                 await this.app.vault.create(filePath, contents);
                 new Notice(`Response saved as ${filePath}`);
-            } catch (error: any) {
+            } catch (error: SafeAny) {
                                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                 new Notice(`Error saving response as note: ${errorMessage}`);
             }
@@ -5569,7 +5569,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                     if (!dirPath) {
                         try {
                             await this.app.vault.createFolder(directory);
-                        } catch (error: any) {
+                        } catch (error: SafeAny) {
                             new Notice(`Failed to create directory: ${directory}`);
                                                         return;
                         }
@@ -5613,7 +5613,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
                 await this.app.vault.create(filePath, contents);
                 new Notice(`Chat session saved as ${filePath}`);
-            } catch (error: any) {
+            } catch (error: SafeAny) {
                                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                 new Notice(`Error saving chat session: ${errorMessage}`);
             }
@@ -6381,7 +6381,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
             
             this.watchMermaidErrors(rendered as HTMLElement ?? preEl, wrapper, question);
-        } catch (err: any) {
+        } catch (err: SafeAny) {
             loadingEl.remove();
 
             const errRow = document.createElement('div');
@@ -6489,7 +6489,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
             
             await this.runCode(preEl, lang, outputEl, wrapper, autoFix);
-        } catch (err: any) {
+        } catch (err: SafeAny) {
             outputEl.classList.remove('code-exec-running');
             outputEl.classList.add('code-exec-error');
             outputEl.empty();
@@ -6710,18 +6710,18 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         });
 
         
-        const embeddingsManager = (this.plugin as any).embeddingsManager;
+        const embeddingsManager = (this.plugin as SafeAny).embeddingsManager;
         if (embeddingsManager && typeof embeddingsManager.detectChanges === 'function') {
             
-            const indexConfigs: any[] = this.settings.indexConfigurations || [];
+            const indexConfigs: SafeAny[] = this.settings.indexConfigurations || [];
             let targetIndexId: string | null = null;
             if (searchMode === 'flash') {
-                const bm25Config = indexConfigs.find((c: any) => c.type === 'bm25' && c.enabled)
-                    ?? indexConfigs.find((c: any) => c.type === 'bm25');
+                const bm25Config = indexConfigs.find((c: SafeAny) => c.type === 'bm25' && c.enabled)
+                    ?? indexConfigs.find((c: SafeAny) => c.type === 'bm25');
                 targetIndexId = bm25Config?.id ?? null;
             } else {
-                const embConfig = indexConfigs.find((c: any) => c.type === 'embedding' && c.enabled)
-                    ?? indexConfigs.find((c: any) => c.type === 'embedding');
+                const embConfig = indexConfigs.find((c: SafeAny) => c.type === 'embedding' && c.enabled)
+                    ?? indexConfigs.find((c: SafeAny) => c.type === 'embedding');
                 targetIndexId = embConfig?.id ?? null;
             }
 
@@ -6752,12 +6752,12 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
             try {
                 
-                const indexConfigs: any[] = this.settings.indexConfigurations || [];
+                const indexConfigs: SafeAny[] = this.settings.indexConfigurations || [];
 
                 if (searchMode === 'flash') {
                     
-                    const bm25Config = indexConfigs.find((c: any) => c.type === 'bm25' && c.enabled)
-                        ?? indexConfigs.find((c: any) => c.type === 'bm25');
+                    const bm25Config = indexConfigs.find((c: SafeAny) => c.type === 'bm25' && c.enabled)
+                        ?? indexConfigs.find((c: SafeAny) => c.type === 'bm25');
 
                     if (bm25Config) {
                         bm25Config.isBuilding = true;
@@ -6791,8 +6791,8 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
                 } else {
                     
-                    const embConfig = indexConfigs.find((c: any) => c.type === 'embedding' && c.enabled)
-                        ?? indexConfigs.find((c: any) => c.type === 'embedding');
+                    const embConfig = indexConfigs.find((c: SafeAny) => c.type === 'embedding' && c.enabled)
+                        ?? indexConfigs.find((c: SafeAny) => c.type === 'embedding');
 
                     const embModel = embConfig?.model || this.settings.embeddingModel;
 
@@ -6818,7 +6818,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                     
                     if (embConfig) {
                         const allMdFiles = this.app.vault.getMarkdownFiles();
-                        const nonExcluded = allMdFiles.filter((f: any) => !embeddingsManager.isFileExcluded(f.path, embConfig.id));
+                        const nonExcluded = allMdFiles.filter((f: SafeAny) => !embeddingsManager.isFileExcluded(f.path, embConfig.id));
                         const embFileCount = await embeddingsManager.getEmbeddedFileCount(embConfig.id);
                         embConfig.fileCount = embFileCount;
                         embConfig.lastUpdated = Date.now();
@@ -6827,7 +6827,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                     }
                     
                     const allFiles = this.app.vault.getMarkdownFiles();
-                    const nonExcluded = allFiles.filter((f: any) => !embeddingsManager.isFileExcluded(f.path, embConfig?.id));
+                    const nonExcluded = allFiles.filter((f: SafeAny) => !embeddingsManager.isFileExcluded(f.path, embConfig?.id));
                     const embCount = embConfig ? embConfig.fileCount : 0;
                     this.settings.embeddingIndexedFiles = nonExcluded.length > 0
                         ? Math.round((embCount / nonExcluded.length) * 100) : 0;
@@ -6840,7 +6840,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 
                 dotWrapper.remove();
 
-            } catch (err: any) {
+            } catch (err: SafeAny) {
                 notice.setMessage(`Indexing failed: ${err?.message || 'Unknown error'}`);
                 setTimeout(() => notice.hide(), 5000);
                 indexBtn.disabled = false;
@@ -6848,8 +6848,8 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 isIndexing = false;
 
                 
-                const indexConfigs: any[] = this.settings.indexConfigurations || [];
-                indexConfigs.forEach((c: any) => { c.isBuilding = false; });
+                const indexConfigs: SafeAny[] = this.settings.indexConfigurations || [];
+                indexConfigs.forEach((c: SafeAny) => { c.isBuilding = false; });
             }
         });
 
@@ -6881,23 +6881,23 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
     private async loadNonIndexedFiles(container: HTMLElement, searchMode: 'vault' | 'flash') {
         try {
-            const embeddingsManager = (this.plugin as any).embeddingsManager;
+            const embeddingsManager = (this.plugin as SafeAny).embeddingsManager;
             if (!embeddingsManager) {
                 container.empty();
                 container.createSpan({ text: 'Unable to load files', cls: 'index-status-files-loading' });
                 return;
             }
 
-            const indexConfigs: any[] = this.settings.indexConfigurations || [];
+            const indexConfigs: SafeAny[] = this.settings.indexConfigurations || [];
 
             
-            let targetConfig: any = null;
+            let targetConfig: SafeAny = null;
             if (searchMode === 'flash') {
-                targetConfig = indexConfigs.find((c: any) => c.type === 'bm25' && c.enabled)
-                    ?? indexConfigs.find((c: any) => c.type === 'bm25');
+                targetConfig = indexConfigs.find((c: SafeAny) => c.type === 'bm25' && c.enabled)
+                    ?? indexConfigs.find((c: SafeAny) => c.type === 'bm25');
             } else {
-                targetConfig = indexConfigs.find((c: any) => c.type === 'embedding' && c.enabled)
-                    ?? indexConfigs.find((c: any) => c.type === 'embedding');
+                targetConfig = indexConfigs.find((c: SafeAny) => c.type === 'embedding' && c.enabled)
+                    ?? indexConfigs.find((c: SafeAny) => c.type === 'embedding');
             }
 
             if (!targetConfig) {
@@ -6944,10 +6944,10 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             const allFiles = this.app.vault.getMarkdownFiles();
             const includedFiles = isBM25
                 ? allFiles
-                : allFiles.filter((file: any) => !embeddingsManager.isFileExcluded(file.path, indexId));
+                : allFiles.filter((file: SafeAny) => !embeddingsManager.isFileExcluded(file.path, indexId));
 
             
-            const nonIndexedFiles = includedFiles.filter((file: any) => !indexedFilePaths.has(file.path) && (file.stat?.size || 0) > 0);
+            const nonIndexedFiles = includedFiles.filter((file: SafeAny) => !indexedFilePaths.has(file.path) && (file.stat?.size || 0) > 0);
 
             container.empty();
 
@@ -6958,7 +6958,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 countText.createSpan({ text: `${nonIndexedFiles.length}`, cls: 'index-status-files-count' });
                 countText.appendText(` file${nonIndexedFiles.length !== 1 ? 's' : ''} not indexed:`);
 
-                nonIndexedFiles.sort((a: any, b: any) => a.path.localeCompare(b.path));
+                nonIndexedFiles.sort((a: SafeAny, b: SafeAny) => a.path.localeCompare(b.path));
 
                 const displayLimit = 50;
                 for (const file of nonIndexedFiles.slice(0, displayLimit)) {
@@ -7228,7 +7228,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                         this.selectedFiles.add(file.path);
                         this.renderFileCapsules(this.inputContainer.querySelector('.context-capsule-display') as HTMLElement);
                     },
-                    searchInput as any, 
+                    searchInput as SafeAny, 
                     curPos
                 );
                 modal.open();
@@ -7244,7 +7244,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                         filesInFolder.forEach(file => this.selectedFiles.add(file.path));
                         this.renderFileCapsules(this.inputContainer.querySelector('.context-capsule-display') as HTMLElement);
                     },
-                    searchInput as any, 
+                    searchInput as SafeAny, 
                     curPos
                 );
                 modal.open();
@@ -7372,13 +7372,13 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 item.className = 'context-file-menu-item';
 
                 
-                if ('badge' in opt && (opt as any).badge) {
+                if ('badge' in opt && (opt as SafeAny).badge) {
                     const labelSpan = document.createElement('span');
                     labelSpan.textContent = opt.label;
 
                     const badgeSpan = document.createElement('span');
                     badgeSpan.className = 'feature-badge beta-badge';
-                    badgeSpan.textContent = (opt as any).badge;
+                    badgeSpan.textContent = (opt as SafeAny).badge;
                     badgeSpan.setCssProps({ 'css-text':  'margin-left: 6px; padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;' });
 
                     item.appendChild(labelSpan);
@@ -7474,7 +7474,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
      * Handles selection of a feature prefix
      * Places prefix at the start of the query
      */
-    private handlePrefixSelection(opt: any) {
+    private handlePrefixSelection(opt: SafeAny) {
         
         const atIndex = this.contextMenuAtIndex;
 
@@ -7501,7 +7501,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                         
                         this.youtubeTranscriptCache.set(url, { transcript, videoTitle });
                         new Notice('YouTube transcript fetched successfully');
-                    } catch (error: any) {
+                    } catch (error: SafeAny) {
                         new Notice(`Failed to fetch transcript: ${error.message}`);
                         
                         this.selectedFiles.delete(url);
@@ -7566,7 +7566,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 return;
             }
 
-            const availableServers = (this.settings.mcpServers || []).filter((s: any) => !s.disabled);
+            const availableServers = (this.settings.mcpServers || []).filter((s: SafeAny) => !s.disabled);
             if (availableServers.length === 0) {
                 new Notice('No MCP servers configured. Please add servers in settings.');
                 return;
@@ -7581,7 +7581,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                     this.pendingMCPSelection = selection;
                     
                     const serverNames = selection.selectedServers
-                        .map((id: string) => this.settings.mcpServers.find((s: any) => s.id === id)?.name)
+                        .map((id: string) => this.settings.mcpServers.find((s: SafeAny) => s.id === id)?.name)
                         .filter(Boolean)
                         .join(', ');
                     const capsuleDisplay = this.inputContainer?.querySelector('.context-capsule-display') as HTMLElement;
@@ -8102,7 +8102,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                             new Notice('MCP support is disabled. Enable it in settings.');
                             return;
                         }
-                        const availableServers = (this.settings.mcpServers || []).filter((s: any) => !s.disabled);
+                        const availableServers = (this.settings.mcpServers || []).filter((s: SafeAny) => !s.disabled);
                         if (availableServers.length === 0) {
                             new Notice('No MCP servers configured. Please add servers in settings.');
                             return;
@@ -8114,7 +8114,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                             (selection) => {
                                 this.pendingMCPSelection = selection;
                                 const serverNames = selection.selectedServers
-                                    .map((id: string) => this.settings.mcpServers.find((s: any) => s.id === id)?.name)
+                                    .map((id: string) => this.settings.mcpServers.find((s: SafeAny) => s.id === id)?.name)
                                     .filter(Boolean)
                                     .join(', ');
                                 const capsuleDisplay = this.inputContainer?.querySelector('.context-capsule-display') as HTMLElement;
@@ -8578,7 +8578,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         const session = await this.aiChatSessionManager.loadSession(sessionId);
         if (session) {
 
-            this.responses = session.messages.map((m: any) => ({
+            this.responses = session.messages.map((m: SafeAny) => ({
                 question: m.question,
                 answer: m.answer,
                 context: m.context || [],
@@ -8625,7 +8625,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     btn.addClass('has-instructions');
                     
                     const matchedItem = this.settings.savedSystemInstructions?.find(
-                        (s: any) => s.instructions === this.currentSystemInstructions
+                        (s: SafeAny) => s.instructions === this.currentSystemInstructions
                     );
                     if (matchedItem?.icon) {
                         btn.empty();
@@ -8811,7 +8811,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         capsule.setCssProps({ 'display':  'flex' });
     }
 
-    private reconstructActionData(savedActionData: any): any {
+    private reconstructActionData(savedActionData: SafeAny): SafeAny {
         if (savedActionData.type === 'edit' && savedActionData.editData) {
             
             const filePath = savedActionData.editData.filePath;
@@ -8906,7 +8906,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
     }
 
     
-    createFileActionCapsule(type: 'edit' | 'create', fileName: string, data?: any): string {
+    createFileActionCapsule(type: 'edit' | 'create', fileName: string, data?: SafeAny): string {
         const actionId = `file-action-${++this.fileActionCounter}`;
 
         const actionState: FileActionState = {
@@ -8914,7 +8914,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             type,
             fileName,
             status: 'processing',
-            element: null as any, 
+            element: null as SafeAny, 
             data
         };
 
@@ -8946,10 +8946,10 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
         
         const nameEl = capsule.createDiv({ cls: 'file-action-name' });
-        if ((actionState as any).fileName && (actionState as any).fileName.includes('[[') && (actionState as any).fileName.includes(']]')) {
-            MarkdownRenderer.render(this.app, (actionState as any).fileName, nameEl, '', this);
+        if ((actionState as SafeAny).fileName && (actionState as SafeAny).fileName.includes('[[') && (actionState as SafeAny).fileName.includes(']]')) {
+            MarkdownRenderer.render(this.app, (actionState as SafeAny).fileName, nameEl, '', this);
         } else {
-            nameEl.textContent = (actionState as any).fileName;
+            nameEl.textContent = (actionState as SafeAny).fileName;
         }
 
         
@@ -9027,7 +9027,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             import('../tools/fileCreateTool').then(mod => {
                 if (mod.FileCreationReviewModal) {
                     try {
-                        new mod.FileCreationReviewModal(this.app, data, this.plugin.settings, (acceptedPlan: any) => {
+                        new mod.FileCreationReviewModal(this.app, data, this.plugin.settings, (acceptedPlan: SafeAny) => {
                             this.acceptFileAction(actionId, acceptedPlan);
                         }).open();
                     } catch (modalError) {
@@ -9042,7 +9042,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         }
     }
 
-    async acceptFileAction(actionId: string, data?: any) {
+    async acceptFileAction(actionId: string, data?: SafeAny) {
         const actionState = this.activeFileActions.get(actionId);
         if (!actionState) return;
 
@@ -9224,7 +9224,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         statusEl.className = `file-action-status ${actionState.status}`;
     }
 
-    private async deleteFilesFromPlan(plan: any): Promise<void> {
+    private async deleteFilesFromPlan(plan: SafeAny): Promise<void> {
         if (!plan || !plan.folderName || !Array.isArray(plan.files)) {
             throw new Error('Invalid file creation plan for deletion');
         }
@@ -9246,7 +9246,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         try {
             const folder = this.app.vault.getAbstractFileByPath(plan.folderName);
             if (folder && folder instanceof this.app.vault.adapter.constructor && 'children' in folder) {
-                const folderChildren = (folder as any).children;
+                const folderChildren = (folder as SafeAny).children;
                 if (folderChildren && folderChildren.length === 0) {
                     await this.app.vault.delete(folder);
                 }
@@ -9256,7 +9256,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         }
     }
 
-    async processFileCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: any[] = [], autoSelectedModel: ModelSelection | null = null) {
+    async processFileCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: SafeAny[] = [], autoSelectedModel: ModelSelection | null = null) {
         try {
             const actionState = this.activeFileActions.get(actionId);
             if (!actionState) return;
@@ -9320,7 +9320,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         return filePath;
     }
 
-    async processCanvasCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: any[] = [], autoSelectedModel: ModelSelection | null = null) {
+    async processCanvasCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: SafeAny[] = [], autoSelectedModel: ModelSelection | null = null) {
         try {
             const actionState = this.activeFileActions.get(actionId);
             if (!actionState) return;
@@ -9379,7 +9379,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         }
     }
 
-    async processExcalidrawCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: any[] = [], autoSelectedModel: ModelSelection | null = null) {
+    async processExcalidrawCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: SafeAny[] = [], autoSelectedModel: ModelSelection | null = null) {
         try {
             const actionState = this.activeFileActions.get(actionId);
             if (!actionState) return;
@@ -9439,7 +9439,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         }
     }
 
-    private async generateDiagramMarkdown(context: any, type: 'canvas' | 'excalidraw'): Promise<string> {
+    private async generateDiagramMarkdown(context: SafeAny, type: 'canvas' | 'excalidraw'): Promise<string> {
         const provider = context.settings.provider;
         let apiKey: string = '';
 
@@ -9478,7 +9478,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
         let contextInfo = '';
         if (context.contextFiles.length > 0) {
-            contextInfo = `\n\nCONTEXT FILES PROVIDED:\n${context.contextFiles.map((f: any) => `- ${f.basename}:\n${f.content.substring(0, 1500)}`).join('\n\n')}`;
+            contextInfo = `\n\nCONTEXT FILES PROVIDED:\n${context.contextFiles.map((f: SafeAny) => `- ${f.basename}:\n${f.content.substring(0, 1500)}`).join('\n\n')}`;
         }
 
         const systemPrompt = `You are an expert at creating hierarchical diagram outlines.
@@ -9510,7 +9510,7 @@ IMPORTANT RULES:
         if (provider === 'groq') {
             const { GroqService } = await import('../services/groqService');
             const groqService = new GroqService(apiKey);
-            const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9526,7 +9526,7 @@ IMPORTANT RULES:
         } else if (provider === 'openrouter') {
             const { OpenRouterService } = await import('../services/openRouterService');
             const openRouterService = new OpenRouterService(apiKey);
-            const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9542,7 +9542,7 @@ IMPORTANT RULES:
         } else if (provider === 'ollama') {
             const { OllamaService } = await import('../services/ollamaService');
             const ollamaService = new OllamaService(context.settings.ollamaBaseUrl, context.settings.ollamaApiKey);
-            const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9558,7 +9558,7 @@ IMPORTANT RULES:
         } else if (provider === 'nvidia') {
             const { NvidiaService } = await import('../services/nvidiaService');
             const nvidiaService = new NvidiaService(apiKey);
-            const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9573,7 +9573,7 @@ IMPORTANT RULES:
             );
         } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
             const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(provider)!;
-            const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9603,7 +9603,7 @@ IMPORTANT RULES:
         return aiText;
     }
 
-    private async getInitialFileStructure(context: any): Promise<any> {
+    private async getInitialFileStructure(context: SafeAny): Promise<SafeAny> {
         
         const provider = context.settings.provider;
         let apiKey: string = '';
@@ -9646,7 +9646,7 @@ IMPORTANT RULES:
             
             let contextInfo = '';
             if (context.contextFiles.length > 0) {
-                contextInfo = `\n\nCONTEXT FILES PROVIDED:\n${context.contextFiles.map((f: any) => `- ${f.basename}: ${f.content.substring(0, 200)}...`).join('\n')}`;
+                contextInfo = `\n\nCONTEXT FILES PROVIDED:\n${context.contextFiles.map((f: SafeAny) => `- ${f.basename}: ${f.content.substring(0, 200)}...`).join('\n')}`;
             }
 
             if (context.webSearchEnabled) {
@@ -9695,7 +9695,7 @@ CRITICAL:
                 const { GroqService } = await import('../services/groqService');
                 const groqService = new GroqService(apiKey);
                 
-                const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+                const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                     role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                     content: h.parts[0].text
                 }));
@@ -9713,7 +9713,7 @@ CRITICAL:
                 const { OpenRouterService } = await import('../services/openRouterService');
                 const openRouterService = new OpenRouterService(apiKey);
                 
-                const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+                const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                     role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                     content: h.parts[0].text
                 }));
@@ -9733,7 +9733,7 @@ CRITICAL:
                     context.settings.ollamaApiKey
                 );
                 
-                const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+                const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                     role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                     content: h.parts[0].text
                 }));
@@ -9755,7 +9755,7 @@ CRITICAL:
             } else if (provider === 'nvidia') {
                 const { NvidiaService } = await import('../services/nvidiaService');
                 const nvidiaService = new NvidiaService(apiKey);
-                const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+                const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                     role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                     content: h.parts[0].text
                 }));
@@ -9770,7 +9770,7 @@ CRITICAL:
                 );
             } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
                 const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(provider)!;
-                const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+                const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                     role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                     content: h.parts[0].text
                 }));
@@ -9825,7 +9825,7 @@ CRITICAL:
         }
     }
 
-    private async generateDetailedFileContent(initialPlan: any, context: any, autoSelectedModel: ModelSelection | null = null): Promise<any> {
+    private async generateDetailedFileContent(initialPlan: SafeAny, context: SafeAny, autoSelectedModel: ModelSelection | null = null): Promise<SafeAny> {
         const enhancedFiles = [];
 
         for (let i = 0; i < initialPlan.files.length; i++) {
@@ -9858,7 +9858,7 @@ CRITICAL:
         };
     }
 
-    private async generateSingleFileContent(file: any, context: any): Promise<string> {
+    private async generateSingleFileContent(file: SafeAny, context: SafeAny): Promise<string> {
         
         const provider = context.settings.provider;
         let apiKey: string = '';
@@ -9903,7 +9903,7 @@ CONTEXT PROVIDED:`;
 
         
         if (context.contextFiles.length > 0) {
-            systemPrompt += `\n\nRELEVANT CONTEXT FILES:\n${context.contextFiles.map((f: any) => `- ${f.basename}: ${f.content.substring(0, 300)}...`).join('\n')}`;
+            systemPrompt += `\n\nRELEVANT CONTEXT FILES:\n${context.contextFiles.map((f: SafeAny) => `- ${f.basename}: ${f.content.substring(0, 300)}...`).join('\n')}`;
         }
 
         systemPrompt += `\n\nORIGINAL USER REQUEST: ${context.userPrompt}
@@ -9918,7 +9918,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
             const { GroqService } = await import('../services/groqService');
             const groqService = new GroqService(apiKey);
             
-            const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9936,7 +9936,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
             const { OpenRouterService } = await import('../services/openRouterService');
             const openRouterService = new OpenRouterService(apiKey);
             
-            const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9956,7 +9956,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
                 context.settings.ollamaApiKey
             );
             
-            const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9978,7 +9978,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         } else if (provider === 'nvidia') {
             const { NvidiaService } = await import('../services/nvidiaService');
             const nvidiaService = new NvidiaService(apiKey);
-            const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9993,7 +9993,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
             );
         } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
             const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(provider)!;
-            const convertedHistory = (context.chatHistory || []).map((h: any) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -10017,7 +10017,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
             const genAI = new GoogleGenerativeAI(apiKey);
 
             
-            const modelConfig: any = { model: context.settings.model };
+            const modelConfig: SafeAny = { model: context.settings.model };
             if (context.webSearchEnabled && context.webSearchService) {
                 modelConfig.tools = [context.webSearchService.getGoogleSearchToolConfig()];
             }
@@ -10045,7 +10045,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         return content;
     }
 
-    private extractAndValidateJSON(aiText: string): any {
+    private extractAndValidateJSON(aiText: string): SafeAny {
 
         
         const strategies = [
@@ -10123,7 +10123,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
                 return null;
     }
 
-    private cleanAndParseJSON(jsonStr: string): any {
+    private cleanAndParseJSON(jsonStr: string): SafeAny {
         if (!jsonStr || !jsonStr.trim()) return null;
 
         
@@ -10146,7 +10146,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
             
             if (parsed && typeof parsed === 'object' && parsed.folderName && Array.isArray(parsed.files)) {
                 
-                parsed.files = parsed.files.map((file: any) => ({
+                parsed.files = parsed.files.map((file: SafeAny) => ({
                     name: file.name || 'Untitled',
                     description: file.description || '',
                     content: file.content || '# New File\n\nContent not generated.',
@@ -10169,7 +10169,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
                 const parsed = JSON.parse(aggressiveCleaned);
 
                 if (parsed && typeof parsed === 'object' && parsed.folderName && Array.isArray(parsed.files)) {
-                    parsed.files = parsed.files.map((file: any) => ({
+                    parsed.files = parsed.files.map((file: SafeAny) => ({
                         name: file.name || 'Untitled',
                         description: file.description || '',
                         content: file.content || '# New File\n\nContent not generated.',
@@ -10212,7 +10212,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         }
     }
 
-    private createFallbackPlan(prompt: string, targetFolder?: string): any {
+    private createFallbackPlan(prompt: string, targetFolder?: string): SafeAny {
         
         const folderName = targetFolder || 'New Files';
         const fileName = this.extractFileNameFromPrompt(prompt) || 'New File';
@@ -10244,7 +10244,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         return 'New File';
     }
 
-    private async createFilesFromPlan(plan: any): Promise<void> {
+    private async createFilesFromPlan(plan: SafeAny): Promise<void> {
         if (!plan || !plan.folderName || !Array.isArray(plan.files)) {
             throw new Error('Invalid file creation plan');
         }
@@ -10294,7 +10294,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         }
     }
 
-    private async createCanvasFile(folderPath: string, canvasData: any): Promise<void> {
+    private async createCanvasFile(folderPath: string, canvasData: SafeAny): Promise<void> {
         if (!canvasData || !canvasData.nodes || !Array.isArray(canvasData.nodes)) {
             throw new Error('Invalid canvas data: missing nodes array.');
         }
@@ -10318,7 +10318,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         await this.app.vault.create(finalPath, jsonContent);
     }
 
-    private async createExcalidrawFile(folderPath: string, excalidrawData: any): Promise<void> {
+    private async createExcalidrawFile(folderPath: string, excalidrawData: SafeAny): Promise<void> {
         if (!excalidrawData || !excalidrawData.elements || !Array.isArray(excalidrawData.elements)) {
             throw new Error('Invalid Excalidraw data: missing elements array.');
         }
@@ -10377,10 +10377,10 @@ ${jsonContent}
 
         
         const nameEl = capsule.createDiv({ cls: 'file-action-name' });
-        if ((actionState as any).fileName && (actionState as any).fileName.includes('[[') && (actionState as any).fileName.includes(']]')) {
-            MarkdownRenderer.render(this.app, (actionState as any).fileName, nameEl, '', this);
+        if ((actionState as SafeAny).fileName && (actionState as SafeAny).fileName.includes('[[') && (actionState as SafeAny).fileName.includes(']]')) {
+            MarkdownRenderer.render(this.app, (actionState as SafeAny).fileName, nameEl, '', this);
         } else {
-            nameEl.textContent = (actionState as any).fileName;
+            nameEl.textContent = (actionState as SafeAny).fileName;
         }
         
         const statusEl = capsule.createDiv({ cls: 'file-action-status' });
@@ -10638,7 +10638,7 @@ ${jsonContent}
             
             
             
-            const serverGroups = new Map<string, any[]>();
+            const serverGroups = new Map<string, SafeAny[]>();
             for (const serverId of selection.selectedServers) {
                 const serverConfig = this.settings.mcpServers.find(s => s.id === serverId);
                 if (!serverConfig) continue;
@@ -10672,7 +10672,7 @@ ${jsonContent}
                     this.updateProcessingUI.bind(this),
                     this.updateProcessingMessageAndSnippet.bind(this),
                     formattedMCPTools,
-                    async (toolCall: any) => {
+                    async (toolCall: SafeAny) => {
                         
                         if (!this.isProcessing || this.currentAbortController?.signal.aborted) {
                             throw new DOMException('Processing stopped by user', 'AbortError');

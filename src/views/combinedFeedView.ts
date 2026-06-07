@@ -29,13 +29,13 @@ export class CombinedFeedView extends ItemView {
     }
 
     
-    async setState(state: any, result: any): Promise<void> {
+    async setState(state: SafeAny, result: SafeAny): Promise<void> {
         
         await super.setState(state, result);
         
     }
 
-    getState(): any {
+    getState(): SafeAny {
         
         return super.getState();
     }

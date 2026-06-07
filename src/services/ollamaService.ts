@@ -118,7 +118,7 @@ export class OllamaService {
     messages: ChatMessage[],
     options?: GenerationOptions
   ): Promise<string> {
-    const requestBody: any = {
+    const requestBody: SafeAny = {
       model,
       messages,
       stream: false,
@@ -208,7 +208,7 @@ export class OllamaService {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
 
-    const requestBody: any = {
+    const requestBody: SafeAny = {
       model,
       messages,
       stream: true,
@@ -295,7 +295,7 @@ export class OllamaService {
       }
 
       const data = response.json;
-      return data.models?.map((m: any) => m.name) || [];
+      return data.models?.map((m: SafeAny) => m.name) || [];
     } else {
       
       const response = await fetch(`${this.baseUrl}/api/tags`, {
@@ -309,7 +309,7 @@ export class OllamaService {
       }
 
       const data = await response.json();
-      return data.models?.map((m: any) => m.name) || [];
+      return data.models?.map((m: SafeAny) => m.name) || [];
     }
   }
 
@@ -340,7 +340,7 @@ export class OllamaService {
     
     const webSearchUrl = 'https://ollama.com/api/web_search';
 
-    const requestBody: any = {
+    const requestBody: SafeAny = {
       query,
       max_results: maxResults
     };
@@ -418,7 +418,7 @@ export class OllamaService {
     
     const webFetchUrl = 'https://ollama.com/api/web_fetch';
 
-    const requestBody: any = {
+    const requestBody: SafeAny = {
       url: cleanUrl
     };
 
@@ -481,10 +481,10 @@ export class OllamaService {
   async generateContentWithTools(
     model: string,
     messages: ChatMessage[],
-    tools: any[],
+    tools: SafeAny[],
     options: GenerationOptions,
-    executeToolsCallback: (toolCalls: any[]) => Promise<any[]>,
-    useRequestUrl?: (options: any) => Promise<any>,
+    executeToolsCallback: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
+    useRequestUrl?: (options: SafeAny) => Promise<SafeAny>,
     onThinkingChunk?: (text: string) => void,
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
@@ -498,7 +498,7 @@ export class OllamaService {
     
     while (true) {
       if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
-      const requestBody: any = {
+      const requestBody: SafeAny = {
         model,
         messages: conversationMessages,
         tools,
@@ -509,7 +509,7 @@ export class OllamaService {
         requestBody.think = options.think;
       }
 
-      let data: any;
+      let data: SafeAny;
       
       
       if (useRequestUrl) {
@@ -597,7 +597,7 @@ export class OllamaService {
             content: toolResult.success
               ? toolResult.content
               : `Error: ${toolResult.error}`
-          } as any);
+          } as SafeAny);
         }
         
         
@@ -621,7 +621,7 @@ export class OllamaService {
                 conversationMessages.push({
           role: 'user',
           content: 'You have already called some tools and received results. Please now synthesise a complete, direct answer to the original question using all the tool results above. Do not call any more tools — just write the final answer.'
-        } as any);
+        } as SafeAny);
         continue;
       }
 

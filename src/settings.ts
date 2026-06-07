@@ -1011,8 +1011,8 @@ export class AISettingTab extends PluginSettingTab {
       return true;
     } else if (provider === 'nvidia') {
       return !!this.plugin.settings.nvidiaApiKey && this.plugin.settings.nvidiaApiKey.length > 0;
-    } else if (this.plugin.settings.customProviders?.some((p: any) => p.id === provider)) {
-      const cp = this.plugin.settings.customProviders.find((p: any) => p.id === provider);
+    } else if (this.plugin.settings.customProviders?.some((p: SafeAny) => p.id === provider)) {
+      const cp = this.plugin.settings.customProviders.find((p: SafeAny) => p.id === provider);
       return !!cp?.apiKey && cp.apiKey.length > 0;
     } else {
       return !!this.plugin.settings.geminiApiKey && this.plugin.settings.geminiApiKey.length > 0;
@@ -1543,7 +1543,7 @@ await this.plugin.saveSettings();
       });
     }
 
-    const indexesOfType = this.plugin.settings.indexConfigurations.filter((i: any) => i.type === type);
+    const indexesOfType = this.plugin.settings.indexConfigurations.filter((i: SafeAny) => i.type === type);
 
     if (indexesOfType.length === 0) {
       sectionEl.createEl('p', {
@@ -1832,7 +1832,7 @@ await this.plugin.saveSettings();
           const confirmed = confirm(`Are you sure you want to delete the index "${index.name}"? This will also permanently delete the index file from your vault.`);
           if (!confirmed) return;
 
-          const indexToRemove = this.plugin.settings.indexConfigurations.findIndex((i: any) => i.id === index.id);
+          const indexToRemove = this.plugin.settings.indexConfigurations.findIndex((i: SafeAny) => i.id === index.id);
           if (indexToRemove !== -1) {
             // Physically delete the file from disk first
             await this.plugin.embeddingsManager.deleteIndexFile(index.id);
@@ -1907,7 +1907,7 @@ await this.plugin.saveSettings();
         return;
       }
 
-      const newIndex: any = {
+      const newIndex: SafeAny = {
         id: `${type}-${Date.now()}`,
         type,
         name: indexName,
@@ -1928,7 +1928,7 @@ await this.plugin.saveSettings();
   }
 
   /** Opens a dialog to edit exclusions for an existing embedding index. */
-  private showIndexExclusionsDialog(index: any): void {
+  private showIndexExclusionsDialog(index: SafeAny): void {
     const dialogEl = this.containerEl.createDiv({ cls: 'index-add-dialog' });
     new Setting(dialogEl).setName(`Exclusions — ${index.name}`).setHeading();
 
@@ -2007,11 +2007,11 @@ await this.plugin.saveSettings();
     const folderListEl = pickerEl.createDiv({ cls: 'index-excl-folder-list' });
 
     // Use vault.getAllFolders() for reliable folder enumeration
-    const allFolders = (this.app.vault as unknown as any).getAllFolders
-      ? (this.app.vault as unknown as any).getAllFolders().map((f: any) => f.path).filter((p: string) => p !== '').sort()
+    const allFolders = (this.app.vault as unknown as SafeAny).getAllFolders
+      ? (this.app.vault as unknown as SafeAny).getAllFolders().map((f: SafeAny) => f.path).filter((p: string) => p !== '').sort()
       : this.app.vault.getAllLoadedFiles()
-          .filter((f: any) => f.children !== undefined && f.path !== '')
-          .map((f: any) => f.path)
+          .filter((f: SafeAny) => f.children !== undefined && f.path !== '')
+          .map((f: SafeAny) => f.path)
           .sort();
 
     const renderFolderList = () => {
@@ -2121,7 +2121,7 @@ await this.plugin.saveSettings();
     renderExcludedSummary();
   }
 
-  private async buildIndex(indexConfig: any, progressCallback: (progress: number, fileStatus?: string) => void): Promise<void> {
+  private async buildIndex(indexConfig: SafeAny, progressCallback: (progress: number, fileStatus?: string) => void): Promise<void> {
     if (!indexConfig) {
       throw new Error('Index not found');
     }
@@ -2153,7 +2153,7 @@ await this.plugin.saveSettings();
           }
           
           const data = await response.json();
-          const availableModels = data.models?.map((m: any) => m.name) || [];
+          const availableModels = data.models?.map((m: SafeAny) => m.name) || [];
           
           // Check if the model is pulled
           if (!availableModels.includes(indexConfig.model)) {
@@ -2517,7 +2517,7 @@ if (this.validatePath(normalizedPath)) {
             // Update live - find all response views and update wallpaper
             const viewType = 'ai-tutor-response';
             this.app.workspace.getLeavesOfType(viewType).forEach(leaf => {
-              const view = leaf.view as unknown as any;
+              const view = leaf.view as unknown as SafeAny;
               if (view && typeof view.updateWallpaper === 'function') {
                 view.updateWallpaper();
               }
@@ -2543,7 +2543,7 @@ if (this.validatePath(normalizedPath)) {
             // Update live - find all response views and update wallpaper
             const viewType = 'ai-tutor-response';
             this.app.workspace.getLeavesOfType(viewType).forEach(leaf => {
-              const view = leaf.view as unknown as any;
+              const view = leaf.view as unknown as SafeAny;
               if (view && typeof view.updateWallpaper === 'function') {
                 view.updateWallpaper();
               }
@@ -2603,7 +2603,7 @@ if (this.validatePath(normalizedPath)) {
       { id: 'opencode', name: 'OpenCode Zen' },
       { id: 'ollama', name: 'Ollama' },
       { id: 'nvidia', name: 'NVIDIA' },
-      ...this.plugin.settings.customProviders.map((p: any) => ({ id: p.id as Provider, name: p.name }))
+      ...this.plugin.settings.customProviders.map((p: SafeAny) => ({ id: p.id as Provider, name: p.name }))
     ];
     new Setting(containerEl).setName('Custom AI models' ).setHeading();
     
@@ -2990,8 +2990,8 @@ if (this.validatePath(normalizedPath)) {
       { id: 'ollama', name: 'Ollama' },
       { id: 'nvidia', name: 'NVIDIA' },
       ...this.plugin.settings.customProviders
-        .filter((p: any) => p.enableEmbeddings)
-        .map((p: any) => ({ id: p.id as Provider, name: p.name }))
+        .filter((p: SafeAny) => p.enableEmbeddings)
+        .map((p: SafeAny) => ({ id: p.id as Provider, name: p.name }))
     ];
 
     new Setting(containerEl).setName('Custom embedding models' ).setHeading();
@@ -3236,7 +3236,7 @@ if (this.validatePath(normalizedPath)) {
     
     // Get all folders from vault, excluding already excluded ones
     const allFolders = this.app.vault.getAllLoadedFiles()
-      .filter(f => (f as unknown as any).children !== undefined)
+      .filter(f => (f as unknown as SafeAny).children !== undefined)
       .map(f => f.path)
       .filter(path => !this.plugin.settings.excludedFolders?.includes(path));
     
@@ -3517,7 +3517,7 @@ if (this.validatePath(normalizedPath)) {
             return;
           }
           // Use Node's child_process — available in Electron/Obsidian desktop
-          const { execSync } = (window as unknown as any).require('child_process') as typeof import('child_process');
+          const { execSync } = (window as unknown as SafeAny).require('child_process') as typeof import('child_process');
           const version = execSync(cmd, { timeout: 5000, encoding: 'utf8' }).trim();
 
           statusEl.textContent = `✅ Installed — ${version}`;
@@ -3996,7 +3996,7 @@ class MCPServerModal extends Modal {
       const currentConfig = this.getCurrentConfigFromFields();
       if (currentConfig) {
         // Strip out ID and disabled state for cleaner schema view
-        const { id, disabled, name, ...schemaFields } = currentConfig as unknown as any;
+        const { id, disabled, name, ...schemaFields } = currentConfig as unknown as SafeAny;
         this.schemaInput.value = JSON.stringify(schemaFields, null, 2);
       }
     } else {
@@ -4059,7 +4059,7 @@ class MCPServerModal extends Modal {
   private getCurrentConfigFromFields(): Partial<MCPServerConfig> | null {
     if (!this.transportSelect) return null;
     const transport = this.transportSelect.value as 'stdio' | 'sse';
-    const config: any = { transport };
+    const config: SafeAny = { transport };
     
     if (this.nameInput.value) config.name = this.nameInput.value;
     

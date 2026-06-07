@@ -27,7 +27,7 @@ export class FeedEntryView extends ItemView {
     }
 
     
-    async setState(state: any, result: any): Promise<void> {
+    async setState(state: SafeAny, result: SafeAny): Promise<void> {
         
         if (state && state.feedData) {
             this.feedData = state.feedData as ParsedFeed;
@@ -51,7 +51,7 @@ export class FeedEntryView extends ItemView {
         await super.setState(state, result);
     }
 
-    getState(): any {
+    getState(): SafeAny {
         
         
         
