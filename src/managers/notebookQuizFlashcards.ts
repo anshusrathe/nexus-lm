@@ -395,17 +395,12 @@ export function triggerConfetti(element: HTMLElement) {
   for (let i = 0; i < confettiCount; i++) {
     const confetti = document.createElement('div');
     confetti.className = 'quiz-confetti';
-    confetti.setCssProps({ 'css-text':  `
-      position: fixed;
-      width: 10px;
-      height: 10px;
-      background: ${colors[Math.floor(Math.random() * colors.length)]};
-      left: ${centerX}px;
-      top: ${centerY}px;
-      pointer-events: none;
-      z-index: 10000;
-      border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
-    ` });
+    confetti.setCssProps({
+      '--confetti-bg': colors[Math.floor(Math.random() * colors.length)],
+      '--confetti-left': `${centerX}px`,
+      '--confetti-top': `${centerY}px`,
+      '--confetti-radius': Math.random() > 0.5 ? '50%' : '0'
+    });
     
     document.body.appendChild(confetti);
     
@@ -424,8 +419,10 @@ export function triggerConfetti(element: HTMLElement) {
       y = vy * elapsed + 0.5 * gravity * elapsed * elapsed;
       rotation = elapsed * 360;
       
-      confetti.setCssProps({ 'transform':  `translate(${x}px, ${y}px) rotate(${rotation}deg)` });
-      confetti.setCssProps({ 'opacity':  String(Math.max(0, 1 - elapsed / 1.5)) });
+      confetti.setCssProps({
+        '--confetti-transform': `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
+        '--confetti-opacity': String(Math.max(0, 1 - elapsed / 1.5))
+      });
       
       if (elapsed < 1.5) {
         requestAnimationFrame(animate);
@@ -944,8 +941,10 @@ export class FlashcardRenderer {
     for (let i = stackCount - 1; i >= 0; i--) {
       if (i > 0) {
         const stackCard = stackContainer.createDiv({ cls: 'flashcard-stack-card' });
-        stackCard.setCssProps({ 'transform':  `translateY(${i * 4}px) scale(${1 - i * 0.02})` });
-        stackCard.setCssProps({ 'z-index':  String(stackCount - i) });
+        stackCard.setCssProps({
+          '--stack-transform': `translateY(${i * 4}px) scale(${1 - i * 0.02})`,
+          '--stack-z-index': String(stackCount - i)
+        });
       }
     }
     

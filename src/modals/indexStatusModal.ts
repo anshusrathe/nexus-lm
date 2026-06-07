@@ -201,7 +201,7 @@ export class IndexStatusModal extends Modal {
 
         const track = progressSection.createDiv({ cls: 'index-status-progress-track' });
         const fill = track.createDiv({ cls: 'index-status-progress-fill' });
-        fill.setCssProps({ 'width':  `${pct}%` });
+        fill.setCssProps({ '--progress-width': `${pct}%` });
         if (pct === 100) fill.addClass('index-status-progress-fill-complete');
 
         // ── Indexed files list ──

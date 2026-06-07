@@ -17569,3 +17569,150 @@
 .nl-css-text-rem-24 { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .nl-css-text-rem-25 { font-size: 0.85em; color: var(--text-muted); }
 .nl-background-rem-26 { background: var(--background-primary, #fff) !important; }
+
+/* Custom Properties and Classes Added During Refactoring */
+
+.notebook-chat-container, .workspace-leaf-content, .mobile-notebook-input-container {
+  --chat-min-height: auto;
+  --chat-height: auto;
+  --tooltip-left: 0;
+  --tooltip-top: 0;
+  --menu-left: 0;
+  --menu-top: 0;
+  --progress-width: 0%;
+  --progress-background: transparent;
+  --folder-border-color: transparent;
+  --info-left: 0;
+  --info-top: 0;
+  --info-border-color: transparent;
+  --theme-glow: transparent;
+  --zoom-transform: scale(1);
+}
+
+.query-input-new, .query-edit-textarea, .chat-textarea {
+  height: var(--chat-height) !important;
+}
+
+.notebook-input-row, .input-row-container {
+  min-height: var(--chat-min-height) !important;
+}
+
+.context-file-menu, .notebook-prefix-menu {
+  left: var(--menu-left) !important;
+  top: var(--menu-top) !important;
+}
+
+.rag-progress-bar-inner, .context-progress-bar, .slide-progress-fill {
+  width: var(--progress-width) !important;
+}
+
+.context-progress-bar {
+  background: var(--progress-background) !important;
+}
+
+.feed-folder-card {
+  border-color: var(--folder-border-color) !important;
+}
+
+.concept-map-svg-wrapper > svg {
+  transform: var(--zoom-transform) !important;
+}
+
+.concept-map-info-box {
+  left: var(--info-left) !important;
+  top: var(--info-top) !important;
+  border-color: var(--info-border-color) !important;
+}
+
+.mobile-node-tooltip-style {
+  position: fixed;
+  left: var(--tooltip-left);
+  top: var(--tooltip-top);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  font-size: 14px;
+  z-index: 3000;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-width: 200px;
+  word-wrap: break-word;
+}
+
+.footnote-tooltip-style {
+  position: fixed;
+  left: var(--tooltip-left);
+  top: var(--tooltip-top);
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 0.9em;
+  max-width: 300px;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.mobile-node-highlight-overlay-style {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--accent-color);
+  font-size: 12px;
+  z-index: 2500;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.mobile-thematic-overlay-style {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid var(--theme-glow);
+  max-width: 300px;
+  z-index: 3000;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  animation: fadeInScale 0.3s ease;
+}
+
+.mobile-thematic-title {
+  margin: 0 0 12px 0;
+  color: var(--theme-glow);
+  font-size: 16px;
+  text-align: center;
+}
+
+.mobile-thematic-content {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.mobile-thematic-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+

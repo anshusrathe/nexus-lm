@@ -285,7 +285,7 @@ export class FeedView extends ItemView {
 
         feedFolders.forEach((folder, folderIndex) => {
             const folderCard = this.savedFeedsContainer.createDiv({ cls: 'feed-folder-card' });
-            folderCard.setCssProps({ 'border-color':  folder.color });
+            folderCard.setCssProps({ '--folder-border-color':  folder.color });
             
             const folderHeader = folderCard.createDiv({ cls: 'feed-folder-header' });
             const folderName = folderHeader.createEl('h3', { text: folder.name });

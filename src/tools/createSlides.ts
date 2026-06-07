@@ -1266,7 +1266,7 @@ export class ZenSlideshowModal extends Modal {
     if (progressFill) {
       const totalNodes = this.navigationSequence.length;
       const progressPercent = (this.currentNavIndex / totalNodes) * 100;
-      progressFill.setCssProps({ 'width':  `${progressPercent}%` });
+      progressFill.setCssProps({ '--progress-width':  `${progressPercent}%` });
     }
   }
 

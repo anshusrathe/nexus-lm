@@ -954,8 +954,8 @@ export class AITutorView extends ItemView {
     const containerRect = this.containerEl.getBoundingClientRect();
     
     
-    menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
-    menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 5}px` });
+    menuEl.setCssProps({ '--menu-right':  `${containerRect.right - btnRect.right}px` });
+    menuEl.setCssProps({ '--menu-top':  `${btnRect.bottom - containerRect.top + 5}px` });
     
     
     const closeHandler = (e: MouseEvent) => {
@@ -1016,7 +1016,7 @@ export class AITutorView extends ItemView {
 
     
     this.contextProgressBar.addClass('nl-transition-width03sease-out');
-    this.contextProgressBar.setCssProps({ 'width':  `${percentage}%` });
+    this.contextProgressBar.setCssProps({ '--progress-width':  `${percentage}%` });
     
     
     this.contextLabel.setText(`${currentTokens.toLocaleString()} / ${maxTokens.toLocaleString()} tokens (${percentage.toFixed(1)}%)`);
@@ -1087,7 +1087,7 @@ export class AITutorView extends ItemView {
         notePaths, 
         qaSettings,
         (percentage, status) => {
-          progressFill.setCssProps({ 'width':  `${percentage}%` });
+          progressFill.setCssProps({ '--progress-width':  `${percentage}%` });
           progressText.textContent = status;
           progressPercentage.textContent = `${percentage}%`;
         }
@@ -1210,7 +1210,7 @@ export class AITutorView extends ItemView {
       const progressLabel = progressContainer.createDiv({ cls: 'relevance-progress-label' });
       
       
-      progressBar.setCssProps({ 'width':  `${relevanceScore}%` });
+      progressBar.setCssProps({ '--progress-width':  `${relevanceScore}%` });
       progressLabel.setText(`Relevance Score: ${relevanceScore}%`);
 
       
@@ -1283,7 +1283,7 @@ export class AITutorView extends ItemView {
         notePaths, 
         mcqSettings,
         (percentage, status) => {
-          progressFill.setCssProps({ 'width':  `${percentage}%` });
+          progressFill.setCssProps({ '--progress-width':  `${percentage}%` });
           progressText.textContent = status;
           progressPercentage.textContent = `${percentage}%`;
         }
@@ -1519,7 +1519,7 @@ export class AITutorView extends ItemView {
     const progressInterval = setInterval(() => {
       progress += Math.random() * 15;
       if (progress > 90) progress = 90;
-      progressFill.setCssProps({ 'width':  `${progress}%` });
+      progressFill.setCssProps({ '--progress-width':  `${progress}%` });
     }, 200);
     
     
@@ -1728,7 +1728,7 @@ export class AITutorView extends ItemView {
       const conceptMapData = await this.conceptMapManager.generateConceptMap(
         notePaths,
         (percentage, status) => {
-          progressFill.setCssProps({ 'width':  `${percentage}%` });
+          progressFill.setCssProps({ '--progress-width':  `${percentage}%` });
           progressText.textContent = status;
           progressPercentage.textContent = `${percentage}%`;
         }
@@ -1835,7 +1835,7 @@ export class AITutorView extends ItemView {
             percentage = 95;
           }
           
-          progressFill.setCssProps({ 'width':  `${percentage}%` });
+          progressFill.setCssProps({ '--progress-width':  `${percentage}%` });
           progressText.textContent = message;
           progressPercentage.textContent = `${percentage}%`;
         }

@@ -1431,8 +1431,10 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     
     // Position tooltip
     const rect = (event.target as Element).getBoundingClientRect();
-    tooltip.setCssProps({ 'left':  `${rect.left + window.scrollX}px` });
-    tooltip.setCssProps({ 'top':  `${rect.bottom + window.scrollY + 5}px` });
+    tooltip.setCssProps({
+      '--tooltip-left': `${rect.left + window.scrollX}px`,
+      '--tooltip-top': `${rect.bottom + window.scrollY + 5}px`
+    });
   }
 
   private hideTooltip() {
@@ -1609,7 +1611,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
         if (circle) {
           circle.addClass('nl-transform-scale11');
           circle.addClass('nl-transition-remaining-1');
-          circle.setCssProps({ 'filter':  `drop-shadow(0 0 12px ${themeColor.glow}) brightness(1.4)` });
+          circle.setCssProps({ '--glow-filter': `drop-shadow(0 0 12px ${themeColor.glow}) brightness(1.4)` });
         }
         
         this.holdTimer = setTimeout(() => {
@@ -1736,7 +1738,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
         node.classList.remove('faded');
         node.classList.add('highlighted');
         // Apply glow color
-        (node as SVGElement).setCssProps({ 'color':  glowColor });
+        (node as SVGElement).setCssProps({ '--node-color': glowColor });
         
         // Also highlight the text
         const nodeId = node.getAttribute('data-node-id');
@@ -1845,7 +1847,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     // Render markdown content
     this.renderMarkdownTooltip(text, infoBox);
     
-    infoBox.setCssProps({ 'border-color':  borderColor });
+    infoBox.setCssProps({ '--info-border-color': borderColor });
     
     // Find the SVG container (modal body)
     const container = this.svgContainerEl || document.querySelector('.concept-map-svg-wrapper') as HTMLElement;
@@ -1904,8 +1906,10 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     
     // Apply position
     infoBox.addClass('nl-position-absolute');
-    infoBox.setCssProps({ 'left':  `${left}px` });
-    infoBox.setCssProps({ 'top':  `${top}px` });
+    infoBox.setCssProps({
+      '--info-left': `${left}px`,
+      '--info-top': `${top}px`
+    });
   }
 
   private hideThemeInfo() {
@@ -2189,32 +2193,13 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     // Create overlay container
     const overlay = document.createElement('div');
     overlay.className = 'theme-overlay-container';
-    overlay.setCssProps({ 'css-text':  `
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      display: flex;
-      gap: 40px;
-      align-items: center;
-      z-index: 2000;
-      pointer-events: auto;
-      animation: themeOverlayFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    ` });
+    overlay.addClass('theme-overlay-container-style');
     
     // Create theme box (left side)
     const themeBox = document.createElement('div');
     themeBox.className = 'theme-overlay-box';
-    themeBox.setCssProps({ 'css-text':  `
-      background: var(--background-secondary);
-      border: 3px solid ${glowColor};
-      border-radius: 16px;
-      padding: 24px 32px;
-      min-width: 300px;
-      max-width: 450px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-      animation: themeBoxSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-    ` });
+    themeBox.addClass('theme-overlay-box-style');
+    themeBox.setCssProps({ '--theme-glow': glowColor });
     
     // Render markdown in theme box
     this.renderMarkdownTooltip(themeReason, themeBox);
@@ -2222,45 +2207,19 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     // Create nodes column (right side)
     const nodesColumn = document.createElement('div');
     nodesColumn.className = 'theme-overlay-nodes';
-    nodesColumn.setCssProps({ 'css-text':  `
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      animation: themeNodesSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-      animation-delay: 0.1s;
-      opacity: 0;
-      animation-fill-mode: forwards;
-    ` });
+    nodesColumn.addClass('theme-overlay-nodes-style');
     
     themeNodeLabels.forEach((node, index) => {
       const nodeItem = document.createElement('div');
-      nodeItem.setCssProps({ 'css-text':  `
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--text-normal);
-        padding: 12px 20px;
-        background: var(--background-primary);
-        border-radius: 8px;
-        border: 2px solid ${glowColor};
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        animation: nodeItemPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-        animation-delay: ${0.15 + index * 0.05}s;
-        opacity: 0;
-        animation-fill-mode: forwards;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-      ` });
+      nodeItem.addClass('theme-overlay-node-item');
+      nodeItem.setCssProps({
+        '--theme-glow': glowColor,
+        '--animation-delay': `${0.15 + index * 0.05}s`
+      });
       
       const bullet = document.createElement('div');
-      bullet.setCssProps({ 'css-text':  `
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: ${glowColor};
-        flex-shrink: 0;
-      ` });
+      bullet.addClass('theme-overlay-bullet');
+      bullet.setCssProps({ '--theme-glow': glowColor });
       
       const label = document.createElement('span');
       label.textContent = node.label;
@@ -2351,7 +2310,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     
     // Render markdown content
     this.renderMarkdownTooltip(text, infoBox);
-    infoBox.setCssProps({ 'border-color':  borderColor });
+    infoBox.setCssProps({ '--info-border-color': borderColor });
     
     // Find the SVG container
     const container = document.querySelector('.concept-map-svg-wrapper') as HTMLElement;
@@ -2435,8 +2394,10 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     
     // Apply the best position
     infoBox.addClass('nl-position-absolute');
-    infoBox.setCssProps({ 'left':  `${bestPosition.x}px` });
-    infoBox.setCssProps({ 'top':  `${bestPosition.y}px` });
+    infoBox.setCssProps({
+      '--info-left': `${bestPosition.x}px`,
+      '--info-top': `${bestPosition.y}px`
+    });
     infoBox.addClass('nl-z-index-1000');
   }
 
@@ -2456,7 +2417,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     
     // Render markdown content
     this.renderMarkdownTooltip(text, infoBox);
-    infoBox.setCssProps({ 'border-color':  borderColor });
+    infoBox.setCssProps({ '--info-border-color': borderColor });
     
     // Find the SVG container
     const container = document.querySelector('.concept-map-svg-wrapper') as HTMLElement;
@@ -2564,8 +2525,10 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     
     // Apply position
     infoBox.addClass('nl-position-absolute');
-    infoBox.setCssProps({ 'left':  `${bestPosition.x}px` });
-    infoBox.setCssProps({ 'top':  `${bestPosition.y}px` });
+    infoBox.setCssProps({
+      '--info-left': `${bestPosition.x}px`,
+      '--info-top': `${bestPosition.y}px`
+    });
     infoBox.addClass('nl-z-index-1000');
   }
 
@@ -2910,7 +2873,7 @@ export class ConceptMapVisualizationModal extends Modal {
 
     // Update zoom
     this.zoomLevel = newZoom;
-    this.svgContainer.setCssProps({ 'transform':  `scale(${this.zoomLevel})` });
+    this.svgContainer.setCssProps({ '--zoom-transform': `scale(${this.zoomLevel})` });
     
     // Calculate new scroll position to keep cursor at same content position
     const newScrollLeft = contentX * newZoom - cursorX;
@@ -2930,7 +2893,7 @@ export class ConceptMapVisualizationModal extends Modal {
 
   private updateTransform() {
     if (this.svgContainer) {
-      this.svgContainer.setCssProps({ 'transform':  `scale(${this.zoomLevel}) translate(${this.panOffset.x}px, ${this.panOffset.y}px)` });
+      this.svgContainer.setCssProps({ '--zoom-transform': `scale(${this.zoomLevel}) translate(${this.panOffset.x}px, ${this.panOffset.y}px)` });
     }
   }
 
@@ -3208,20 +3171,7 @@ export class ConceptMapVisualizationModal extends Modal {
     // Create tooltip
     const tooltip = document.createElement('div');
     tooltip.className = 'mobile-node-tooltip';
-    tooltip.setCssProps({ 'css-text':  `
-      position: fixed;
-      background: var(--background-secondary);
-      color: var(--text-normal);
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid var(--background-modifier-border);
-      font-size: 14px;
-      z-index: 3000;
-      pointer-events: none;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      max-width: 200px;
-      word-wrap: break-word;
-    ` });
+    tooltip.addClass('mobile-node-tooltip-style');
     
     tooltip.textContent = nodeText;
     document.body.appendChild(tooltip);
@@ -3242,8 +3192,10 @@ export class ConceptMapVisualizationModal extends Modal {
       top = rect.bottom + 10;
     }
     
-    tooltip.setCssProps({ 'left':  `${left}px` });
-    tooltip.setCssProps({ 'top':  `${top}px` });
+    tooltip.setCssProps({
+      '--tooltip-left': `${left}px`,
+      '--tooltip-top': `${top}px`
+    });
     
     // Auto-hide tooltip after 3 seconds
     setTimeout(() => {
@@ -3320,21 +3272,7 @@ export class ConceptMapVisualizationModal extends Modal {
     // Add visual feedback overlay
     const overlay = document.createElement('div');
     overlay.className = 'mobile-node-highlight-overlay';
-    overlay.setCssProps({ 'css-text':  `
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--background-secondary);
-      color: var(--text-normal);
-      padding: 8px 16px;
-      border-radius: 20px;
-      border: 1px solid var(--accent-color);
-      font-size: 12px;
-      z-index: 2500;
-      pointer-events: none;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    ` });
+    overlay.addClass('mobile-node-highlight-overlay-style');
     overlay.textContent = `Connections for: ${nodeId}`;
     document.body.appendChild(overlay);
     
@@ -3395,55 +3333,20 @@ export class ConceptMapVisualizationModal extends Modal {
     // Create thematic overlay
     const overlay = document.createElement('div');
     overlay.className = 'mobile-thematic-overlay';
-    overlay.setCssProps({ 'css-text':  `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: var(--background-secondary);
-      color: var(--text-normal);
-      padding: 20px;
-      border-radius: 12px;
-      border: 2px solid ${glowColor};
-      max-width: 300px;
-      z-index: 3000;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-      animation: fadeInScale 0.3s ease;
-    ` });
+    overlay.addClass('mobile-thematic-overlay-style');
+    overlay.setCssProps({ '--theme-glow': glowColor });
     
     const title = document.createElement('h3');
-    title.setCssProps({ 'css-text':  `
-      margin: 0 0 12px 0;
-      color: ${glowColor};
-      font-size: 16px;
-      text-align: center;
-    ` });
+    title.addClass('mobile-thematic-title');
+    title.setCssProps({ '--theme-glow': glowColor });
     title.textContent = nodeId;
     
     const content = document.createElement('p');
-    content.setCssProps({ 'css-text':  `
-      margin: 0;
-      font-size: 14px;
-      line-height: 1.4;
-    ` });
+    content.addClass('mobile-thematic-content');
     content.textContent = themeReason;
     
     const closeButton = document.createElement('button');
-    closeButton.setCssProps({ 'css-text':  `
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 18px;
-      cursor: pointer;
-      width: 24px;
-      height: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    ` });
+    closeButton.addClass('mobile-thematic-close-btn');
     closeButton.textContent = '×';
     closeButton.addEventListener('click', () => overlay.remove());
     

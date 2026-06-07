@@ -1496,11 +1496,11 @@ export class ResponseView extends ItemView {
         
         const parent = textarea.parentElement;
         if (parent) {
-            parent.setCssProps({ 'min-height':  parent.clientHeight + 'px' });
+            parent.setCssProps({ '--response-min-height':  parent.clientHeight + 'px' });
         }
 
         textarea.addClass('nl-height-auto');
-        textarea.setCssProps({ 'height':  textarea.scrollHeight + 'px' });
+        textarea.setCssProps({ '--response-height':  textarea.scrollHeight + 'px' });
 
         
         if (parent) {
@@ -1548,10 +1548,10 @@ export class ResponseView extends ItemView {
 
             if (currentWidth > maxAllowedWidth) {
                 const ratio = maxAllowedWidth / currentWidth;
-                nameSpan.setCssProps({ 'transform':  `scale(${ratio})` });
-                nameSpan.setCssProps({ 'width':  `${currentWidth}px` }); // Force span to maintain its natural width so scale works
-                nameSpan.setCssProps({ 'margin-left':  `${(maxAllowedWidth - currentWidth) / 2}px` }); // Center the scaled text
-                nameSpan.setCssProps({ 'margin-right':  `${(maxAllowedWidth - currentWidth) / 2}px` });
+                nameSpan.setCssProps({ '--scale-transform':  `scale(${ratio})` });
+                nameSpan.setCssProps({ '--name-width':  `${currentWidth}px` }); // Force span to maintain its natural width so scale works
+                nameSpan.setCssProps({ '--name-margin-left':  `${(maxAllowedWidth - currentWidth) / 2}px` }); // Center the scaled text
+                nameSpan.setCssProps({ '--name-margin-right':  `${(maxAllowedWidth - currentWidth) / 2}px` });
             } else {
                 nameSpan.addClass('nl-transform-none');
                 nameSpan.addClass('nl-width-auto');
@@ -1693,8 +1693,8 @@ export class ResponseView extends ItemView {
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
         menuEl.addClass('nl-position-absolute');
-        menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
-        menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
+        menuEl.setCssProps({ '--menu-top':  `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssProps({ '--menu-right':  `${containerRect.right - btnRect.right}px` });
 
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
@@ -1740,8 +1740,8 @@ export class ResponseView extends ItemView {
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
         menuEl.addClass('nl-position-absolute');
-        menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
-        menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
+        menuEl.setCssProps({ '--menu-top':  `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssProps({ '--menu-right':  `${containerRect.right - btnRect.right}px` });
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-ollama-thinking-btn')) {
@@ -1790,8 +1790,8 @@ export class ResponseView extends ItemView {
         const btnRect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
         menuEl.addClass('nl-position-absolute');
-        menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
-        menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
+        menuEl.setCssProps({ '--menu-top':  `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssProps({ '--menu-right':  `${containerRect.right - btnRect.right}px` });
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-ollama-thinking-btn')) {
@@ -1831,8 +1831,8 @@ export class ResponseView extends ItemView {
         const rect = anchorEl.getBoundingClientRect();
         const containerRect = this.containerEl.getBoundingClientRect();
         menuEl.addClass('nl-position-absolute');
-        menuEl.setCssProps({ 'top':  `${rect.bottom - containerRect.top + 5}px` });
-        menuEl.setCssProps({ 'left':  `${rect.left - containerRect.left}px` });
+        menuEl.setCssProps({ '--menu-top':  `${rect.bottom - containerRect.top + 5}px` });
+        menuEl.setCssProps({ '--menu-left':  `${rect.left - containerRect.left}px` });
         menuEl.addClass('nl-z-index-1000');
         menuEl.addClass('nl-min-width-250px');
         menuEl.addClass('nl-max-height-400px');
@@ -2148,8 +2148,8 @@ export class ResponseView extends ItemView {
 
         
         menuEl.addClass('nl-position-absolute');
-        menuEl.setCssProps({ 'top':  `${btnRect.bottom - containerRect.top + 4}px` });
-        menuEl.setCssProps({ 'right':  `${containerRect.right - btnRect.right}px` });
+        menuEl.setCssProps({ '--menu-top':  `${btnRect.bottom - containerRect.top + 4}px` });
+        menuEl.setCssProps({ '--menu-right':  `${containerRect.right - btnRect.right}px` });
 
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) &&
@@ -2549,7 +2549,7 @@ export class ResponseView extends ItemView {
 
         const btnRect = ellipsisBtn.getBoundingClientRect();
         menuEl.addClass('nl-position-absolute');
-        menuEl.setCssProps({ 'top':  `${btnRect.bottom + 4}px` });
+        menuEl.setCssProps({ '--menu-top':  `${btnRect.bottom + 4}px` });
         menuEl.addClass('nl-right-10px');
 
         const closeHandler = (e: MouseEvent) => {
@@ -2593,7 +2593,7 @@ export class ResponseView extends ItemView {
 
         const btnRect = this.containerEl.querySelector('.header-ellipsis-btn')?.getBoundingClientRect();
         if (btnRect) {
-            pickerEl.setCssProps({ 'top':  `${btnRect.bottom + 4}px` });
+            pickerEl.setCssProps({ '--picker-top':  `${btnRect.bottom + 4}px` });
             pickerEl.addClass('nl-right-10px');
         }
 
@@ -2704,7 +2704,7 @@ export class ResponseView extends ItemView {
         this.wallpaperEl.addClass('nl-overflow-hidden');
 
         const wallpaperOpacity = this.settings.chatWallpaperOpacity ?? 0.5;
-        this.wallpaperEl.setCssProps({ 'opacity':  wallpaperOpacity.toString() });
+        this.wallpaperEl.setCssProps({ '--wallpaper-opacity':  wallpaperOpacity.toString() });
         
         
         const imgEl = this.wallpaperEl.createEl('img');
@@ -2738,7 +2738,7 @@ export class ResponseView extends ItemView {
             
             if (headerSection && headerGlassFactor > 0) {
                 headerSection.classList.add('liquid-glass-active');
-                (headerSection as HTMLElement).setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
+                (headerSection as HTMLElement).setCssProps({ '--header-background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             } else if (headerSection) {
                 headerSection.classList.remove('liquid-glass-active');
                 (headerSection as HTMLElement).addClass('nl-background-');
@@ -2746,7 +2746,7 @@ export class ResponseView extends ItemView {
             
             if (inputContainer && headerGlassFactor > 0) {
                 inputContainer.classList.add('liquid-glass-active');
-                (inputContainer as HTMLElement).setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
+                (inputContainer as HTMLElement).setCssProps({ '--input-background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             } else if (inputContainer) {
                 inputContainer.classList.remove('liquid-glass-active');
                 (inputContainer as HTMLElement).addClass('nl-background-');
@@ -2760,8 +2760,8 @@ export class ResponseView extends ItemView {
             responseItems.forEach((item) => {
                 if (responseGlassFactor > 0) {
                     item.classList.add('liquid-glass-active');
-                    (item as HTMLElement).setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, responseGlassFactor)})` });
-                    (item as HTMLElement).setCssProps({ 'border-color':  `rgba(255, 255, 255, ${Math.min(0.5, responseGlassFactor)})` });
+                    (item as HTMLElement).setCssProps({ '--item-background':  `rgba(255, 255, 255, ${Math.min(0.95, responseGlassFactor)})` });
+                    (item as HTMLElement).setCssProps({ '--item-border-color':  `rgba(255, 255, 255, ${Math.min(0.5, responseGlassFactor)})` });
                 } else {
                     item.classList.remove('liquid-glass-active');
                     (item as HTMLElement).addClass('nl-background-');
@@ -2772,7 +2772,7 @@ export class ResponseView extends ItemView {
             
             if (queryInput && headerGlassFactor > 0) {
                 queryInput.classList.add('liquid-glass-active');
-queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
+queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(0.95, headerGlassFactor)})` });
             }
         } else {
             
@@ -4906,26 +4906,15 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 if (targetEl) {
                     const tooltip = document.createElement('div');
                     tooltip.classList.add('footnote-tooltip');
-                    tooltip.setCssProps({ 'css-text':  `
-                        position: fixed;
-                        background-color: var(--background-primary);
-                        border: 1px solid var(--background-modifier-border);
-                        border-radius: 4px;
-                        padding: 8px 12px;
-                        max-width: 300px;
-                        z-index: 10000;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-                        font-size: 0.9em;
-                        pointer-events: none;
-                    ` });
+                    tooltip.addClass('footnote-tooltip-style');
 
                     
                     const text = targetEl.textContent?.replace(/↩/g, '').replace(/\[\^\d+\]:\s*/, '').trim() || '';
                     tooltip.textContent = text;
 
                     const rect = refLink.getBoundingClientRect();
-                    tooltip.setCssProps({ 'left':  rect.left + 'px' });
-                    tooltip.setCssProps({ 'top':  (rect.bottom + 5) + 'px' });
+                    tooltip.setCssProps({ '--tooltip-left':  rect.left + 'px' });
+                    tooltip.setCssProps({ '--tooltip-top':  (rect.bottom + 5) + 'px' });
 
                     document.body.appendChild(tooltip);
 
@@ -6209,7 +6198,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             
             const onMsg = (e: MessageEvent) => {
                 if (e.data?.iframeHeight && iframe.isConnected) {
-                    iframe.setCssProps({ 'height':  e.data.iframeHeight + 'px' });
+                    iframe.setCssProps({ '--iframe-height':  e.data.iframeHeight + 'px' });
                     window.removeEventListener('message', onMsg);
                 }
             };
@@ -7146,7 +7135,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         
         const adjustHeight = () => {
             textArea.addClass('nl-height-auto');
-            textArea.setCssProps({ 'height':  textArea.scrollHeight + 'px' });
+            textArea.setCssProps({ '--response-height':  textArea.scrollHeight + 'px' });
         };
         textArea.addEventListener('input', adjustHeight);
         setTimeout(adjustHeight, 0); 
@@ -7202,7 +7191,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         
         const rect = anchorEl.getBoundingClientRect();
         menu.addClass('nl-position-fixed');
-        menu.setCssProps({ 'left':  `${rect.left}px` });
+        menu.setCssProps({ '--menu-left':  `${rect.left}px` });
         menu.addClass('nl-z-index-9999');
         menu.addClass('nl-min-width-260px');
         
@@ -7265,11 +7254,11 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         const menuHeight = menu.offsetHeight;
         
         if (anchorEl.classList.contains('capsule-more-tag')) {
-            menu.setCssProps({ 'left':  `${rect.right - menu.offsetWidth}px` });
+            menu.setCssProps({ '--menu-left':  `${rect.right - menu.offsetWidth}px` });
         } else {
-            menu.setCssProps({ 'left':  `${rect.left}px` });
+            menu.setCssProps({ '--menu-left':  `${rect.left}px` });
         }
-        menu.setCssProps({ 'top':  `${rect.top - menuHeight - 8}px` });
+        menu.setCssProps({ '--menu-top':  `${rect.top - menuHeight - 8}px` });
         this.contextMenuEl = menu;
     }
 
@@ -7317,7 +7306,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         
         const rect = anchorEl.getBoundingClientRect();
         menu.addClass('nl-position-fixed');
-        menu.setCssProps({ 'left':  `${rect.left}px` });
+        menu.setCssProps({ '--menu-left':  `${rect.left}px` });
         menu.addClass('nl-z-index-9999');
         menu.addClass('nl-min-width-260px');
 
@@ -7338,7 +7327,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
 
         
         const menuHeight = menu.offsetHeight;
-        menu.setCssProps({ 'top':  `${rect.top - menuHeight - 8}px` });
+        menu.setCssProps({ '--menu-top':  `${rect.top - menuHeight - 8}px` });
 
         this.contextMenuEl = menu;
     }
@@ -7801,10 +7790,10 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                 const previewHeight = 250; 
 
                 this.contextMenuPreviewEl.addClass('nl-position-fixed');
-                this.contextMenuPreviewEl.setCssProps({ 'left':  `${menuRect.left}px` });
-                this.contextMenuPreviewEl.setCssProps({ 'bottom':  `${window.innerHeight - menuRect.top + 8}px` });
-                this.contextMenuPreviewEl.setCssProps({ 'width':  `${Math.max(menuRect.width, 400)}px` });
-                this.contextMenuPreviewEl.setCssProps({ 'max-height':  `${previewHeight}px` });
+                this.contextMenuPreviewEl.setCssProps({ '--preview-left':  `${menuRect.left}px` });
+                this.contextMenuPreviewEl.setCssProps({ '--preview-bottom':  `${window.innerHeight - menuRect.top + 8}px` });
+                this.contextMenuPreviewEl.setCssProps({ '--preview-width':  `${Math.max(menuRect.width, 400)}px` });
+                this.contextMenuPreviewEl.setCssProps({ '--preview-max-height':  `${previewHeight}px` });
                 this.contextMenuPreviewEl.addClass('nl-display-block');
             }
         } catch (error) {
@@ -11064,7 +11053,7 @@ class CodeCanvasModal extends Modal {
                     previewArea.appendChild(iframe);
                     const onMsg = (e: MessageEvent) => {
                         if (e.data?.iframeHeight) {
-                            iframe.setCssProps({ 'height':  e.data.iframeHeight + 'px' });
+                            iframe.setCssProps({ '--iframe-height':  e.data.iframeHeight + 'px' });
                             window.removeEventListener('message', onMsg);
                         }
                     };
@@ -11190,7 +11179,7 @@ class CodeCanvasModal extends Modal {
                 outputArea.appendChild(iframe);
                 const onMsg = (e: MessageEvent) => {
                     if (e.data?.iframeHeight && iframe.isConnected) {
-                        iframe.setCssProps({ 'height':  e.data.iframeHeight + 'px' });
+                        iframe.setCssProps({ '--iframe-height':  e.data.iframeHeight + 'px' });
                         window.removeEventListener('message', onMsg);
                     }
                 };

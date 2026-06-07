@@ -935,10 +935,10 @@ Rules:
     this.chatInput.inputEl.addEventListener('input', function () {
       const parent = this.parentElement;
       if (parent) {
-        parent.setCssProps({ 'min-height':  parent.clientHeight + 'px' });
+        parent.setCssProps({ '--chat-min-height': parent.clientHeight + 'px' });
       }
       this.addClass('nl-height-auto');
-      this.setCssProps({ 'height':  Math.min(this.scrollHeight, 200) + 'px' });
+      this.setCssProps({ '--chat-height': Math.min(this.scrollHeight, 200) + 'px' });
       if (parent) {
         parent.addClass('nl-min-height-');
       }
@@ -1113,10 +1113,10 @@ Rules:
     this.chatInput.inputEl.addEventListener('input', function () {
       const parent = this.parentElement;
       if (parent) {
-        parent.setCssProps({ 'min-height':  parent.clientHeight + 'px' });
+        parent.setCssProps({ '--chat-min-height': parent.clientHeight + 'px' });
       }
       this.addClass('nl-height-auto');
-      this.setCssProps({ 'height':  Math.min(this.scrollHeight, 120) + 'px' });
+      this.setCssProps({ '--chat-height': Math.min(this.scrollHeight, 120) + 'px' });
       if (parent) {
         parent.addClass('nl-min-height-');
       }
@@ -1552,7 +1552,7 @@ Rules:
 
     const rect = anchorEl.getBoundingClientRect();
     menu.addClass('nl-position-fixed');
-    menu.setCssProps({ 'left':  `${rect.left}px` });
+    menu.setCssProps({ '--menu-left': `${rect.left}px` });
     menu.addClass('nl-z-index-9999');
     menu.addClass('nl-min-width-220px');
 
@@ -1605,7 +1605,7 @@ Rules:
 
     
     const menuHeight = menu.offsetHeight;
-    menu.setCssProps({ 'top':  `${rect.top - menuHeight - 8}px` });
+    menu.setCssProps({ '--menu-top': `${rect.top - menuHeight - 8}px` });
 
     this.contextMenuEl = menu;
 
@@ -2052,7 +2052,7 @@ Rules:
 
           
           if (progressBar) {
-            progressBar.setCssProps({ 'width':  `${percentage}%` });
+            progressBar.setCssProps({ '--progress-width': `${percentage}%` });
           }
 
           
@@ -2093,7 +2093,7 @@ Rules:
 
           
           if (progressBar) {
-            progressBar.setCssProps({ 'width':  `${percentage}%` });
+            progressBar.setCssProps({ '--progress-width': `${percentage}%` });
           }
 
           
@@ -2234,7 +2234,7 @@ Rules:
 
     const adjustHeight = () => {
       textArea.addClass('nl-height-auto');
-      textArea.setCssProps({ 'height':  textArea.scrollHeight + 'px' });
+      textArea.setCssProps({ '--chat-height':  textArea.scrollHeight + 'px' });
     };
     textArea.addEventListener('input', adjustHeight);
     setTimeout(adjustHeight, 0);
@@ -3675,17 +3675,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         if (targetEl) {
           const tooltip = document.createElement('div');
           tooltip.classList.add('footnote-tooltip');
-          tooltip.setCssProps({ 'css-text':  `
-            position: fixed;
-            background-color: var(--background-primary);
-            border: 1px solid var(--background-modifier-border);
-            border-radius: 4px;
-            padding: 8px 12px;
-            font-size: 0.9em;
-            max-width: 300px;
-            z-index: 1000;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          ` });
+          tooltip.addClass('footnote-tooltip-style');
 
           
           const clonedContent = targetEl.cloneNode(true) as HTMLElement;
@@ -3698,8 +3688,8 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
 
           
           const rect = refLink.getBoundingClientRect();
-          tooltip.setCssProps({ 'left':  `${rect.left}px` });
-          tooltip.setCssProps({ 'top':  `${rect.bottom + 5}px` });
+          tooltip.setCssProps({ '--tooltip-left':  `${rect.left}px` });
+          tooltip.setCssProps({ '--tooltip-top':  `${rect.bottom + 5}px` });
 
           
           const removeTooltip = () => {
@@ -3812,8 +3802,8 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         const btnRect = modelBtn.getBoundingClientRect();
         const menuRect = menuEl.getBoundingClientRect();
         menuEl.addClass('nl-position-absolute');
-        menuEl.setCssProps({ 'left':  `${btnRect.left}px` });
-        menuEl.setCssProps({ 'top':  `${btnRect.top - menuRect.height - 8}px` });
+        menuEl.setCssProps({ '--menu-left':  `${btnRect.left}px` });
+        menuEl.setCssProps({ '--menu-top':  `${btnRect.top - menuRect.height - 8}px` });
         menuEl.addClass('nl-z-index-1000');
 
         setTimeout(() => {
@@ -3913,8 +3903,8 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     const btnRect = modelBtn.getBoundingClientRect();
     const menuRect = menuEl.getBoundingClientRect();
     menuEl.addClass('nl-position-absolute');
-    menuEl.setCssProps({ 'left':  `${btnRect.left}px` });
-    menuEl.setCssProps({ 'top':  `${btnRect.top - menuRect.height - 8}px` });
+    menuEl.setCssProps({ '--menu-left':  `${btnRect.left}px` });
+    menuEl.setCssProps({ '--menu-top':  `${btnRect.top - menuRect.height - 8}px` });
     menuEl.addClass('nl-z-index-1000');
     setTimeout(() => {
       document.addEventListener('click', closeMenu);
@@ -4003,7 +3993,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
 
     
     this.contextProgressBar.addClass('nl-transition-width03sease-out');
-    this.contextProgressBar.setCssProps({ 'width':  `${percentage}%` });
+    this.contextProgressBar.setCssProps({ '--progress-width':  `${percentage}%` });
 
     
     if (this.notebook.mode === 'rag') {
@@ -4047,7 +4037,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
       
       const docsRatio = docsTokens / currentTokens;
       const splitPoint = docsRatio * 100;
-      this.contextProgressBar.setCssProps({ 'background':  `linear-gradient(to right, ${baseColor} ${splitPoint}%, var(--color-purple, #9b59b6) ${splitPoint}%)` });
+      this.contextProgressBar.setCssProps({ '--progress-background':  `linear-gradient(to right, ${baseColor} ${splitPoint}%, var(--color-purple, #9b59b6) ${splitPoint}%)` });
     } else {
       this.contextProgressBar.addClass('nl-background-');
     }
