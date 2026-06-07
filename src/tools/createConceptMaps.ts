@@ -1608,7 +1608,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
         const circle = group.querySelector('.concept-node-circle') as SVGElement;
         if (circle) {
           circle.addClass('nl-transform-scale11');
-          circle.setCssProps({ 'transition':  'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)' });
+          circle.addClass('nl-transition-remaining-1');
           circle.setCssProps({ 'filter':  `drop-shadow(0 0 12px ${themeColor.glow}) brightness(1.4)` });
         }
         
@@ -1650,7 +1650,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
       if (circle && !this.isHolding) {
         circle.addClass('nl-transform-');
         circle.addClass('nl-filter-');
-        circle.setCssProps({ 'transition':  'transform 0.2s ease, filter 0.2s ease' });
+        circle.addClass('nl-transition-rem-1');
       }
     });
     
@@ -1666,7 +1666,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
       if (circle && !this.isHolding) {
         circle.addClass('nl-transform-');
         circle.addClass('nl-filter-');
-        circle.setCssProps({ 'transition':  'transform 0.2s ease, filter 0.2s ease' });
+        circle.addClass('nl-transition-rem-2');
       }
       
       // Only clear if no node or theme is clicked
@@ -2272,11 +2272,11 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
       // Add hover effect
       nodeItem.addEventListener('mouseenter', () => {
         nodeItem.addClass('nl-transform-translateX5px');
-        nodeItem.setCssProps({ 'box-shadow':  '0 6px 16px rgba(0,0,0,0.25)' });
+        nodeItem.addClass('nl-box-shadow-rem-3');
       });
       nodeItem.addEventListener('mouseleave', () => {
         nodeItem.addClass('nl-transform-translateX0');
-        nodeItem.setCssProps({ 'box-shadow':  '0 4px 12px rgba(0,0,0,0.15)' });
+        nodeItem.addClass('nl-box-shadow-rem-4');
       });
     });
     
@@ -2293,7 +2293,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     // Fade everything else in the SVG
     svg.addClass('nl-opacity-01');
     svg.addClass('nl-filter-blur3px');
-    svg.setCssProps({ 'transition':  'opacity 0.4s ease, filter 0.4s ease' });
+    svg.addClass('nl-transition-rem-5');
   }
 
   // Public method to check if theme overlay is active
@@ -2329,7 +2329,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     if (this.firedThemeNode) {
       this.firedThemeNode.addClass('nl-transform-');
       this.firedThemeNode.addClass('nl-filter-');
-      this.firedThemeNode.setCssProps({ 'transition':  'transform 0.3s ease, filter 0.3s ease' });
+      this.firedThemeNode.addClass('nl-transition-rem-6');
       this.firedThemeNode = null;
     }
     

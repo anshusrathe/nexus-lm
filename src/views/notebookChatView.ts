@@ -1574,7 +1574,7 @@ Rules:
 
       const descSpan = document.createElement('span');
       descSpan.textContent = opt.description;
-      descSpan.setCssProps({ 'css-text':  'font-size: 0.85em; color: var(--text-muted); margin-left: 8px;' });
+      descSpan.addClass('nl-css-text-remaining-7');
       item.appendChild(descSpan);
 
       item.addEventListener('click', async (e) => {
@@ -1810,7 +1810,8 @@ Rules:
 
     
     const sliderContainer = sourcesHeader.createDiv({ cls: 'cag-history-slider-container' });
-    sliderContainer.setCssProps({ 'display':  (this.notebook.mode === 'cag' && this.sourceViewMode === 'notes') ? 'flex':  'none' });
+    sliderContainer.toggleClass('nl-display-flex', !!((this.notebook.mode === 'cag' && this.sourceViewMode === 'notes')));
+    sliderContainer.toggleClass('nl-display-none', !((this.notebook.mode === 'cag' && this.sourceViewMode === 'notes')));
     sliderContainer.addClass('nl-align-items-center');
     sliderContainer.addClass('nl-gap-8px');
     sliderContainer.addClass('nl-font-size-08em');
@@ -3732,7 +3733,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
           backArrow.classList.add('footnote-backref');
           backArrow.textContent = ' ↩';
           backArrow.setAttribute('aria-label', 'Back to content');
-          backArrow.setCssProps({ 'css-text':  'margin-left: 0.25em; cursor: pointer; text-decoration: none;' });
+          backArrow.addClass('nl-css-text-remaining-8');
 
           backArrow.addEventListener('click', (e: MouseEvent) => {
             e.preventDefault();

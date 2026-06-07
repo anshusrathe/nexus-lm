@@ -2581,15 +2581,15 @@ export class ResponseView extends ItemView {
         pickerEl.className = 'wallpaper-picker';
         pickerEl.addClass('nl-position-absolute');
         pickerEl.addClass('nl-z-index-1000');
-        pickerEl.setCssProps({ 'background':  'var(--background-primary, #ffffff)' });
-        pickerEl.setCssProps({ 'border':  '1px solid var(--border-color, #e0e0e0)' });
+        pickerEl.addClass('nl-background-rem-7');
+        pickerEl.addClass('nl-border-rem-8');
         pickerEl.addClass('nl-border-radius-8px');
         pickerEl.addClass('nl-padding-8px');
         pickerEl.addClass('nl-max-height-300px');
         pickerEl.addClass('nl-overflow-y-auto');
         pickerEl.addClass('nl-min-width-250px');
         pickerEl.classList.add('wallpaper-picker-shadow');
-        pickerEl.setCssProps({ 'color':  'var(--text-normal, #000000)' });
+        pickerEl.addClass('nl-color-rem-9');
 
         const btnRect = this.containerEl.querySelector('.header-ellipsis-btn')?.getBoundingClientRect();
         if (btnRect) {
@@ -2602,7 +2602,7 @@ export class ResponseView extends ItemView {
         titleEl.addClass('nl-font-weight-bold');
         titleEl.addClass('nl-margin-bottom-8px');
         titleEl.addClass('nl-padding-4px');
-        titleEl.setCssProps({ 'color':  'var(--text-normal, #000000)' });
+        titleEl.addClass('nl-color-rem-10');
 
         for (const file of images) {
             const itemEl = pickerEl.createDiv({ cls: 'wallpaper-picker-item' });
@@ -2610,10 +2610,10 @@ export class ResponseView extends ItemView {
             itemEl.addClass('nl-padding-6px8px');
             itemEl.addClass('nl-cursor-pointer');
             itemEl.addClass('nl-border-radius-4px');
-            itemEl.setCssProps({ 'color':  'var(--text-normal, #000000)' });
+            itemEl.addClass('nl-color-rem-11');
             itemEl.addClass('nl-background-transparent');
             itemEl.addEventListener('mouseenter', () => {
-                itemEl.setCssProps({ 'background':  'var(--hover-bg, #e0e0e0)' });
+                itemEl.addClass('nl-background-rem-12');
             });
             itemEl.addEventListener('mouseleave', () => {
                 itemEl.addClass('nl-background-transparent');
@@ -4960,7 +4960,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                     backArrow.classList.add('footnote-backref');
                     backArrow.textContent = ' ↩';
                     backArrow.setAttribute('aria-label', 'Back to content');
-                    backArrow.setCssProps({ 'css-text':  'margin-left: 0.25em; cursor: pointer; text-decoration: none;' });
+                    backArrow.addClass('nl-css-text-remaining-8');
 
                     this.registerDomEvent(backArrow, 'click', (e: MouseEvent) => {
                         e.preventDefault();
@@ -5175,7 +5175,8 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             
             sourcesHeader.addEventListener('click', () => {
                 const isCollapsed = sourcesContent.style.display === 'none';
-                sourcesContent.setCssProps({ 'display':  isCollapsed ? 'block':  'none' });
+                sourcesContent.toggleClass('nl-display-block', !!(isCollapsed));
+                sourcesContent.toggleClass('nl-display-none', !(isCollapsed));
                 toggleIcon.setText(isCollapsed ? '▼' : '▶'); 
             });
 
@@ -5222,7 +5223,8 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             
             toolsHeader.addEventListener('click', () => {
                 const isCollapsed = toolsContent.style.display === 'none';
-                toolsContent.setCssProps({ 'display':  isCollapsed ? 'block':  'none' });
+                toolsContent.toggleClass('nl-display-block', !!(isCollapsed));
+                toolsContent.toggleClass('nl-display-none', !(isCollapsed));
                 toggleIcon.setText(isCollapsed ? '▼' : '▶'); 
             });
 
@@ -5262,7 +5264,8 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             
             sourcesHeader.addEventListener('click', () => {
                 const isCollapsed = sourcesContent.style.display === 'none';
-                sourcesContent.setCssProps({ 'display':  isCollapsed ? 'block':  'none' });
+                sourcesContent.toggleClass('nl-display-block', !!(isCollapsed));
+                sourcesContent.toggleClass('nl-display-none', !(isCollapsed));
                 toggleIcon.setText(isCollapsed ? '▼' : '▶');
             });
 
@@ -5382,7 +5385,8 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
         
         sourcesHeader.addEventListener('click', () => {
             const isCollapsed = sourcesContent.style.display === 'none';
-            sourcesContent.setCssProps({ 'display':  isCollapsed ? 'block':  'none' });
+            sourcesContent.toggleClass('nl-display-block', !!(isCollapsed));
+            sourcesContent.toggleClass('nl-display-none', !(isCollapsed));
             toggleIcon.setText(isCollapsed ? '▼' : '▶');
         });
 
@@ -6388,7 +6392,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
             errRow.className = 'code-exec-toggle-row mermaid-repair-row';
             const errLabel = document.createElement('span');
             errLabel.className = 'code-exec-label';
-            errLabel.setCssProps({ 'color':  'var(--text-error, #f44336)' });
+            errLabel.addClass('nl-color-remaining-13');
             errLabel.textContent = `Repair failed: ${err?.message || String(err)}`;
             const retryBtn = document.createElement('button');
             retryBtn.className = 'code-block-btn';
@@ -7379,7 +7383,7 @@ queryInput.setCssProps({ 'background':  `rgba(255, 255, 255, ${Math.min(0.95, he
                     const badgeSpan = document.createElement('span');
                     badgeSpan.className = 'feature-badge beta-badge';
                     badgeSpan.textContent = (opt as SafeAny).badge;
-                    badgeSpan.setCssProps({ 'css-text':  'margin-left: 6px; padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;' });
+                    badgeSpan.addClass('nl-css-text-remaining-14');
 
                     item.appendChild(labelSpan);
                     item.appendChild(badgeSpan);
@@ -7930,12 +7934,12 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     const toggleContainer = document.createElement('div');
                     toggleContainer.className = 'vault-citation-toggle-container';
-                    toggleContainer.setCssProps({ 'css-text':  'margin-left: auto; display: flex; align-items: center; gap: 10px;' });
+                    toggleContainer.addClass('nl-css-text-rem-13');
 
                     
                     const toggleLabel = document.createElement('span');
                     toggleLabel.textContent = 'Citations';
-                    toggleLabel.setCssProps({ 'css-text':  'font-size: 0.85em; color: var(--text-muted);' });
+                    toggleLabel.addClass('nl-css-text-rem-14');
 
                     const toggleSwitch = document.createElement('input');
                     toggleSwitch.type = 'checkbox';
@@ -7954,7 +7958,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     toggleContainer.appendChild(toggleSwitch);
                     item.appendChild(toggleContainer);
 
-                    item.setCssProps({ 'css-text':  'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
+                    item.addClass('nl-css-text-rem-15');
                 } else if (opt.hasToggle && opt.value === '@flash ') {
                     
                     const labelSpan = document.createElement('span');
@@ -7963,11 +7967,11 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     const toggleContainer = document.createElement('div');
                     toggleContainer.className = 'flash-citation-toggle-container';
-                    toggleContainer.setCssProps({ 'css-text':  'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
+                    toggleContainer.addClass('nl-css-text-rem-16');
 
                     const toggleLabel = document.createElement('span');
                     toggleLabel.textContent = 'Citations';
-                    toggleLabel.setCssProps({ 'css-text':  'font-size: 0.85em; color: var(--text-muted);' });
+                    toggleLabel.addClass('nl-css-text-rem-17');
 
                     const toggleSwitch = document.createElement('input');
                     toggleSwitch.type = 'checkbox';
@@ -7986,12 +7990,12 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     toggleContainer.appendChild(toggleSwitch);
                     item.appendChild(toggleContainer);
 
-                    item.setCssProps({ 'css-text':  'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
+                    item.addClass('nl-css-text-rem-18');
                     /* TEMPORARILY DISABLED - @agent mode
                     } else if (opt.hasToggle && opt.value === '@agent ') {
                         
                         const labelContainer = document.createElement('div');
-                        labelContainer.setCssProps({ 'css-text':  'display: flex; align-items: center; gap: 6px;' });
+                        labelContainer.addClass('nl-css-text-rem-19');
                         
                         const labelSpan = document.createElement('span');
                         labelSpan.textContent = opt.label;
@@ -8002,7 +8006,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                             const badgeSpan = document.createElement('span');
                             badgeSpan.className = 'feature-badge beta-badge';
                             badgeSpan.textContent = opt.badge;
-                            badgeSpan.setCssProps({ 'css-text':  'padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600;' });
+                            badgeSpan.addClass('nl-css-text-rem-20');
                             labelContainer.appendChild(badgeSpan);
                         }
                         
@@ -8010,11 +8014,11 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                         
                         const toggleContainer = document.createElement('div');
                         toggleContainer.className = 'agent-ratelimit-toggle-container';
-                        toggleContainer.setCssProps({ 'css-text':  'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
+                        toggleContainer.addClass('nl-css-text-rem-21');
                         
                         const toggleLabel = document.createElement('span');
                         toggleLabel.textContent = 'Rate Limit';
-                        toggleLabel.setCssProps({ 'css-text':  'font-size: 0.85em; color: var(--text-muted);' });
+                        toggleLabel.addClass('nl-css-text-rem-22');
                         
                         const toggleSwitch = document.createElement('input');
                         toggleSwitch.type = 'checkbox';
@@ -8033,7 +8037,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                         toggleContainer.appendChild(toggleSwitch);
                         item.appendChild(toggleContainer);
                         
-                        item.setCssProps({ 'css-text':  'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
+                        item.addClass('nl-css-text-rem-23');
                     */ 
                 } else if (opt.hasToggle && opt.value === '@mcp ') {
                     
@@ -8043,11 +8047,11 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     const toggleContainer = document.createElement('div');
                     toggleContainer.className = 'mcp-ratelimit-toggle-container';
-                    toggleContainer.setCssProps({ 'css-text':  'margin-left: auto; display: flex; align-items: center; gap: 6px;' });
+                    toggleContainer.addClass('nl-css-text-rem-24');
 
                     const toggleLabel = document.createElement('span');
                     toggleLabel.textContent = 'Delay Limit';
-                    toggleLabel.setCssProps({ 'css-text':  'font-size: 0.85em; color: var(--text-muted);' });
+                    toggleLabel.addClass('nl-css-text-rem-25');
 
                     const toggleSwitch = document.createElement('input');
                     toggleSwitch.type = 'checkbox';
@@ -8066,7 +8070,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     toggleContainer.appendChild(toggleSwitch);
                     item.appendChild(toggleContainer);
 
-                    item.setCssProps({ 'css-text':  'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;' });
+                    item.addClass('nl-css-text-remaining-17');
                 } else {
                     item.textContent = opt.label;
                 }

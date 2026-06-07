@@ -570,16 +570,20 @@ export class AITutorView extends ItemView {
         const startSlidesButton = this.container.querySelector('.start-slides-button') as HTMLElement;
         
         if (startQAButton) {
-          startQAButton.setCssProps({ 'display':  selectedPaths.length > 0 ? 'grid':  'none' });
+          startQAButton.toggleClass('nl-display-grid', !!(selectedPaths.length > 0));
+          startQAButton.toggleClass('nl-display-none', !(selectedPaths.length > 0));
         }
         if (startMCQButton) {
-          startMCQButton.setCssProps({ 'display':  selectedPaths.length > 0 ? 'grid':  'none' });
+          startMCQButton.toggleClass('nl-display-grid', !!(selectedPaths.length > 0));
+          startMCQButton.toggleClass('nl-display-none', !(selectedPaths.length > 0));
         }
         if (startConceptMapButton) {
-          startConceptMapButton.setCssProps({ 'display':  selectedPaths.length > 0 ? 'grid':  'none' });
+          startConceptMapButton.toggleClass('nl-display-grid', !!(selectedPaths.length > 0));
+          startConceptMapButton.toggleClass('nl-display-none', !(selectedPaths.length > 0));
         }
         if (startSlidesButton) {
-          startSlidesButton.setCssProps({ 'display':  selectedPaths.length > 0 ? 'grid':  'none' });
+          startSlidesButton.toggleClass('nl-display-grid', !!(selectedPaths.length > 0));
+          startSlidesButton.toggleClass('nl-display-none', !(selectedPaths.length > 0));
         }
         
         
@@ -1811,7 +1815,7 @@ export class AITutorView extends ItemView {
 
       
       progressFill.addClass('nl-width-0');
-      progressFill.setCssProps({ 'transition':  'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)' });
+      progressFill.addClass('nl-transition-remaining-21');
 
       let filePath: string;
 
@@ -2510,7 +2514,7 @@ export class AITutorView extends ItemView {
     this.timerContainer.addClass('nl-justify-content-flex-end');
     this.timerContainer.addClass('nl-align-items-center');
     this.timerContainer.addClass('nl-z-index-10');
-    this.timerContainer.setCssProps({ 'background':  'var(--background-primary, #fff)' });
+    this.timerContainer.addClass('nl-background-rem-26');
     this.timerContainer.addClass('nl-padding-8px16px00');
     this.timerContainer.addClass('nl-gap-8px');
 

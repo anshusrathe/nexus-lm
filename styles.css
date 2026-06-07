@@ -17514,3 +17514,58 @@
 .nl-border-color- { border-color:  !important; }
 .nl-text-shadow-008pxvar--text-accent { text-shadow: 0 0 8px var(--text-accent) !important; }
 .nl-text-shadow- { text-shadow:  !important; }
+
+/* Remaining utility classes */
+.nl-display-flex { display: flex !important; }
+.nl-display-grid { display: grid !important; }
+.nl-display-block { display: block !important; }
+.nl-transition-remaining-1 { transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important; }
+.nl-transition-remaining-2 { transition: transform 0.2s ease, filter 0.2s ease !important; }
+.nl-transition-remaining-5 { transition: opacity 0.4s ease, filter 0.4s ease !important; }
+.nl-transition-remaining-6 { transition: transform 0.3s ease, filter 0.3s ease !important; }
+.nl-transition-remaining-21 { transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important; }
+.nl-box-shadow-remaining-3 { box-shadow: 0 6px 16px rgba(0,0,0,0.25) !important; }
+.nl-box-shadow-remaining-4 { box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; }
+.nl-css-text-remaining-7 { font-size: 0.85em; color: var(--text-muted); margin-left: 8px; }
+.nl-css-text-remaining-8 { margin-left: 0.25em; cursor: pointer; text-decoration: none; }
+.nl-css-text-remaining-14 { margin-left: 6px; padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600; }
+.nl-css-text-remaining-15 { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.nl-css-text-remaining-16 { font-size: 0.85em; color: var(--text-muted); }
+.nl-css-text-remaining-17 { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; }
+.nl-css-text-remaining-18 { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.nl-css-text-remaining-19 { display: flex; align-items: center; gap: 6px; }
+.nl-css-text-remaining-20 { padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600; }
+.nl-background-remaining-9 { background: var(--background-primary, #ffffff) !important; }
+.nl-background-remaining-12 { background: var(--hover-bg, #e0e0e0) !important; }
+.nl-background-remaining-22 { background: var(--background-primary, #fff) !important; }
+.nl-border-remaining-10 { border: 1px solid var(--border-color, #e0e0e0) !important; }
+.nl-color-remaining-11 { color: var(--text-normal, #000000) !important; }
+.nl-color-remaining-13 { color: var(--text-error, #f44336) !important; }
+
+/* Final remaining utility classes */
+.nl-transition-rem-1 { transition: transform 0.2s ease, filter 0.2s ease !important; }
+.nl-transition-rem-2 { transition: transform 0.2s ease, filter 0.2s ease !important; }
+.nl-box-shadow-rem-3 { box-shadow: 0 6px 16px rgba(0,0,0,0.25) !important; }
+.nl-box-shadow-rem-4 { box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; }
+.nl-transition-rem-5 { transition: opacity 0.4s ease, filter 0.4s ease !important; }
+.nl-transition-rem-6 { transition: transform 0.3s ease, filter 0.3s ease !important; }
+.nl-background-rem-7 { background: var(--background-primary, #ffffff) !important; }
+.nl-border-rem-8 { border: 1px solid var(--border-color, #e0e0e0) !important; }
+.nl-color-rem-9 { color: var(--text-normal, #000000) !important; }
+.nl-color-rem-10 { color: var(--text-normal, #000000) !important; }
+.nl-color-rem-11 { color: var(--text-normal, #000000) !important; }
+.nl-background-rem-12 { background: var(--hover-bg, #e0e0e0) !important; }
+.nl-css-text-rem-13 { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.nl-css-text-rem-14 { font-size: 0.85em; color: var(--text-muted); }
+.nl-css-text-rem-15 { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; }
+.nl-css-text-rem-16 { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.nl-css-text-rem-17 { font-size: 0.85em; color: var(--text-muted); }
+.nl-css-text-rem-18 { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; }
+.nl-css-text-rem-19 { display: flex; align-items: center; gap: 6px; }
+.nl-css-text-rem-20 { padding: 2px 6px; font-size: 0.7em; background: var(--interactive-accent); color: var(--text-on-accent); border-radius: 3px; font-weight: 600; }
+.nl-css-text-rem-21 { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.nl-css-text-rem-22 { font-size: 0.85em; color: var(--text-muted); }
+.nl-css-text-rem-23 { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; }
+.nl-css-text-rem-24 { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.nl-css-text-rem-25 { font-size: 0.85em; color: var(--text-muted); }
+.nl-background-rem-26 { background: var(--background-primary, #fff) !important; }
