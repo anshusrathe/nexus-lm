@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile, ButtonComponent, Notice, MarkdownRenderer, Component, Modal, Setting, setIcon, normalizePath, Platform } from 'obsidian';
+import { App, TAbstractFile, ItemView, WorkspaceLeaf, TFile, ButtonComponent, Notice, MarkdownRenderer, Component, Modal, Setting, setIcon, normalizePath, Platform } from 'obsidian';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AISettings, Provider, getModelsGroupedByProvider, getModelDisplayName, getProviderForModel } from '../settings';
 import { DirectorySuggester } from '../utils/directorySuggester';
@@ -79,7 +79,7 @@ export class NoteSuggester {
   private multimodalEnabled: boolean = false;
 
   constructor(
-    private app: any,
+    private app: App,
     private container: HTMLElement,
     onSelect: (paths: string[]) => void,
     multimodalEnabled: boolean = false
@@ -278,7 +278,7 @@ export class FolderSuggester {
   private selectedFoldersContainer!: HTMLElement;
 
   constructor(
-    private app: any,
+    private app: App,
     private container: HTMLElement,
     onSelect: (folders: string[]) => void
   ) {
@@ -289,8 +289,8 @@ export class FolderSuggester {
 
   private getAvailableFolders(): string[] {
     const allFolders = this.app.vault.getAllLoadedFiles()
-      .filter((f: any) => f.children !== undefined) 
-      .map((f: any) => f.path)
+      .filter((f: TAbstractFile) => (f as any).children !== undefined) 
+      .map((f: TAbstractFile) => f.path)
       .filter((path: string) => path !== '' && !path.startsWith('.'));
     return allFolders;
   }
@@ -849,7 +849,7 @@ export class AITutorView extends ItemView {
     const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_NOTEBOOK_CHAT);
     for (const leaf of leaves) {
       const viewState = leaf.getViewState();
-      const notebook = (viewState.state as any)?.notebook;
+      const notebook = (viewState.state as unknown as any)?.notebook;
       if (notebook?.id === notebookId) {
         return leaf;
       }
@@ -1519,13 +1519,13 @@ export class AITutorView extends ItemView {
     }, 200);
     
     
-    (dialog as any)._progressInterval = progressInterval;
+    (dialog as unknown as any)._progressInterval = progressInterval;
   }
   
   private hideMCQProgressDialog() {
     if (this._mcqProgressDialog) {
       
-      const interval = (this._mcqProgressDialog as any)._progressInterval;
+      const interval = (this._mcqProgressDialog as unknown as any)._progressInterval;
       if (interval) {
         clearInterval(interval);
       }

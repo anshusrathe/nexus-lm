@@ -1,4 +1,4 @@
-import { create, insert, search, save, load, remove } from '@orama/orama';
+import { create, insert, search, save, load, remove, AnyOrama, AnySchema } from '@orama/orama';
 import * as fflate from 'fflate';
 import { decode } from '@msgpack/msgpack';
 
@@ -17,9 +17,9 @@ interface OramaWorkerResponse {
     error?: string;
 }
 
-const ctx: Worker = self as any;
-const instances: Map<string, any> = new Map();
-const schemas: Map<string, any> = new Map();
+const ctx: Worker = self as unknown as any;
+const instances: Map<string, AnyOrama> = new Map();
+const schemas: Map<string, AnySchema> = new Map();
 const metadatas: Map<string, any> = new Map();
 const shadowDocsMap: Map<string, any[]> = new Map();
 
@@ -39,7 +39,7 @@ const tokenizerConfig = {
     ]
 };
 
-function createDb(schema: any) {
+function createDb(schema: AnySchema) {
     return create({ schema, components: { tokenizer: tokenizerConfig } });
 }
 
@@ -56,10 +56,10 @@ function buildSchema(dimension: number = 0) {
         lastModified: 'number'
     };
     if (dimension > 0) schema.embedding = `vector[${dimension}]`;
-    return schema;
+    return schema as AnySchema;
 }
 
-async function initInstance(instanceId: string, schema: any) {
+async function initInstance(instanceId: string, schema: AnySchema) {
     try {
         const db = await createDb(schema);
         instances.set(instanceId, db);
@@ -176,7 +176,7 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
                 const metadata = { ...(payload?.metadata || metadatas.get(instanceId) || {}) };
                 
                 // Track dimension
-                const currentSchema = schemas.get(instanceId);
+                const currentSchema: any = schemas.get(instanceId);
                 if (currentSchema?.embedding) {
                     const match = currentSchema.embedding.match(/vector\[(\d+)\]/);
                     if (match) metadata.dimension = parseInt(match[1]);
@@ -207,7 +207,7 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
                 // Defensive check for vector dimension mismatch
                 if (payload.params.mode === 'vector' || payload.params.vector) {
                     const queryVector = payload.params.vector?.value || payload.params.vector;
-                    const schema = schemas.get(instanceId);
+                    const schema: any = schemas.get(instanceId);
                     if (schema?.embedding) {
                         const match = schema.embedding.match(/vector\[(\d+)\]/);
                         const expectedDim = match ? parseInt(match[1]) : 0;
@@ -247,7 +247,7 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
                 if (db) {
                     await remove(db, payload.docId);
                     const shadow = shadowDocsMap.get(instanceId) || [];
-                    shadowDocsMap.set(instanceId, shadow.filter(d => `${d.path}:${d.chunkIndex}` !== payload.docId));
+                    shadowDocsMap.set(instanceId, shadow.filter((d: any) => `${d.path}:${d.chunkIndex}` !== payload.docId));
                 }
                 ctx.postMessage({ success: true, instanceId, id });
                 break;
@@ -262,11 +262,11 @@ ctx.addEventListener('message', async (event: MessageEvent<OramaWorkerMessage>) 
             case 'CLEAR_FILE':
                 if (db) {
                     const shadow = shadowDocsMap.get(instanceId) || [];
-                    const docsToRemove = shadow.filter(d => d.path === payload.path);
+                    const docsToRemove = shadow.filter((d: any) => d.path === payload.path);
                     for (const doc of docsToRemove) {
                         await remove(db, `${doc.path}:${doc.chunkIndex}`);
                     }
-                    shadowDocsMap.set(instanceId, shadow.filter(d => d.path !== payload.path));
+                    shadowDocsMap.set(instanceId, shadow.filter((d: any) => d.path !== payload.path));
                 }
                 ctx.postMessage({ success: true, instanceId, id });
                 break;
