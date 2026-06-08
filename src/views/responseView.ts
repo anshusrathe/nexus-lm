@@ -5016,7 +5016,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             const sourcesContent = sourcesEl.createDiv({ cls: 'sources-content' });
-            sourcesContent.addClass('nl-display-none'); 
+            sourcesContent.addClass('collapsed'); 
 
             
             const extractYouTubeId = (url: string): string | null => {
@@ -5163,9 +5163,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             sourcesHeader.addEventListener('click', () => {
-                const isCollapsed = sourcesContent.style.display === 'none';
-                sourcesContent.toggleClass('nl-display-block', !!(isCollapsed));
-                sourcesContent.toggleClass('nl-display-none', !(isCollapsed));
+                const isCollapsed = sourcesContent.classList.contains('collapsed');
+                if (isCollapsed) {
+                    sourcesContent.removeClass('collapsed');
+                } else {
+                    sourcesContent.addClass('collapsed');
+                }
                 toggleIcon.setText(isCollapsed ? '▼' : '▶'); 
             });
 
@@ -5188,7 +5191,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             const toolsContent = toolsEl.createDiv({ cls: 'sources-content' });
-            toolsContent.addClass('nl-display-none'); 
+            toolsContent.addClass('collapsed'); 
 
             
             const toolsByServer = new Map<string, string[]>();
@@ -5211,9 +5214,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             toolsHeader.addEventListener('click', () => {
-                const isCollapsed = toolsContent.style.display === 'none';
-                toolsContent.toggleClass('nl-display-block', !!(isCollapsed));
-                toolsContent.toggleClass('nl-display-none', !(isCollapsed));
+                const isCollapsed = toolsContent.classList.contains('collapsed');
+                if (isCollapsed) {
+                    toolsContent.removeClass('collapsed');
+                } else {
+                    toolsContent.addClass('collapsed');
+                }
                 toggleIcon.setText(isCollapsed ? '▼' : '▶'); 
             });
 
@@ -5234,7 +5240,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             const sourcesContent = webSourcesEl.createDiv({ cls: 'sources-content' });
-            sourcesContent.addClass('nl-display-none'); 
+            sourcesContent.addClass('collapsed'); 
 
             const sourcesList = sourcesContent.createEl('ul');
             webResults.forEach(result => {
@@ -5252,9 +5258,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             sourcesHeader.addEventListener('click', () => {
-                const isCollapsed = sourcesContent.style.display === 'none';
-                sourcesContent.toggleClass('nl-display-block', !!(isCollapsed));
-                sourcesContent.toggleClass('nl-display-none', !(isCollapsed));
+                const isCollapsed = sourcesContent.classList.contains('collapsed');
+                if (isCollapsed) {
+                    sourcesContent.removeClass('collapsed');
+                } else {
+                    sourcesContent.addClass('collapsed');
+                }
                 toggleIcon.setText(isCollapsed ? '▼' : '▶');
             });
 
@@ -5284,7 +5293,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         const sourcesContent = sourcesEl.createDiv({ cls: 'sources-content' });
-        sourcesContent.addClass('nl-display-none'); 
+        sourcesContent.addClass('collapsed'); 
 
         
         const answerEl = responseEl.querySelector('.agent-final-answer-content') || responseEl.querySelector('.response-answer');
@@ -5373,9 +5382,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         sourcesHeader.addEventListener('click', () => {
-            const isCollapsed = sourcesContent.style.display === 'none';
-            sourcesContent.toggleClass('nl-display-block', !!(isCollapsed));
-            sourcesContent.toggleClass('nl-display-none', !(isCollapsed));
+            const isCollapsed = sourcesContent.classList.contains('collapsed');
+            if (isCollapsed) {
+                sourcesContent.removeClass('collapsed');
+            } else {
+                sourcesContent.addClass('collapsed');
+            }
             toggleIcon.setText(isCollapsed ? '▼' : '▶');
         });
 

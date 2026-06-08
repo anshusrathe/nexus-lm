@@ -1104,7 +1104,7 @@ export class AISettingTab extends PluginSettingTab {
              await this.plugin.saveSettings();
 
              // Refresh models from providers when provider is changed
-             await this.plugin.refreshModelsFromProviders();
+             await this.plugin.refreshModelsFromProviders(true);
            });
       });
 
@@ -1220,7 +1220,7 @@ await this.plugin.saveSettings();
  } else {
    new Notice('API key saved successfully');
  }                 // Refresh models from providers when API key is updated
-                 await this.plugin.refreshModelsFromProviders();
+                 await this.plugin.refreshModelsFromProviders(true);
                  // Refresh display to update model enable/disable states
                  this.display();
               } else {
@@ -1288,7 +1288,7 @@ await this.plugin.saveSettings();
                new Notice(`Switched to ${val === 'cloud' ? 'Cloud' : 'Local'} mode`);
                
                // Refresh models from providers when mode/URL changes
-               await this.plugin.refreshModelsFromProviders();
+               await this.plugin.refreshModelsFromProviders(true);
              })
         );
       
@@ -1311,7 +1311,7 @@ await this.plugin.saveSettings();
                new Notice('Ollama base URL saved successfully');
                
                // Refresh models from providers when URL is manually updated
-               await this.plugin.refreshModelsFromProviders();
+               await this.plugin.refreshModelsFromProviders(true);
              } else {
                new Notice('Invalid URL format. Please enter a valid HTTP/HTTPS URL.');
              }
@@ -1333,7 +1333,7 @@ await this.plugin.saveSettings();
                 new Notice(`Reset to default ${this.plugin.settings.ollamaMode} URL`);
                 
                 // Refresh models from providers after reset
-                await this.plugin.refreshModelsFromProviders();
+                await this.plugin.refreshModelsFromProviders(true);
               });
       });
       
@@ -1370,7 +1370,7 @@ await this.plugin.saveSettings();
           new CustomProviderModal(this.app, async (provider) => {
             this.plugin.settings.customProviders.push(provider);
             await this.plugin.saveSettings();
-            await this.plugin.refreshModelsFromProviders();
+            await this.plugin.refreshModelsFromProviders(true);
             this.display();
             new Notice(`Added custom provider: ${provider.name}`);
           }).open();
@@ -1409,7 +1409,7 @@ await this.plugin.saveSettings();
           if (index !== -1) {
             this.plugin.settings.customProviders[index] = updatedProvider;
             await this.plugin.saveSettings();
-            await this.plugin.refreshModelsFromProviders();
+            await this.plugin.refreshModelsFromProviders(true);
             this.display();
             new Notice(`Updated custom provider: ${updatedProvider.name}`);
           }
@@ -1423,7 +1423,7 @@ await this.plugin.saveSettings();
         if (confirmed) {
           this.plugin.settings.customProviders = this.plugin.settings.customProviders.filter((p: CustomProviderConfig) => p.id !== provider.id);
           await this.plugin.saveSettings();
-          await this.plugin.refreshModelsFromProviders();
+          await this.plugin.refreshModelsFromProviders(true);
           this.display();
           new Notice(`Deleted custom provider: ${provider.name}`);
         }
