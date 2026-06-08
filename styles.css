@@ -1519,6 +1519,10 @@
   margin-top: 8px;
 }
 
+.response-sources .sources-content.collapsed {
+  display: none;
+}
+
 .response-sources ul {
   margin: 0;
   padding: 0;
@@ -17597,9 +17601,23 @@
   min-height: var(--chat-min-height) !important;
 }
 
-.context-file-menu, .notebook-prefix-menu {
+.context-file-menu, .notebook-prefix-menu, .model-select-menu {
   left: var(--menu-left) !important;
   top: var(--menu-top) !important;
+}
+
+.model-search-container {
+  position: sticky;
+  top: 0;
+  background: var(--background-primary);
+  z-index: 2;
+  padding: 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.model-search-input {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .rag-progress-bar-inner, .context-progress-bar, .slide-progress-fill {

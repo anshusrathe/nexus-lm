@@ -699,11 +699,11 @@ export default class AIPlugin extends Plugin {
      * Updates the custom models list and caches results for fallback.
      * This runs in the background after plugin load to avoid slowing down startup.
      */
-    public async refreshModelsFromProviders(): Promise<void> {
+    public async refreshModelsFromProviders(force: boolean = false): Promise<void> {
         // Prevent redundant background refreshes on every app reload
         const lastFetched = this.settings.modelCache?.lastFetched || 0;
         const CACHE_TTL = 60 * 60 * 1000; // 1 hour
-        if (Date.now() - lastFetched < CACHE_TTL) return;
+        if (!force && Date.now() - lastFetched < CACHE_TTL) return;
 
         const config = {
             openRouterApiKey: this.settings.openRouterApiKey,

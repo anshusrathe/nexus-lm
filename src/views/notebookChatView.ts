@@ -3763,19 +3763,11 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     
     const searchContainer = document.createElement('div');
     searchContainer.className = 'model-search-container';
-    searchContainer.addClass('nl-position-sticky');
-    searchContainer.addClass('nl-top-0');
-    searchContainer.addClass('nl-background-var--background-primary');
-    searchContainer.addClass('nl-z-index-2');
-    searchContainer.addClass('nl-padding-8px');
-    searchContainer.addClass('nl-border-bottom-1pxsolidvar--background-modifier-border');
 
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Search models...';
     searchInput.className = 'model-search-input';
-    searchInput.addClass('nl-width-100');
-    searchInput.addClass('nl-box-sizing-border-box');
     searchInput.addEventListener('keydown', (e) => e.stopPropagation());
     searchContainer.appendChild(searchInput);
     menuEl.appendChild(searchContainer);
@@ -3801,10 +3793,8 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         document.body.appendChild(menuEl);
         const btnRect = modelBtn.getBoundingClientRect();
         const menuRect = menuEl.getBoundingClientRect();
-        menuEl.addClass('nl-position-absolute');
         menuEl.setCssProps({ '--menu-left':  `${btnRect.left}px` });
         menuEl.setCssProps({ '--menu-top':  `${btnRect.top - menuRect.height - 8}px` });
-        menuEl.addClass('nl-z-index-1000');
 
         setTimeout(() => {
           document.addEventListener('click', closeMenuNotice);
@@ -3902,10 +3892,8 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     
     const btnRect = modelBtn.getBoundingClientRect();
     const menuRect = menuEl.getBoundingClientRect();
-    menuEl.addClass('nl-position-absolute');
     menuEl.setCssProps({ '--menu-left':  `${btnRect.left}px` });
     menuEl.setCssProps({ '--menu-top':  `${btnRect.top - menuRect.height - 8}px` });
-    menuEl.addClass('nl-z-index-1000');
     setTimeout(() => {
       document.addEventListener('click', closeMenu);
     }, 0);
