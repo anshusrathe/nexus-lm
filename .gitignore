@@ -1,0 +1,8 @@
+node_modules/
+data.json
+.obsidian/
+.DS_Store
+*.js.map
+line_debug.txt
+main.js
+errorlogs/
