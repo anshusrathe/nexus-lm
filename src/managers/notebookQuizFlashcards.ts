@@ -1,5 +1,4 @@
-import { App, Notice, MarkdownRenderer, Component, setIcon } from 'obsidian';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { App, MarkdownRenderer, Component, setIcon } from 'obsidian';
 import { AISettings, getModelTemperature, getModelTopP } from '../settings';
 import { GroqService, ChatMessage } from '../services/groqService';
 import { OpenRouterService, ChatMessage as OpenRouterChatMessage } from '../services/openRouterService';
@@ -831,7 +830,7 @@ export class QuizRenderer {
         setIcon(copyBtn, 'check');
         copyBtn.createEl('span', { text: 'Copied!' });
         copyBtn.addClass('copied');
-        setTimeout(() => {
+        window.setTimeout(() => {
           copyBtn.empty();
           setIcon(copyBtn, 'copy');
           copyBtn.createEl('span', { text: 'Copy' });

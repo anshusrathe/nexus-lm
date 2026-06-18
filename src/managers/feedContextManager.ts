@@ -1,5 +1,4 @@
 import { App, Modal, ButtonComponent, Notice } from 'obsidian';
-import { AISettings } from '../settings';
 import { parseFeed, ParsedFeedEntry } from '../parsing/feedParsing';
 
 export interface FeedMeta {

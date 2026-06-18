@@ -1,5 +1,6 @@
-import { App, Modal, Setting, Notice, setIcon } from 'obsidian';
+import { App, Modal, setIcon } from 'obsidian';
 import { MCPServerConfig } from '../settings';
+import { MCPService, MCPResource, MCPTool } from '../mcp/mcpService';
 
 export interface MCPServerSelection {
     selectedServers: string[];
@@ -18,12 +19,12 @@ export class MCPServerSelectionModal extends Modal {
     private resourceContainers = new Map<string, HTMLElement>();
     private toolContainers = new Map<string, HTMLElement>();
     private submitBtn: HTMLButtonElement | null = null;
-    private mcpService: SafeAny;
+    private mcpService: MCPService;
     private availableServers: MCPServerConfig[];
     private onSubmit: (selection: MCPServerSelection) => void;
     private mcpAutoConnect: boolean;
 
-    constructor(app: App, mcpService: SafeAny, availableServers: MCPServerConfig[], onSubmit: (selection: MCPServerSelection) => void, mcpAutoConnect = true) {
+    constructor(app: App, mcpService: MCPService, availableServers: MCPServerConfig[], onSubmit: (selection: MCPServerSelection) => void, mcpAutoConnect = true) {
         super(app);
         this.mcpService = mcpService;
         this.availableServers = availableServers.filter(s => !s.disabled);
@@ -98,26 +99,28 @@ export class MCPServerSelectionModal extends Modal {
                     attr: { 'aria-label': 'Connect to server', title: 'Connect to this MCP server' }
                 });
                 setIcon(connectBtn, 'link');
-                connectBtn.addEventListener('click', async (e) => {
+                connectBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    connectBtn.disabled = true;
-                    setIcon(connectBtn, 'loader-2');
-                    connectBtn.addClass('mcp-connect-btn--loading');
-                    try {
-                        await this.mcpService.connectServer(server);
-                        statusBadge.className = 'mcp-status-badge connected';
-                        statusBadge.textContent = '● Connected';
-                        connectBtn.remove();
-                        this.loadServerResources(server.id, this.resourceContainers.get(server.id)!);
-                        this.loadServerTools(server.id, this.toolContainers.get(server.id)!);
-                    } catch (err) {
-                                                connectBtn.disabled = false;
-                        connectBtn.removeClass('mcp-connect-btn--loading');
-                        setIcon(connectBtn, 'refresh-cw');
-                        connectBtn.addClass('mcp-connect-btn--error');
-                        const errorDiv = serverHeader.createEl('span', { cls: 'mcp-connect-error', text: `Failed to connect` });
-                        setTimeout(() => errorDiv.remove(), 4000);
-                    }
+                    void (async () => {
+                        connectBtn.disabled = true;
+                        setIcon(connectBtn, 'loader-2');
+                        connectBtn.addClass('mcp-connect-btn--loading');
+                        try {
+                            await this.mcpService.connectServer(server);
+                            statusBadge.className = 'mcp-status-badge connected';
+                            statusBadge.textContent = '● Connected';
+                            connectBtn.remove();
+                            this.loadServerResources(server.id, this.resourceContainers.get(server.id)!);
+                            this.loadServerTools(server.id, this.toolContainers.get(server.id)!);
+                        } catch (err) {
+                                                    connectBtn.disabled = false;
+                            connectBtn.removeClass('mcp-connect-btn--loading');
+                            setIcon(connectBtn, 'refresh-cw');
+                            connectBtn.addClass('mcp-connect-btn--error');
+                            const errorDiv = serverHeader.createEl('span', { cls: 'mcp-connect-error', text: `Failed to connect` });
+                            window.setTimeout(() => errorDiv.remove(), 4000);
+                        }
+                    })();
                 });
             }
 
@@ -195,7 +198,7 @@ export class MCPServerSelectionModal extends Modal {
                 container.createEl('p', { text: 'No resources available', cls: 'mcp-empty-hint' });
                 return;
             }
-            resources.forEach((resource: SafeAny) => {
+            resources.forEach((resource: MCPResource) => {
                 const item = container.createDiv({ cls: 'mcp-selectable-item' });
                 const cb = item.createEl('input', { type: 'checkbox' });
                 const id = `resource-${serverId}-${resource.uri}`;
@@ -229,7 +232,7 @@ export class MCPServerSelectionModal extends Modal {
                 container.createEl('p', { text: 'No tools available', cls: 'mcp-empty-hint' });
                 return;
             }
-            tools.forEach((tool: SafeAny) => {
+            tools.forEach((tool: MCPTool) => {
                 const item = container.createDiv({ cls: 'mcp-selectable-item' });
                 const cb = item.createEl('input', { type: 'checkbox' });
                 const id = `tool-${serverId}-${tool.name}`;

@@ -14,7 +14,7 @@ export interface StreamCallbacks {
 }
 
 function yieldToUI(): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, 0));
+  return new Promise(resolve => window.setTimeout(resolve, 0));
 }
 
 /**
@@ -39,7 +39,7 @@ export async function simulatedStream(
 ): Promise<Record<string, string>> {
   if (abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
-  const parsedBody = JSON.parse(body);
+  const parsedBody: { stream?: boolean; [key: string]: unknown } = JSON.parse(body);
   parsedBody.stream = false;
   const nonStreamBody = JSON.stringify(parsedBody);
 
@@ -48,12 +48,12 @@ export async function simulatedStream(
   if (abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
   if (response.status >= 400) {
-    const errorData = typeof response.json === 'object' ? response.json : {};
+    const errorData = (typeof response.json === 'object' ? response.json : {}) as { error?: { message?: string } };
     const msg = errorData.error?.message || `Request failed with status ${response.status}`;
     throw new Error(`API error (${response.status}): ${msg}`);
   }
 
-  const data = response.json;
+  const data = response.json as StreamingResponseData;
 
   let fullContent = '';
   let thinkingText = '';
@@ -64,7 +64,8 @@ export async function simulatedStream(
   } else {
     const message = data.choices?.[0]?.message;
     fullContent = message?.content || '';
-    thinkingText = message?.reasoning || message?.reasoning_content || '';
+    const messageWithReasoning = message as unknown as Record<string, unknown>;
+    thinkingText = (messageWithReasoning.reasoning as string) || (messageWithReasoning.reasoning_content as string) || '';
   }
 
   if (thinkingText && callbacks.onThinking) {
@@ -144,7 +145,7 @@ export function createSSEParser(): LineStreamParser {
     if (!trimmed.startsWith('data: ')) return { done: false };
     if (trimmed === 'data: [DONE]') return { done: true };
     try {
-      const parsed = JSON.parse(trimmed.slice(6));
+      const parsed = JSON.parse(trimmed.slice(6)) as SSEChoiceDelta;
       const delta = parsed.choices?.[0]?.delta;
       return {
         content: delta?.content || undefined,
@@ -162,7 +163,7 @@ export function createOllamaParser(): LineStreamParser {
     const trimmed = line.trim();
     if (!trimmed) return { done: false };
     try {
-      const data = JSON.parse(trimmed);
+      const data: OllamaStreamChunk = JSON.parse(trimmed);
       return {
         content: data.message?.content || undefined,
         thinking: data.message?.thinking || undefined,

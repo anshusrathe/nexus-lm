@@ -33,6 +33,12 @@ export interface AIChatSession {
     searchMode?: string;
     vaultIndexName?: string;
     isQuickSearch?: boolean;
+    // Agent and vault fields
+    agentSteps?: unknown[];
+    isAgentResponse?: boolean;
+    vaultAnswer?: string;
+    vaultResults?: Array<{ path: string; score: number }>;
+    fileOperations?: unknown[];
     // File action data for persistence
     fileActionData?: Record<string, unknown>;
   }[];
@@ -63,7 +69,7 @@ export class AIChatSessionManager {
             let updatedAt = Date.now();
             try {
               const json = await this.app.vault.adapter.read(f);
-              const session = JSON.parse(json);
+              const session = JSON.parse(json) as AIChatSession;
               name = session.name || id;
               createdAt = session.createdAt || createdAt;
               updatedAt = session.updatedAt || updatedAt;
@@ -105,7 +111,7 @@ export class AIChatSessionManager {
             
             try {
               const json = await this.app.vault.adapter.read(f);
-              const session = JSON.parse(json);
+              const session = JSON.parse(json) as AIChatSession;
               name = session.name || id;
               createdAt = session.createdAt || createdAt;
               updatedAt = session.updatedAt || updatedAt;
@@ -164,7 +170,7 @@ export class AIChatSessionManager {
             let updatedAt = Date.now();
             try {
               const json = await this.app.vault.adapter.read(f);
-              const session = JSON.parse(json);
+              const session = JSON.parse(json) as AIChatSession;
               name = session.name || id;
               createdAt = session.createdAt || createdAt;
               updatedAt = session.updatedAt || updatedAt;
@@ -186,7 +192,7 @@ export class AIChatSessionManager {
       const exists = await this.app.vault.adapter.exists(file);
       if (!exists) return null;
       const json = await this.app.vault.adapter.read(file);
-      return JSON.parse(json);
+      return JSON.parse(json) as AIChatSession;
     } catch (e) {
       return null;
     }

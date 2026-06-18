@@ -1,8 +1,8 @@
-import { Notice, requestUrl, Platform } from 'obsidian';
+import { requestUrl, Platform } from 'obsidian';
 
 
-const child_process = (!Platform.isMobile && (window as unknown as SafeAny).require) ? (window as unknown as SafeAny).require('child_process') : null;
-const spawn = child_process?.spawn;
+const child_process = (!Platform.isMobile && (window as unknown as Record<string, unknown>).require) ? ((window as unknown as Record<string, unknown>).require as (module: string) => Record<string, unknown>)('child_process') : null;
+const spawn = child_process?.spawn as ((...args: unknown[]) => ChildProcess) | undefined;
 type ChildProcess = import('child_process').ChildProcess; 
 
 function spawnMCPProcess(
@@ -40,7 +40,7 @@ function spawnMCPProcess(
         
         
         const shell = process.env.ComSpec || 'cmd.exe';
-        return spawn(shell, ['/d', '/s', '/c', `"${cmdString}"`], {
+        return spawn!(shell, ['/d', '/s', '/c', `"${cmdString}"`], {
             env,
             stdio: ['pipe', 'pipe', 'pipe'],
             shell: false,
@@ -55,7 +55,7 @@ function spawnMCPProcess(
         const tokens = [command, ...args].map(t =>
             t.includes(' ') || t.includes("'") || t.includes('"') ? quoteShArg(t) : t
         );
-        return spawn('sh', ['-c', tokens.join(' ')], {
+        return spawn!('sh', ['-c', tokens.join(' ')], {
             env,
             stdio: ['pipe', 'pipe', 'pipe'],
             shell: false,
@@ -376,7 +376,7 @@ export class MCPService {
                 lastError = e instanceof Error ? e.message : String(e);
                 
             }
-            await new Promise(r => setTimeout(r, intervalMs));
+            await new Promise(r => window.setTimeout(r, intervalMs));
         }
 
         throw new Error(`streamUrl ${url} did not become reachable within ${timeoutMs}ms. Last error: ${lastError}`);
@@ -440,11 +440,11 @@ export class MCPService {
             if (!line.trim()) continue;
 
             try {
-                const message = JSON.parse(line);
+                const message = JSON.parse(line) as JSONRPCResponse;
                 
-                if (message.id !== undefined && connection.pendingRequests.has(message.id)) {
-                    const request = connection.pendingRequests.get(message.id)!;
-                    connection.pendingRequests.delete(message.id);
+                if (message.id !== undefined && connection.pendingRequests.has(Number(message.id))) {
+                    const request = connection.pendingRequests.get(Number(message.id))!;
+                    connection.pendingRequests.delete(Number(message.id));
 
                     if (message.error) {
                         request.reject(new Error(message.error.message || 'MCP request failed'));
@@ -519,7 +519,7 @@ export class MCPService {
             
             
             const timeoutMs = method === 'initialize' ? 60000 : 30000;
-            setTimeout(() => {
+            window.setTimeout(() => {
                 if (connection.pendingRequests.has(id)) {
                     connection.pendingRequests.delete(id);
                     reject(new Error(
@@ -612,7 +612,7 @@ export class MCPService {
 
             
             if (contentType.includes('application/json')) {
-                const result = response.json;
+                const result = response.json as JSONRPCResponse;
                                 if (result.error) {
                     throw new Error(result.error.message || 'MCP request failed');
                 }
@@ -646,7 +646,7 @@ export class MCPService {
             } else if (line === '') {
                 if (currentEvent === 'message' && currentData) {
                     try {
-                        const message = JSON.parse(currentData);
+                        const message = JSON.parse(currentData) as JSONRPCResponse;
                                                 if (message.id === requestId) {
                             if (message.error) {
                                 hasError = true;
@@ -816,7 +816,7 @@ export class MCPService {
                 connection.process.kill();
             }
             if (connection.eventSource) {
-                (connection.eventSource as unknown as SafeAny).close();
+                (connection.eventSource as { close?: () => void })?.close?.();
             }
         } catch (error) {
                     }

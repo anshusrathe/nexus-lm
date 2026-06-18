@@ -5,7 +5,51 @@
  * rate limit header tracking across all providers.
  */
 
-import { GoogleGenerativeAI, GenerativeModel, ChatSession } from '@google/generative-ai';
+import { GoogleGenerativeAI, GenerativeModel, ChatSession, GenerationConfig, Content } from '@google/generative-ai';
+
+interface OpenAIMessage {
+  role: string;
+  content?: string;
+  name?: string;
+  tool_calls?: Array<{
+    id?: string;
+    type?: string;
+    function?: {
+      name: string;
+      arguments: string;
+    };
+    name?: string;
+  }>;
+}
+
+interface OpenAITool {
+  function: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  };
+}
+
+interface ToolCallResult {
+  success: boolean;
+  content: string;
+  error?: string;
+}
+
+interface GeminiApiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<Record<string, unknown>>;
+      role?: string;
+    };
+    finishReason?: string;
+  }>;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
+}
 
 export interface GeminiGenerationOptions {
   temperature?: number;
@@ -41,7 +85,7 @@ export class GeminiService {
   /**
    * Get a generative model instance
    */
-  getGenerativeModel(config: { model: string; generationConfig?: SafeAny; tools?: SafeAny[] }): GenerativeModel {
+  getGenerativeModel(config: { model: string; generationConfig?: GenerationConfig; tools?: Record<string, unknown>[] }): GenerativeModel {
     return this.genAI.getGenerativeModel(config);
   }
   
@@ -51,15 +95,15 @@ export class GeminiService {
    */
   private async makeDirectApiCall(
     model: string,
-    contents: SafeAny[],
-    generationConfig?: SafeAny,
-    tools?: SafeAny[],
+    contents: Content[],
+    generationConfig?: Record<string, unknown>,
+    tools?: Record<string, unknown>[],
     abortSignal?: AbortSignal
-  ): Promise<{ response: SafeAny; headers: Headers }> {
-    const apiKey = (this.genAI as unknown as SafeAny)._apiKey;
+  ): Promise<{ response: GeminiApiResponse; headers: Headers }> {
+    const apiKey = (this.genAI as unknown as { _apiKey: string })._apiKey;
     const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
     
-    const requestBody: SafeAny = {
+    const requestBody: Record<string, unknown> = {
       contents,
       generationConfig: generationConfig || {
         temperature: 0.7,
@@ -83,11 +127,12 @@ export class GeminiService {
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error?.message || `Gemini API error: ${response.status}`);
+      const errorData = await response.json() as { error?: { message?: string } };
+      const errorMsg = errorData?.error?.message || `Gemini API error: ${response.status}`;
+      throw new Error(typeof errorMsg === 'string' ? errorMsg : `Gemini API error: ${response.status}`);
     }
     
-    const data = await response.json();
+    const data = await response.json() as GeminiApiResponse;
     return { response: data, headers: response.headers };
   }
   
@@ -97,10 +142,10 @@ export class GeminiService {
   async generateContentWithHeaders(
     model: string,
     prompt: string,
-    generationConfig?: SafeAny,
+    generationConfig?: Record<string, unknown>,
     abortSignal?: AbortSignal
   ): Promise<string> {
-    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+    const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
     const { response, headers } = await this.makeDirectApiCall(model, contents, generationConfig, undefined, abortSignal);
     
     // Report headers for rate limit tracking
@@ -108,7 +153,7 @@ export class GeminiService {
       this.onHeadersReceived(headers);
     }
     
-    return response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return (response.candidates?.[0]?.content?.parts?.[0]?.text as string) || '';
   }
   
   /**
@@ -126,20 +171,20 @@ export class GeminiService {
     });
     
     const chat = modelInstance.startChat({
-      history: (config.history as unknown as SafeAny) || [],
-      generationConfig: config.generationConfig as unknown as SafeAny
+      history: (config.history as unknown as Content[]) || [],
+      generationConfig: config.generationConfig as GenerationConfig
     });
     
     // Provide a method to capture headers on next API call
     const captureHeaders = async () => {
       // Make a dummy call to capture headers
       try {
-        const contents = config.history || [];
+        const contents = (config.history || []) as unknown as Content[];
         if (contents.length > 0) {
           const { headers } = await this.makeDirectApiCall(
             model,
             contents.slice(-1), // Just use last message
-            config.generationConfig,
+            config.generationConfig as unknown as Record<string, unknown>,
             config.tools
           );
           
@@ -147,8 +192,11 @@ export class GeminiService {
             this.onHeadersReceived(headers);
           }
         }
-      } catch (error) {
-              }
+      } catch (e: unknown) {
+        if (e instanceof Error) {
+          // Silently ignore header capture failures
+        }
+      }
     };
     
     return { chat, captureHeaders };
@@ -165,10 +213,10 @@ export class GeminiService {
    */
   async generateContentWithTools(
     model: string,
-    messages: SafeAny[],
-    tools: SafeAny[],
+    messages: OpenAIMessage[],
+    tools: OpenAITool[],
     options: GeminiGenerationOptions,
-    executeToolsCallback: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
+    executeToolsCallback: (toolCalls: OpenAITool['function'][]) => Promise<ToolCallResult[]>,
     onThinkingChunk?: (text: string) => void,
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
@@ -214,8 +262,8 @@ export class GeminiService {
       const response = result.response;
 
       // Track tokens
-      if ((response as unknown as SafeAny).usageMetadata) {
-        const usage = (response as unknown as SafeAny).usageMetadata;
+      if (response.usageMetadata) {
+        const usage = response.usageMetadata;
         totalTokens = (usage.promptTokenCount || 0) + (usage.candidatesTokenCount || 0);
       }
 
@@ -223,37 +271,41 @@ export class GeminiService {
       if (!candidate) break;
 
       // Extract and emit thought parts for thinking models
-      const thoughtParts = candidate.content.parts?.filter((part: SafeAny) => part.thought === true);
+      const thoughtParts = candidate.content?.parts?.filter((part) => (part as unknown as Record<string, unknown>).thought === true);
       if (thoughtParts?.length > 0 && onThinkingChunk) {
         for (const thought of thoughtParts) {
-          if (thought.text) onThinkingChunk(thought.text);
+          if ((thought as unknown as Record<string, unknown>).text) onThinkingChunk((thought as unknown as Record<string, unknown>).text as string);
         }
       }
 
       // Append the model's response to the conversation
       conversationContents.push({
         role: 'model',
-        parts: candidate.content.parts
+        parts: candidate.content?.parts
       });
 
       // Check for function calls
-      const functionCalls = candidate.content.parts?.filter((part: SafeAny) => part.functionCall);
+      const functionCalls = candidate.content?.parts?.filter((part) => (part as unknown as Record<string, unknown>).functionCall);
 
       if (functionCalls && functionCalls.length > 0) {
                 toolRoundsExecuted++;
 
         // Convert Gemini function calls to OpenAI format for the callback
-        const toolCalls = functionCalls.map((fc: SafeAny, index: number) => ({
-          id: `call_${index}`,
-          type: 'function',
-          function: {
-            name: fc.functionCall.name,
-            arguments: JSON.stringify(fc.functionCall.args || {})
-          }
-        }));
+        const toolCalls = functionCalls.map((fc, index) => {
+          const fcRecord = fc as unknown as Record<string, unknown>;
+          const functionCall = fcRecord.functionCall as Record<string, unknown>;
+          return {
+            id: `call_${index}`,
+            type: 'function',
+            function: {
+              name: functionCall.name as string,
+              arguments: JSON.stringify(functionCall.args || {})
+            }
+          };
+        });
 
         // Execute tools
-        const toolResults = await executeToolsCallback(toolCalls);
+        const toolResults = await executeToolsCallback(toolCalls.map(tc => tc.function));
 
         // Append function responses as a single user turn (Gemini requires this)
         const functionResponseParts = toolResults.map((res, index) => ({
@@ -274,9 +326,9 @@ export class GeminiService {
       }
 
       // No function calls — this is the synthesis turn
-      const textPart = candidate.content.parts?.find((part: SafeAny) => part.text && part.thought !== true);
-      if (textPart && textPart.text) {
-        fullContent = textPart.text;
+      const textPart = candidate.content?.parts?.find((part) => (part as unknown as Record<string, unknown>).text && (part as unknown as Record<string, unknown>).thought !== true);
+      if (textPart && (textPart as unknown as Record<string, unknown>).text) {
+        fullContent = (textPart as unknown as Record<string, unknown>).text as string;
         if (streamCallback) {
           streamCallback(fullContent);
         }
@@ -305,16 +357,16 @@ export class GeminiService {
    * This handles injected tool history (assistant+tool pairs) correctly by
    * building proper model/functionCall + user/functionResponse turn pairs.
    */
-  private convertMessagesToGeminiContents(messages: SafeAny[]): {
+  private convertMessagesToGeminiContents(messages: OpenAIMessage[]): {
     systemInstruction: string | null;
-    contents: SafeAny[];
+    contents: Content[];
   } {
     let systemInstruction: string | null = null;
-    const contents: SafeAny[] = [];
+    const contents: Content[] = [];
 
     for (const msg of messages) {
       if (msg.role === 'system') {
-        systemInstruction = msg.content;
+        systemInstruction = msg.content ?? null;
 
       } else if (msg.role === 'user') {
         // Plain user text message
@@ -332,11 +384,11 @@ export class GeminiService {
               role: 'model',
               parts: [{
                 functionCall: {
-                  name: tc.function?.name || tc.name,
+                  name: tc.function?.name || tc.name || 'unknown',
                   args: (() => {
                     try {
                       return typeof tc.function?.arguments === 'string'
-                        ? JSON.parse(tc.function.arguments)
+                        ? JSON.parse(tc.function.arguments) as Record<string, unknown>
                         : (tc.function?.arguments || {});
                     } catch { return {}; }
                   })()
@@ -372,7 +424,7 @@ export class GeminiService {
   /**
    * Convert OpenAI-style tools to Gemini format
    */
-  private convertToolsToGeminiFormat(tools: SafeAny[]): SafeAny[] {
+  private convertToolsToGeminiFormat(tools: OpenAITool[]): Record<string, unknown>[] {
     return tools.map(tool => {
       // Deep-clone and strip fields Gemini rejects: $schema, additionalProperties
       const parameters = this.sanitizeSchemaForGemini(tool.function.parameters);
@@ -393,14 +445,15 @@ export class GeminiService {
    * - additionalProperties
    * - $defs / definitions (not supported)
    */
-  private sanitizeSchemaForGemini(schema: SafeAny): SafeAny {
+  private sanitizeSchemaForGemini(schema: unknown): Record<string, unknown> | unknown[] | unknown {
     if (!schema || typeof schema !== 'object') return schema;
     if (Array.isArray(schema)) return schema.map(item => this.sanitizeSchemaForGemini(item));
 
-    const cleaned: SafeAny = {};
-    for (const key of Object.keys(schema)) {
+    const schemaObj = schema as Record<string, unknown>;
+    const cleaned: Record<string, unknown> = {};
+    for (const key of Object.keys(schemaObj)) {
       if (key === '$schema' || key === 'additionalProperties' || key === '$defs' || key === 'definitions') continue;
-      cleaned[key] = this.sanitizeSchemaForGemini(schema[key]);
+      cleaned[key] = this.sanitizeSchemaForGemini(schemaObj[key]);
     }
     return cleaned;
   }

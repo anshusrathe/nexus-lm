@@ -1,9 +1,8 @@
 import { AISettings } from '../settings';
-import { GoogleGenerativeAI, Part } from '@google/generative-ai';
+import { Part } from '@google/generative-ai';
 import { RateLimitManager } from '../utils/rateLimitManager';
 import { GeminiService } from './geminiService';
 import { YouTubeTranscriptService } from './youtubeTranscriptService';
-import { Notice } from 'obsidian';
 import { OllamaService } from './ollamaService';
 import { GroqService } from './groqService';
 import { OpenRouterService } from './openRouterService';
@@ -203,11 +202,12 @@ export class YouTubeChatService {
                 const response = result.response;
                 return response.text();
             }
-        } catch (error: SafeAny) {
-            if (error.status === 400 && error.message?.includes('Invalid `file_uri`')) {
+        } catch (error: unknown) {
+            const errObj = error as { status?: number; message?: string };
+            if (errObj.status === 400 && errObj.message?.includes('Invalid `file_uri`')) {
                 throw new Error('The YouTube URL might be invalid or inaccessible to the Gemini API. Ensure it is a public video.');
             }
-            throw new Error(error.message || 'Failed to process YouTube video with Gemini.');
+            throw new Error(errObj.message || 'Failed to process YouTube video with Gemini.');
         }
     }
 

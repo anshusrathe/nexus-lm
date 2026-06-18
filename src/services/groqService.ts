@@ -70,6 +70,38 @@ export interface GroqErrorResponse {
   };
 }
 
+interface GroqChatCompletionRequest {
+  model: string;
+  messages: ChatMessage[];
+  temperature: number;
+  top_p: number;
+  stream: boolean;
+  max_tokens?: number;
+  reasoning_effort?: string;
+  compound_custom?: {
+    tools: {
+      enabled_tools: string[];
+    };
+  };
+  tools?: Array<Record<string, unknown>>;
+  tool_choice?: string;
+}
+
+interface GroqToolCall {
+  id: string;
+  type: string;
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+interface ToolResult {
+  success: boolean;
+  content: string;
+  error?: string;
+}
+
 /**
  * Custom error class for Groq API errors with status code
  */
@@ -334,7 +366,7 @@ export class GroqService {
     messages: ChatMessage[],
     options?: GenerationOptions
   ): Promise<string> {
-    const body: SafeAny = {
+    const body: GroqChatCompletionRequest = {
       model,
       messages,
       temperature: options?.temperature ?? 0.7,
@@ -369,8 +401,8 @@ export class GroqService {
       this.onHeadersReceived(response.headers);
     }
 
-    const data = await response.json();
-    return data.choices[0]?.message?.content || '';
+    const data = await response.json() as GroqChatCompletionResponse;
+    return data.choices?.[0]?.message?.content || '';
   }
 
   /**
@@ -387,7 +419,7 @@ export class GroqService {
     options: GenerationOptions | undefined,
     onChunk: (chunk: string) => void
   ): Promise<string> {
-    const body: SafeAny = {
+    const body: GroqChatCompletionRequest = {
       model,
       messages,
       temperature: options?.temperature ?? 0.7,
@@ -484,7 +516,7 @@ export class GroqService {
       return;
     }
 
-    const requestBody: SafeAny = {
+    const requestBody: GroqChatCompletionRequest = {
       model,
       messages,
       stream: true,
@@ -552,7 +584,7 @@ export class GroqService {
     options: GenerationOptions | undefined,
     headers: Record<string, string>
   ): Promise<void> {
-    const body: SafeAny = {
+    const body: GroqChatCompletionRequest = {
       model,
       messages,
       stream: false,
@@ -582,8 +614,8 @@ export class GroqService {
         const errorData: GroqErrorResponse = typeof resp.json === 'object' ? resp.json : { error: { message: `HTTP ${resp.status}` } };
         throw new GroqApiError(errorData.error?.message || `Groq API error: ${resp.status}`, resp.status);
       }
-      const data = resp.json;
-      const message = data.choices[0]?.message;
+      const data = resp.json as GroqChatCompletionResponse;
+      const message = data.choices?.[0]?.message;
       const reasoning = message?.reasoning_content || message?.reasoning || '';
       if (reasoning) onEvent({ type: 'thinking', text: reasoning });
       const content = message?.content || '';
@@ -603,8 +635,8 @@ export class GroqService {
       });
       if (!response.ok) await this.handleErrorResponse(response);
       if (this.onHeadersReceived) this.onHeadersReceived(response.headers);
-      const data = await response.json();
-      const message = data.choices[0]?.message;
+      const data = await response.json() as GroqChatCompletionResponse;
+      const message = data.choices?.[0]?.message;
       const reasoning = message?.reasoning_content || message?.reasoning || '';
       if (reasoning) onEvent({ type: 'thinking', text: reasoning });
       const content = message?.content || '';
@@ -638,7 +670,7 @@ export class GroqService {
     const isCompoundModel = isGroqWebSearchCapable(model) && !isGroqGptOssModel(model);
     const isGptOssModel = isGroqGptOssModel(model);
     
-    const requestBody: SafeAny = {
+    const requestBody: GroqChatCompletionRequest = {
       model,
       messages,
       temperature: options?.temperature ?? 0.7,
@@ -687,7 +719,7 @@ export class GroqService {
       this.onHeadersReceived(response.headers);
     }
 
-    const data = await response.json();
+    const data = await response.json() as GroqChatCompletionResponse;
         
     const choice = data.choices?.[0];
     if (!choice) {
@@ -717,13 +749,15 @@ export class GroqService {
     let executedTools: ExecutedTool[] = [];
 
     
-    if (choice.message?.executed_tools) {
-      executedTools = choice.message.executed_tools;
-          } else if (choice.executed_tools) {
-      executedTools = choice.executed_tools;
-          } else if (data.executed_tools) {
-      executedTools = data.executed_tools;
-          }
+    const choiceWithExecuted = choice as unknown as Record<string, unknown>;
+    const messageWithExecuted = (choiceWithExecuted.message as Record<string, unknown>) || {};
+    if (messageWithExecuted.executed_tools) {
+      executedTools = messageWithExecuted.executed_tools as ExecutedTool[];
+    } else if (choiceWithExecuted.executed_tools) {
+      executedTools = choiceWithExecuted.executed_tools as ExecutedTool[];
+    } else if ((data as unknown as Record<string, unknown>).executed_tools) {
+      executedTools = (data as unknown as Record<string, unknown>).executed_tools as ExecutedTool[];
+    }
 
     
     if (executedTools.length > 0) {
@@ -762,7 +796,7 @@ export class GroqService {
           
           if (tool.arguments) {
             try {
-              const args = JSON.parse(tool.arguments);
+              const args = JSON.parse(tool.arguments) as { results?: unknown[] };
               if (args.results && Array.isArray(args.results)) {
                 const parsedResults = this.parseWebSearchResults(args.results);
                 webSources.push(...parsedResults);
@@ -792,7 +826,7 @@ export class GroqService {
     
     
     try {
-      const parsed = JSON.parse(output);
+      const parsed = JSON.parse(output) as unknown[] | { results?: unknown[] };
       if (Array.isArray(parsed)) {
         return this.parseWebSearchResults(parsed);
       } else if (parsed.results && Array.isArray(parsed.results)) {
@@ -874,7 +908,7 @@ export class GroqService {
                       }
         } else {
                   }
-      } catch (parseError) {
+      } catch (_parseError) {
                 
       }
     }
@@ -957,9 +991,9 @@ export class GroqService {
   async generateContentWithTools(
     model: string,
     messages: ChatMessage[],
-    tools: SafeAny[],
+    tools: Array<Record<string, unknown>>,
     options: GenerationOptions,
-    executeToolsCallback: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
+    executeToolsCallback: (toolCalls: GroqToolCall[]) => Promise<ToolResult[]>,
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
     let fullContent = '';
@@ -996,7 +1030,7 @@ export class GroqService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json() as { error?: { message?: string; type?: string } };
         throw new GroqApiError(
           errorData.error?.message || 'Groq API request failed',
           response.status,
@@ -1004,21 +1038,23 @@ export class GroqService {
         );
       }
 
-      const data = await response.json();
+      const data = await response.json() as GroqChatCompletionResponse;
       
       if (data.usage) {
         totalTokens += (data.usage.total_tokens || 0);
       }
 
-      const message = data.choices[0]?.message;
+      const message = data.choices?.[0]?.message;
       if (!message) break;
 
       
-      conversationMessages.push(message);
+      conversationMessages.push(message as ChatMessage);
 
       
-      if (message.tool_calls && message.tool_calls.length > 0) {
+      const messageWithToolCalls = message as unknown as Record<string, unknown>;
+      if (messageWithToolCalls.tool_calls && (messageWithToolCalls.tool_calls as unknown[]).length > 0) {
                 toolRoundsExecuted++;
+        
         
         
         
@@ -1027,11 +1063,11 @@ export class GroqService {
         }
         
         
-        const toolResults = await executeToolsCallback(message.tool_calls);
+        const toolResults = await executeToolsCallback(messageWithToolCalls.tool_calls as GroqToolCall[]);
         
         
-        for (let i = 0; i < message.tool_calls.length; i++) {
-          const toolCall = message.tool_calls[i];
+        for (let i = 0; i < (messageWithToolCalls.tool_calls as unknown[]).length; i++) {
+          const toolCall = (messageWithToolCalls.tool_calls as GroqToolCall[])[i];
           const toolResult = toolResults[i];
           
           conversationMessages.push({
@@ -1041,13 +1077,13 @@ export class GroqService {
             content: toolResult.success 
               ? toolResult.content 
               : `Error: ${toolResult.error}`
-          } as SafeAny);
+          } as ChatMessage);
         }
         
         
         continue;
       }
-
+        
       
       if (message.content) {
         
@@ -1067,7 +1103,7 @@ export class GroqService {
                 conversationMessages.push({
           role: 'user',
           content: 'You have already called some tools and received results. Please now synthesise a complete, direct answer to the original question using all the tool results above. Do not call any more tools — just write the final answer.'
-        } as SafeAny);
+        } as ChatMessage);
         continue;
       }
 

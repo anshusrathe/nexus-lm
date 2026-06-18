@@ -1,14 +1,13 @@
-import { Plugin, Notice, TFile, TAbstractFile, WorkspaceLeaf, ItemView, Setting, Menu, Editor, MarkdownView, Platform, Modal, requestUrl, normalizePath } from 'obsidian';
+import { Plugin, Notice, TFile, WorkspaceLeaf, Editor, Platform, Modal, requestUrl, normalizePath } from 'obsidian';
 import { AISettingTab, AISettings, DEFAULT_SETTINGS, Provider, migrateSettings } from './settings';
 import { AITutorView, VIEW_TYPE_NEXUS_TUTOR } from './views/view';
 import { ResponseView, VIEW_TYPE_NEXUS_CHAT } from './views/responseView';
 import { LandingView, VIEW_TYPE_LANDING } from './views/landingView';
 import { EmbeddingsManager } from './managers/embeddingsManager';
 import { PdfExtractOptionsModal, extractTextFromPdf } from './utils/pdfExtractor';
-import { Vault } from 'obsidian';
 import { VIEW_TYPE_NEXUS_FEED, FeedView } from './views/feedView';
 import { FeedEntryView, VIEW_TYPE_NEXUS_FEED_ENTRIES } from './views/feedEntryView';
-import { parseFeed, ParsedFeed, ParsedFeedEntry } from './parsing/feedParsing';
+import { ParsedFeedEntry } from './parsing/feedParsing';
 import { CombinedFeedView, VIEW_TYPE_COMBINED_FEED } from './views/combinedFeedView';
 import { BookmarkView, VIEW_TYPE_BOOKMARKS } from './views/bookmarkView';
 import { NotebookChatView, VIEW_TYPE_NOTEBOOK_CHAT } from './views/notebookChatView';
@@ -68,7 +67,7 @@ export default class AIPlugin extends Plugin {
 
         
         
-        setTimeout(() => {
+        window.setTimeout(() => {
             const mcqOverlays = document.body.querySelectorAll('.mcq-error-overlay, .mcq-progress-dialog');
             mcqOverlays.forEach(overlay => overlay.remove());
         }, 0);
@@ -233,7 +232,7 @@ export default class AIPlugin extends Plugin {
         this.addCommand({
             id: 'edit-selection',
             name: 'Nexuslm: Edit selection',
-            editorCallback: (editor: Editor, view: MarkdownView | SafeAny) => {
+            editorCallback: (editor: Editor) => {
                 openEditSelectionModal(this.app, this.settings);
             }
         });
@@ -257,29 +256,31 @@ export default class AIPlugin extends Plugin {
                                 
                                 const vault = this.app.vault;
                                 const arrayBuffer = await vault.readBinary(activeFile!);
-                                const pdfjsLib = (window as SafeAny).pdfjsLib;
+                                const pdfjsLib = (window as { pdfjsLib?: PdfjsLib }).pdfjsLib;
                                 if (!pdfjsLib) throw new Error('PDF.js library not loaded.');
                                 const pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                                 const numPages = pdfDocument.numPages;
                                 
                                 const defaultDir = this.settings.pdfOutputDirectory || 'PDF-Extracted-Text';
-                                new PdfExtractOptionsModal(this.app, numPages, defaultDir, pdfDocument, async (opts) => {
-                                    new Notice(`Extracting text from ${activeFile!.name}...`);
-                                    const extractedText = await extractTextFromPdf(activeFile!, vault, { from: opts.from, to: opts.to });
-                                    
-                                    const outputDir = opts.directory || defaultDir;
-                                    await vault.adapter.mkdir(outputDir);
-                                    
-                                    const fileNameWithoutExtension = activeFile!.basename;
-                                    let outputFileName = '';
-                                    if (opts.full) {
-                                        outputFileName = `${fileNameWithoutExtension} text.md`;
-                                    } else {
-                                        outputFileName = `${fileNameWithoutExtension} ${opts.from}-${opts.to} text.md`;
-                                    }
-                                    const outputPath = normalizePath(`${outputDir}/${outputFileName}`);
-                                    await vault.create(outputPath, extractedText);
-                                    new Notice(`Text extracted and saved to ${outputPath}`);
+                                new PdfExtractOptionsModal(this.app, numPages, defaultDir, pdfDocument, (opts) => {
+                                    void (async () => {
+                                        new Notice(`Extracting text from ${activeFile!.name}...`);
+                                        const extractedText = await extractTextFromPdf(activeFile!, vault, { from: opts.from, to: opts.to });
+                                        
+                                        const outputDir = opts.directory || defaultDir;
+                                        await vault.adapter.mkdir(outputDir);
+                                        
+                                        const fileNameWithoutExtension = activeFile!.basename;
+                                        let outputFileName = '';
+                                        if (opts.full) {
+                                            outputFileName = `${fileNameWithoutExtension} text.md`;
+                                        } else {
+                                            outputFileName = `${fileNameWithoutExtension} ${opts.from}-${opts.to} text.md`;
+                                        }
+                                        const outputPath = normalizePath(`${outputDir}/${outputFileName}`);
+                                        await vault.create(outputPath, extractedText);
+                                        new Notice(`Text extracted and saved to ${outputPath}`);
+                                    })();
                                 }).open();
                             } catch (error) {
                                                                 const message = error instanceof Error ? error.message : String(error);
@@ -318,61 +319,65 @@ export default class AIPlugin extends Plugin {
                     text: 'Cancel'
                 });
                 
-                fetchButton.addEventListener('click', async () => {
-                    const youtubeUrl = urlInput.value.trim();
-                    if (!youtubeUrl) {
-                        new Notice('Please enter a YouTube URL');
-                        return;
-                    }
-                    
-                    modal.close();
-                    
-                    try {
-                        new Notice('Fetching YouTube transcript...');
-                        const rateLimitManager = RateLimitManager.getInstance();
-                        const ytService = new YouTubeChatService(this.settings, rateLimitManager);
+                fetchButton.addEventListener('click', () => {
+                    void (async () => {
+                        const youtubeUrl = urlInput.value.trim();
+                        if (!youtubeUrl) {
+                            new Notice('Please enter a YouTube URL');
+                            return;
+                        }
                         
+                        modal.close();
                         
-                        const [transcript, videoTitle] = await Promise.all([
-                            ytService.getTranscriptOnly(youtubeUrl),
-                            ytService.getVideoTitle(youtubeUrl)
-                        ]);
-                        
-                        const defaultFolder = this.settings.youtubeTranscriptFolder || 'YouTube Transcripts';
-                        
-                        
-                        new YouTubeTranscriptModal(
-                            this.app,
-                            defaultFolder,
-                            videoTitle,
-                            async (fileName: string, folderPath: string) => {
-                                try {
-                                    
-                                    const vault = this.app.vault;
-                                    if (folderPath !== '/') {
-                                        await vault.adapter.mkdir(folderPath);
-                                    }
-                                    
-                                    
-                                    const filePath = normalizePath(`${folderPath}/${fileName}`);
-                                    
-                                    
-                                    const content = `# ${videoTitle}\n\nSource: ${youtubeUrl}\n\n## Transcript\n\n${transcript}`;
-                                    
-                                    
-                                    await vault.create(filePath, content);
-                                    
-                                    new Notice(`Transcript saved to ${filePath}`);
-                                } catch (error) {
-                                                                        const message = error instanceof Error ? error.message : String(error);
-                                    new Notice(`Failed to save transcript: ${message}`);
+                        try {
+                            new Notice('Fetching YouTube transcript...');
+                            const rateLimitManager = RateLimitManager.getInstance();
+                            const ytService = new YouTubeChatService(this.settings, rateLimitManager);
+                            
+                            
+                            const [transcript, videoTitle] = await Promise.all([
+                                ytService.getTranscriptOnly(youtubeUrl),
+                                ytService.getVideoTitle(youtubeUrl)
+                            ]);
+                            
+                            const defaultFolder = this.settings.youtubeTranscriptFolder || 'YouTube Transcripts';
+                            
+                            
+                            new YouTubeTranscriptModal(
+                                this.app,
+                                defaultFolder,
+                                videoTitle,
+                                (fileName: string, folderPath: string) => {
+                                    void (async () => {
+                                        try {
+                                            
+                                            const vault = this.app.vault;
+                                            if (folderPath !== '/') {
+                                                await vault.adapter.mkdir(folderPath);
+                                            }
+                                            
+                                            
+                                            const filePath = normalizePath(`${folderPath}/${fileName}`);
+                                            
+                                            
+                                            const content = `# ${videoTitle}\n\nSource: ${youtubeUrl}\n\n## Transcript\n\n${transcript}`;
+                                            
+                                            
+                                            await vault.create(filePath, content);
+                                            
+                                            new Notice(`Transcript saved to ${filePath}`);
+                                        } catch (error) {
+                                                                                    const message = error instanceof Error ? error.message : String(error);
+                                            new Notice(`Failed to save transcript: ${message}`);
+                                        }
+                                    })();
                                 }
-                            }
-                        ).open();
-                    } catch (error) {
-                                                const message = error instanceof Error ? error.message : String(error);
-                        new Notice(`Failed to fetch transcript: ${message}`);
-                    }
+                            ).open();
+                        } catch (error) {
+                                                    const message = error instanceof Error ? error.message : String(error);
+                            new Notice(`Failed to fetch transcript: ${message}`);
+                        }
+                    })();
                 });
                 
                 cancelButton.addEventListener('click', () => {
@@ -546,7 +551,7 @@ export default class AIPlugin extends Plugin {
         await this.notebookManager.saveNotebooks();
     }
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<AISettings>);
         
         
         const { settings: migratedSettings, migrated } = migrateSettings(this.settings);
@@ -560,7 +565,7 @@ export default class AIPlugin extends Plugin {
         }
         
         
-        setTimeout(() => {
+        window.setTimeout(() => {
             this.settings.bookmarkedEntries = this.settings.bookmarkedEntries.map(entry => ({
                 ...entry,
                 title: entry.title || undefined,
@@ -578,7 +583,7 @@ export default class AIPlugin extends Plugin {
      * Populates Sets in the background after plugin is interactive
      */
     private deferredSetInitialization(): void {
-        setTimeout(() => {
+        window.setTimeout(() => {
             
             if (this.settings.visitedEntries && this.settings.visitedEntries.length > 0) {
                 this.visitedEntriesSet = new Set(this.settings.visitedEntries);
@@ -881,7 +886,7 @@ export default class AIPlugin extends Plugin {
                     url: 'https://openrouter.ai/api/v1/credits',
                     headers: { 'Authorization': `Bearer ${this.settings.openRouterApiKey}` }
                 });
-                const data = response.json;
+                const data = response.json as { data?: { total_credits?: number; total_usage?: number } };
                 if (data && data.data) {
                     const credits = data.data.total_credits ?? 0;
                     const usage = data.data.total_usage ?? 0;
@@ -949,11 +954,11 @@ export default class AIPlugin extends Plugin {
             await Promise.all(activeTasks);
             
             notice.setMessage(`Verification complete for ${provider}: ${processedCount} models processed.`);
-            setTimeout(() => notice.hide(), 4000);
+            window.setTimeout(() => notice.hide(), 4000);
         } catch (error) {
                         const errorMessage = error instanceof Error ? error.message : String(error);
             notice.setMessage(`Verification failed for ${provider}: ${errorMessage}`);
-            setTimeout(() => notice.hide(), 5000);
+            window.setTimeout(() => notice.hide(), 5000);
         } finally {
             const now = Date.now();
             let unresponsiveCount = 0;
@@ -1069,11 +1074,11 @@ export default class AIPlugin extends Plugin {
             await Promise.all(activeTasks);
             
             notice.setMessage(`Verification complete for ${provider}: ${processedCount} embedding models processed.`);
-            setTimeout(() => notice.hide(), 4000);
+            window.setTimeout(() => notice.hide(), 4000);
         } catch (error) {
                         const errorMessage = error instanceof Error ? error.message : String(error);
             notice.setMessage(`Embedding verification failed for ${provider}: ${errorMessage}`);
-            setTimeout(() => notice.hide(), 5000);
+            window.setTimeout(() => notice.hide(), 5000);
         } finally {
             const now = Date.now();
             let unresponsiveCount = 0;

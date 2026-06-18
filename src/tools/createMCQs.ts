@@ -1,4 +1,4 @@
-import { ButtonComponent, Notice, MarkdownRenderer, Component, Modal, Setting, TFile, requestUrl } from 'obsidian';
+import { ButtonComponent, Notice, MarkdownRenderer, Component, Modal, Setting, TFile, requestUrl, App } from 'obsidian';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AISettings, getModelTemperature, getModelTopP } from '../settings';
 import { DirectorySuggester } from '../utils/directorySuggester';
@@ -44,9 +44,9 @@ export interface MCQSettings {
 
 export class MCQManager {
   private settings: AISettings;
-  private app: SafeAny;
+  private app: App;
 
-  constructor(app: SafeAny, settings: AISettings) {
+  constructor(app: App, settings: AISettings) {
     this.app = app;
     this.settings = settings;
   }
@@ -169,7 +169,7 @@ export class MCQManager {
 ${mcqSettings.customPrompt ? `Additional context for MCQ generation: ${mcqSettings.customPrompt}\n\n` : ''}${formattedContent ? `Here's the content:\n\n${formattedContent}\n\n` : ''}Generate exactly ${mcqSettings.numMCQs} MCQs now:`;
 
         // Build message parts with multimodal inputs
-        const messageParts: SafeAny[] = [{ text: prompt }];
+        const messageParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [{ text: prompt }];
         
         // Add multimodal inputs (images, PDFs, audio, video) for inline data
         const inlineInputs = multimodalInputs.filter(input => input.type === 'inline' && input.data);
@@ -646,7 +646,7 @@ export class MCQSettingsModal extends Modal {
   private correctMarks: number = 1;
   private incorrectMarks: number = 0;
 
-  constructor(app: SafeAny, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: MCQSettings) => void) {
+  constructor(app: App, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: MCQSettings) => void) {
     super(app);
     this.initialSelectedPaths = initialSelectedPaths;
     this.onSubmit = onSubmit;

@@ -6,6 +6,26 @@ interface TranscriptSegment {
     offset: number;
 }
 
+interface CaptionTrack {
+    languageCode: string;
+    baseUrl: string;
+    name?: { simpleText: string };
+    kind?: string;
+}
+
+interface PlayerCaptionsTracklistRenderer {
+    captionTracks: CaptionTrack[];
+}
+
+interface PlayerCaptions {
+    playerCaptionsTracklistRenderer: PlayerCaptionsTracklistRenderer;
+}
+
+interface YouTubePlayerResponse {
+    captions?: PlayerCaptions;
+    playabilityStatus?: { status: string; reason?: string };
+}
+
 export class YouTubeTranscriptService {
     private cache: Map<string, { transcript: string; timestamp: number }>;
     private readonly DEFAULT_CACHE_TTL = 1800000;
@@ -47,7 +67,7 @@ export class YouTubeTranscriptService {
                     headers: { 'User-Agent': this.CAPTION_USER_AGENT },
                 });
                 if (oembedRes.status === 200 && oembedRes.json?.title) {
-                    return oembedRes.json.title;
+                    return oembedRes.json.title as string;
                 }
             }
         } catch (_) {
@@ -61,7 +81,7 @@ export class YouTubeTranscriptService {
      * This approach does NOT require scraping the YouTube page for an API key,
      * which was the source of the 429 / bot-detection redirect errors.
      */
-    private async getPlayerResponse(videoId: string): Promise<SafeAny> {
+    private async getPlayerResponse(videoId: string): Promise<YouTubePlayerResponse> {
         const response = await requestUrl({
             url: 'https://www.youtube.com/youtubei/v1/player',
             method: 'POST',
@@ -82,17 +102,18 @@ export class YouTubeTranscriptService {
                 videoId,
             }),
         });
-        return response.json;
+        return response.json as YouTubePlayerResponse;
     }
 
-    private extractCaptionTrackUrl(playerResponse: SafeAny, lang: string): string {
-        const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    private extractCaptionTrackUrl(playerResponse: YouTubePlayerResponse, lang: string): string {
+        const captions = playerResponse?.captions as PlayerCaptions | undefined;
+        const tracks = captions?.playerCaptionsTracklistRenderer?.captionTracks as CaptionTrack[] | undefined;
         if (!tracks || tracks.length === 0) {
             throw new Error('No captions available for this video');
         }
-        const track = tracks.find((t: SafeAny) => t.languageCode === lang);
+        const track = tracks.find((t: CaptionTrack) => t.languageCode === lang);
         if (!track) {
-            const available = tracks.map((t: SafeAny) => t.languageCode).join(', ');
+            const available = tracks.map((t: CaptionTrack) => t.languageCode).join(', ');
             throw new Error(`Language ${lang} not available. Available: ${available}`);
         }
         return track.baseUrl.replace(/&fmt=\w+$/, '');
@@ -143,12 +164,13 @@ export class YouTubeTranscriptService {
 
         const playerResponse = await this.getPlayerResponse(videoId);
 
-        const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+        const captions = playerResponse?.captions as PlayerCaptions | undefined;
+        const tracks = captions?.playerCaptionsTracklistRenderer?.captionTracks as CaptionTrack[] | undefined;
         if (!tracks || tracks.length === 0) {
             throw new Error('No captions available for this video');
         }
 
-        const availableLanguages = tracks.map((t: SafeAny) => t.languageCode);
+        const availableLanguages = tracks.map((t: CaptionTrack) => t.languageCode);
 
         let selectedLanguage = preferredLanguages.find(l => availableLanguages.includes(l))
             ?? availableLanguages[0];
@@ -172,12 +194,13 @@ export class YouTubeTranscriptService {
 
         const playerResponse = await this.getPlayerResponse(videoId);
 
-        const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+        const captions = playerResponse?.captions as PlayerCaptions | undefined;
+        const tracks = captions?.playerCaptionsTracklistRenderer?.captionTracks as CaptionTrack[] | undefined;
         if (!tracks || tracks.length === 0) {
             throw new Error('No captions available for this video');
         }
 
-        const availableLanguages = tracks.map((t: SafeAny) => t.languageCode);
+        const availableLanguages = tracks.map((t: CaptionTrack) => t.languageCode);
         const selectedLanguage = preferredLanguages.find(l => availableLanguages.includes(l))
             ?? availableLanguages[0];
 

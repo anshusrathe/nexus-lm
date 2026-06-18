@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, setIcon, Platform } from 'obsidian';
+import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
 import AIPlugin from '../main';
 import { PLATFORM_FEATURES } from '../utils/platformFeatures';
 
@@ -63,7 +63,7 @@ export class LandingView extends ItemView {
             'Tutor View',
             'graduation-cap',
             '#10b981',
-            () => this.plugin.activateView('tutor')
+            () => void this.plugin.activateView('tutor')
         );
 
         // AI Chat Card
@@ -72,7 +72,7 @@ export class LandingView extends ItemView {
             'Chat View',
             'message-square',
             '#3b82f6',
-            () => this.plugin.activateView('chat')
+            () => void this.plugin.activateView('chat')
         );
 
         // Your Feed Card
@@ -82,7 +82,7 @@ export class LandingView extends ItemView {
                 'Your Feed',
                 'rss',
                 '#f59e0b',
-                () => this.plugin.activateView('feed')
+                () => void this.plugin.activateView('feed')
             );
         }
 

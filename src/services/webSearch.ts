@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requestUrl } from 'obsidian';
 import { AISettings } from '../settings';
 
@@ -28,7 +27,7 @@ export class WebSearchService {
     }
 
     // New method to provide the Google Search tool configuration for Gemini API.
-    public getGoogleSearchToolConfig(): SafeAny {
+    public getGoogleSearchToolConfig(): { googleSearch: Record<string, never> } {
         return {
             googleSearch: {}, // This object enables Google Search grounding for the Gemini model.
         };
@@ -42,9 +41,9 @@ export class WebSearchService {
         }
         const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=${apiKey}&cx=${cx}`;
         const response = await requestUrl({ url });
-        const data = response.json;
+        const data = response.json as { items?: Array<{ title: string; link: string; snippet: string }> };
         if (!data.items) return [];
-        return data.items.map((item: SafeAny) => ({
+        return data.items.map((item) => ({
             title: item.title,
             link: item.link,
             snippet: item.snippet,

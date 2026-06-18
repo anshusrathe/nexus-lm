@@ -31,11 +31,11 @@ export class DirectorySuggester {
         this.input.addEventListener('input', () => this.onInputChange());
         this.input.addEventListener('focus', () => this.onInputChange());
         this.input.addEventListener('blur', () => {
-            setTimeout(() => this.suggestionsEl.hide(), 100);
+            window.setTimeout(() => this.suggestionsEl.hide(), 100);
         });
 
         if (initialPath) {
-            setTimeout(() => this.onInputChange(), 0);
+            window.setTimeout(() => this.onInputChange(), 0);
         }
     }
 

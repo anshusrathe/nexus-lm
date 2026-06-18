@@ -1,7 +1,7 @@
 /**
  * OpenRouter Service - Handles API calls to OpenRouter's API
  */
-import { requestUrl } from 'obsidian';
+import { requestUrl, type RequestUrlResponse } from 'obsidian';
 import { simulatedStream, fetchStream, createSSEParser } from '../utils/streamingUtils';
 
 export interface ChatMessage {
@@ -30,6 +30,15 @@ export interface OpenRouterErrorResponse {
     code?: string;
   };
 }
+
+interface ToolMessage {
+  role: 'tool';
+  tool_call_id: string;
+  name: string;
+  content: string;
+}
+
+type ConversationMessage = ChatMessage | ToolMessage;
 
 export class OpenRouterApiError extends Error {
   status: number;
@@ -66,7 +75,7 @@ export class OpenRouterService {
     messages: ChatMessage[],
     options?: GenerationOptions
   ): Promise<string> {
-    const body: SafeAny = {
+    const body: Record<string, unknown> = {
       model,
       messages,
       temperature: options?.temperature ?? 0.7,
@@ -104,7 +113,7 @@ export class OpenRouterService {
       this.onHeadersReceived(headersObj);
     }
 
-    return response.json.choices[0]?.message?.content || '';
+    return (response.json as OpenAIChatCompletionResponse).choices?.[0]?.message?.content || '';
   }
 
   async generateContentStream(
@@ -127,7 +136,7 @@ export class OpenRouterService {
     };
 
     const buildBody = (stream: boolean) => {
-      const body: SafeAny = { model, messages, stream };
+      const body: Record<string, unknown> = { model, messages, stream };
       if (options?.temperature !== undefined) body.temperature = options.temperature;
       if (options?.topP !== undefined) body.top_p = options.topP;
       if (options?.maxTokens !== undefined) body.max_tokens = options.maxTokens;
@@ -180,8 +189,8 @@ export class OpenRouterService {
     }
   }
 
-  private async handleRequestUrlError(response: SafeAny): Promise<never> {
-    const errorData = response.json || {};
+  private async handleRequestUrlError(response: RequestUrlResponse): Promise<never> {
+    const errorData = (response.json || {}) as OpenRouterErrorResponse;
     const message = errorData.error?.message || `HTTP ${response.status}`;
     throw new OpenRouterApiError(message, response.status);
   }
@@ -189,13 +198,13 @@ export class OpenRouterService {
   async generateContentWithTools(
     model: string,
     messages: ChatMessage[],
-    tools: SafeAny[],
+    tools: Record<string, unknown>[],
     options: GenerationOptions,
-    executeToolsCallback: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
+    executeToolsCallback: (toolCalls: Record<string, unknown>[]) => Promise<Record<string, unknown>[]>,
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
     let fullContent = '';
-    let conversationMessages = [...messages];
+    let conversationMessages: ConversationMessage[] = [...messages];
     let totalTokens = 0;
     let toolRoundsExecuted = 0;
     const MAX_CONTINUATION_NUDGES = 3;
@@ -205,7 +214,7 @@ export class OpenRouterService {
     while (true) {
       if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
       
-      const body: SafeAny = {
+      const body: Record<string, unknown> = {
         model,
         messages: conversationMessages,
         temperature: options.temperature ?? 0.7,
@@ -244,26 +253,26 @@ export class OpenRouterService {
         this.onHeadersReceived(h);
       }
 
-      const data = response.json;
+      const data = response.json as OpenAIChatCompletionResponse;
       if (data.usage) totalTokens += (data.usage.total_tokens || 0);
 
-      const message = data.choices[0]?.message;
+      const message = data.choices?.[0]?.message;
       if (!message) break;
-      conversationMessages.push(message);
+      conversationMessages.push(message as ChatMessage);
 
       if (message.tool_calls && message.tool_calls.length > 0) {
         toolRoundsExecuted++;
         if (currentToolChoice === 'required') currentToolChoice = 'auto';
-        const toolResults = await executeToolsCallback(message.tool_calls);
+        const toolResults = await executeToolsCallback(message.tool_calls as Array<Record<string, unknown>>);
         for (let i = 0; i < message.tool_calls.length; i++) {
-          const toolCall = message.tool_calls[i];
+          const toolCall = message.tool_calls[i] as Record<string, unknown>;
           const toolResult = toolResults[i];
           conversationMessages.push({
             role: 'tool',
-            tool_call_id: toolCall.id,
-            name: toolCall.function.name,
+            tool_call_id: toolCall.id as string,
+            name: (toolCall.function as Record<string, unknown>)?.name as string,
             content: toolResult.success ? toolResult.content : `Error: ${toolResult.error}`
-          } as SafeAny);
+          } as ToolMessage);
         }
         continue;
       }
@@ -279,7 +288,7 @@ export class OpenRouterService {
         conversationMessages.push({
           role: 'user',
           content: 'Please synthesise a final answer based on the tool results above.'
-        } as SafeAny);
+        } as ChatMessage);
         continue;
       }
       break;

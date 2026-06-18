@@ -1,4 +1,4 @@
-import { App, Modal, Setting, TFile, TFolder, ButtonComponent, Notice, normalizePath } from 'obsidian';
+import { App, Modal, Setting, TFile, TFolder, ButtonComponent, Notice } from 'obsidian';
 import { AISettings } from '../settings';
 
 export class SaveNoteModal extends Modal {

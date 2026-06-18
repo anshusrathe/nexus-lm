@@ -1,28 +1,25 @@
-import { App, ItemView, WorkspaceLeaf, ButtonComponent, Notice, MarkdownRenderer, TFile, Component, SuggestModal, ToggleComponent, TFolder, Modal, Setting, setIcon, normalizePath, requestUrl, Platform } from 'obsidian';
-import { decode } from '@msgpack/msgpack';
+import { App, ItemView, WorkspaceLeaf, ButtonComponent, Notice, MarkdownRenderer, TFile, Component, SuggestModal, TFolder, Modal, Setting, setIcon, normalizePath, requestUrl, Platform } from 'obsidian';
 import { OramaWorkerManager } from '../utils/oramaWorkerManager';
-import { AISettings, Provider, getModelsGroupedByProvider, getModelDisplayName as getModelDisplayNameFromSettings, getProviderForModel, getProviderForEmbeddingModel, SavedSystemInstruction, getGeminiThinkingConfig, getModelTemperature, getModelTopP } from '../settings';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { AISettings, Provider, getModelsGroupedByProvider, getModelDisplayName as getModelDisplayNameFromSettings, getProviderForModel, getProviderForEmbeddingModel, getGeminiThinkingConfig, getModelTemperature, getModelTopP } from '../settings';
 import { TokenEstimator, TaskType } from '../utils/tokenEstimator';
 import { ModelSelector, ModelSelection } from '../modelSelector';
 import AIPlugin from '../main';
 import { WebSearchService, SearchResult as WebSearchResult } from '../services/webSearch';
-import { VaultSearchAgent, VaultSearchResult } from '../managers/vaultSearchAgent';
+import { VaultSearchAgent } from '../managers/vaultSearchAgent';
 import { BasicChatService } from '../services/basicChatService';
 import { OllamaService } from '../services/ollamaService';
-import { extractTextFromImage } from '../utils/utils';
 import { UnifiedProviderManager } from '../services/unifiedProviderManager';
-import { AIChatSessionManager, AIChatSessionMeta, AIChatSession } from '../managers/aiChatSessionManager';
+import { AIChatSessionManager, AIChatSession } from '../managers/aiChatSessionManager';
 import { YouTubeChatService } from '../services/youtubeChatService';
 import { YouTubeTranscriptModal } from '../modals/youtubeTranscriptModal';
-import { handleFileCreationPrompt, processDiagramContent } from '../tools/fileCreateTool';
+import { processDiagramContent } from '../tools/fileCreateTool';
 import { MultimodalInput, processFileForMultimodal, isTextFile, isImageFile, isPDFFile, isAudioFile, isVideoFile, isMultimodalSupported, getFileIcon, extractImagesFromMarkdown } from '../utils/multimodalUtils';
 import { RateLimitManager } from '../utils/rateLimitManager';
 import { GeminiService } from '../services/geminiService';
 import { GeminiFileAPIService } from '../services/geminiFileAPI';
-import { MCPServerSelectionModal, MCPServerSelection } from '../modals/mcpServerSelectionModal';
-import { MCPToolCallingService, sanitizeServerName } from '../mcp/mcpToolCalling';
-import { executeCode, detectLanguage, isExecutable, isRenderable, isEnhanceable, wrapInMarkdownFence } from '../tools/codeExecutor';
+import { MCPServerSelectionModal } from '../modals/mcpServerSelectionModal';
+import { MCPToolCallingService } from '../mcp/mcpToolCalling';
+import { executeCode, detectLanguage, isExecutable, isRenderable, wrapInMarkdownFence } from '../tools/codeExecutor';
 import { SaveNoteModal } from '../modals/saveNoteModal';
 
 interface MCPResourceReadResult {
@@ -51,7 +48,7 @@ interface Response {
     id?: string;
     sessionId?: string;
     fileActionIds?: string[]; 
-    fileActionData?: { [actionId: string]: SafeAny }; 
+    fileActionData?: { [actionId: string]: FileActionData };
     
     modelName?: string; 
     totalTokens?: number; 
@@ -65,6 +62,12 @@ interface Response {
     searchMode?: 'vault' | 'flash';
     
     vaultIndexName?: string;
+
+    agentSteps?: unknown[];
+    isAgentResponse?: boolean;
+    vaultAnswer?: string;
+    vaultResults?: Array<{ path: string; score: number }>;
+    fileOperations?: unknown[];
     
     metadata?: {
         vaultSearchFallback?: {
@@ -93,17 +96,146 @@ interface SearchResult {
     similarity: number;
 }
 
+interface GeminiPart {
+    text?: string;
+    thought?: boolean;
+}
+
+interface GeminiCandidate {
+    content?: {
+        parts?: GeminiPart[];
+    };
+}
+
+interface GeminiResponse {
+    candidates?: GeminiCandidate[];
+    text?: () => string;
+    response?: GeminiResponse;
+}
+
+interface AIResponseResult {
+    answer?: string;
+    response?: string;
+    content?: string;
+    text?: string;
+    message?: string;
+}
+
+interface FileCreationPlan {
+    folderName: string;
+    files: Array<{
+        name: string;
+        content: string;
+        extension: string;
+        description?: string;
+        templatePath?: string;
+    }>;
+}
+
+interface CanvasData {
+    nodes: unknown[];
+    edges?: unknown[];
+    targetPath?: string;
+}
+
+interface ExcalidrawData {
+    elements: unknown[];
+    type?: string;
+    version?: number;
+    source?: string;
+    appState?: Record<string, unknown>;
+    files?: Record<string, unknown>;
+    targetPath?: string;
+}
+
+interface GeminiResponse {
+    candidates?: GeminiCandidate[];
+    text?: () => string;
+    [key: string]: unknown;
+}
+
+interface ContextFile {
+    basename: string;
+    content: string;
+    [key: string]: unknown;
+}
+
+interface PrefixOption {
+    label: string;
+    value: string;
+    action: string;
+    description?: string;
+    modalType?: string;
+    hasToggle?: boolean;
+    badge?: string;
+    disabled?: boolean;
+}
+
+interface ChatHistoryEntry {
+    role: string;
+    parts: Array<{ text: string }>;
+}
+
+interface DiagramGenerationContext {
+    settings: AISettings;
+    userPrompt: string;
+    targetFolder?: string;
+    contextFiles: ContextFile[];
+    webSearchEnabled?: boolean;
+    webSearchService?: WebSearchService;
+    chatHistory?: ChatHistoryEntry[];
+}
+
+interface IframeResizeMessage {
+    iframeHeight: number;
+}
+
+interface FileActionResult {
+    type?: 'edit' | 'create' | 'canvas' | 'excalidraw';
+    folderName?: string;
+    creationPrompt?: string;
+    files?: Array<{ name?: string; description?: string; content?: string; extension?: string; templatePath?: string }> | unknown[];
+    editData?: { filePath?: string; originalContent?: string; editedContent?: string; editPrompt?: string };
+    createData?: { folderName?: string; creationPrompt?: string; files?: unknown[] };
+    file?: { path?: string; basename?: string } | null;
+    originalContent?: string;
+    editedContent?: string;
+    editPrompt?: string;
+    nodes?: unknown[];
+    edges?: unknown[];
+    targetPath?: string;
+    elements?: unknown[];
+}
+
+interface FileActionSaveData {
+    type: 'edit' | 'create';
+    fileName: string;
+    status: string;
+    isApplied: boolean;
+    editData?: {
+        filePath: string;
+        originalContent: string;
+        editedContent: string;
+        editPrompt: string;
+    };
+    createData?: {
+        folderName: string;
+        creationPrompt: string;
+        files: unknown[];
+    };
+}
+
 interface FileActionState {
     id: string;
     type: 'edit' | 'create';
     fileName: string;
     status: 'processing' | 'completed' | 'failed' | 'accepted' | 'rejected';
     element: HTMLElement;
-    data?: SafeAny; 
+    data?: FileActionResult;
     error?: string;
-    isApplied?: boolean; 
-    originalFileContent?: string; 
-    isExcalidraw?: boolean; 
+    isApplied?: boolean;
+    originalFileContent?: string;
+    isExcalidraw?: boolean;
 }
 
 type PauseResumeTimerCallback = (pause: boolean) => void;
@@ -242,7 +374,7 @@ class YouTubeURLModal extends Modal {
                     });
                 text.inputEl.addClass('nl-width-100');
                 
-                setTimeout(() => text.inputEl.focus(), 50);
+                window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
@@ -318,7 +450,7 @@ class WebPageURLModal extends Modal {
 
             
             if (index === 0) {
-                setTimeout(() => input.focus(), 50);
+                window.setTimeout(() => input.focus(), 50);
             }
 
             
@@ -475,7 +607,7 @@ class SystemInstructionsModal extends Modal {
         });
 
         
-        setTimeout(() => this.textarea.focus(), 50);
+        window.setTimeout(() => this.textarea.focus(), 50);
 
         
         this.charCount = contentEl.createDiv({ cls: 'system-instructions-char-count' });
@@ -587,7 +719,7 @@ class SystemInstructionsModal extends Modal {
 
         iconSearchInput.addEventListener('input', () => renderIcons(iconSearchInput.value));
 
-        setTimeout(() => nameInput.focus(), 50);
+        window.setTimeout(() => nameInput.focus(), 50);
 
         const btnContainer = contentEl.createDiv({ cls: 'modal-button-container' });
 
@@ -697,7 +829,7 @@ class SystemInstructionsModal extends Modal {
                     attr: { 'aria-label': 'Change icon' }
                 });
                 setIcon(editIconBtn, 'radio');
-                editIconBtn.addEventListener('click', async (e) => {
+                editIconBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.showIconPickerForItem(index, iconEl, collectionsModal);
                 });
@@ -708,14 +840,15 @@ class SystemInstructionsModal extends Modal {
                     attr: { 'aria-label': 'Delete' }
                 });
                 setIcon(deleteBtn, 'x');
-                deleteBtn.addEventListener('click', async (e) => {
+                deleteBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.settings.savedSystemInstructions.splice(index, 1);
-                    await this.saveSettingsCallback();
-                    new Notice(`Deleted "${saved.name}"`);
-                    
-                    this.showCollectionsModal();
-                    collectionsModal.close();
+                    this.saveSettingsCallback().then(() => {
+                        new Notice(`Deleted "${saved.name}"`);
+                        
+                        this.showCollectionsModal();
+                        collectionsModal.close();
+                    }).catch(console.error);
                 });
             });
         }
@@ -776,7 +909,7 @@ class SystemInstructionsModal extends Modal {
         };
         renderIcons('');
         searchInput.addEventListener('input', () => renderIcons(searchInput.value));
-        setTimeout(() => searchInput.focus(), 50);
+        window.setTimeout(() => searchInput.focus(), 50);
 
         const btnContainer = contentEl.createDiv({ cls: 'modal-button-container' });
         new ButtonComponent(btnContainer).setButtonText('Cancel').onClick(() => pickerModal.close());
@@ -812,6 +945,7 @@ export class ResponseView extends ItemView {
     private inputContainer!: HTMLElement;
     private selectedFilesDisplay!: HTMLElement;
     private plugin: AIPlugin;
+    get document() { return this.containerEl.ownerDocument; }
     private geminiFileAPI: GeminiFileAPIService;
     private loadingSpinner!: HTMLElement;
     private mode: 'chat' | 'qa' | 'mcq' = 'chat';
@@ -883,7 +1017,7 @@ export class ResponseView extends ItemView {
 
     // Throttled answer rendering
     private lastAnswerRenderTime: number = 0;
-    private answerRenderTimeout: SafeAny | null = null;
+    private answerRenderTimeout: number | null = null;
 
     
     private currentStreamingAnswerEl: HTMLElement | null = null;
@@ -951,7 +1085,7 @@ export class ResponseView extends ItemView {
             const view = leaf.view;
             if (view instanceof ResponseView) {
                 
-                const viewWithSession = view as SafeAny;
+                const viewWithSession = view as ResponseView;
                 if (viewWithSession.currentSessionId === sessionId) {
                     return leaf;
                 }
@@ -1221,7 +1355,7 @@ export class ResponseView extends ItemView {
         sendBtn.setAttr('tabindex', '0');
         sendBtn.setAttr('data-state', 'send'); 
 
-        sendBtn.addEventListener('click', async () => {
+        sendBtn.addEventListener('click', () => {
             const currentState = sendBtn.getAttribute('data-state');
 
             if (currentState === 'send') {
@@ -1229,12 +1363,11 @@ export class ResponseView extends ItemView {
                 const query = this.queryInput.value;
                 if (query.trim()) {
                     this.loadingSpinner.classList.add('visible');
-                    try {
-                        await this.processQuery(query);
+                    this.processQuery(query).then(() => {
                         this.loadingSpinner.classList.remove('visible');
                         this.queryInput.value = '';
                         this.adjustTextareaHeight();
-                    } catch (error) {
+                    }).catch((error) => {
                         this.loadingSpinner.classList.remove('visible');
                         
                         if (error instanceof Error && error.message.startsWith('PRESERVE_INPUT:')) {
@@ -1246,7 +1379,7 @@ export class ResponseView extends ItemView {
                             throw error;
                         }
                         this.adjustTextareaHeight();
-                    }
+                    });
                 }
             } else {
                 
@@ -1281,17 +1414,17 @@ export class ResponseView extends ItemView {
             'Use prefix @mcp to use MCP servers and tools...'
         ];
         let promptIndex = 0;
-        let placeholderInterval: SafeAny = null;
+        let placeholderInterval: number | null = null;
         let isInputActive = false;
         const setNextPlaceholder = () => {
-            if (!isInputActive && document.activeElement !== this.queryInput) {
+            if (!isInputActive && this.document.activeElement !== this.queryInput) {
                 promptIndex = (promptIndex + 1) % prompts.length;
                 if (this.queryInput.value.trim() === '') {
                     this.queryInput.setAttribute('placeholder', prompts[promptIndex]);
                 }
             }
         };
-        placeholderInterval = setInterval(setNextPlaceholder, 3500);
+        placeholderInterval = window.setInterval(setNextPlaceholder, 3500);
         this.queryInput.addEventListener('focus', () => {
             isInputActive = true;
         });
@@ -1302,7 +1435,7 @@ export class ResponseView extends ItemView {
             }
         });
         this.queryInput.addEventListener('input', () => {
-            isInputActive = (document.activeElement === this.queryInput && this.queryInput.value.trim() !== '');
+            isInputActive = (this.document.activeElement === this.queryInput && this.queryInput.value.trim() !== '');
             if (this.queryInput.value.trim() === '') {
                 this.queryInput.setAttribute('placeholder', prompts[promptIndex]);
             } else {
@@ -1375,7 +1508,7 @@ export class ResponseView extends ItemView {
             }
         });
 
-        this.queryInput.addEventListener('keydown', async (e) => {
+        this.queryInput.addEventListener('keydown', (e) => {
             
             if (this.contextMenuEl && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
                 e.preventDefault();
@@ -1405,7 +1538,7 @@ export class ResponseView extends ItemView {
                 items[currentIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 
                 
-                await this.updateContextMenuPreview(items[currentIndex]);
+                this.updateContextMenuPreview(items[currentIndex]).catch(console.error);
 
                 return;
             }
@@ -1455,12 +1588,11 @@ export class ResponseView extends ItemView {
                 const query = this.queryInput.value;
                 if (query.trim()) {
                     this.loadingSpinner.classList.add('visible');
-                    try {
-                        await this.processQuery(query);
+                    this.processQuery(query).then(() => {
                         this.loadingSpinner.classList.remove('visible');
                         this.queryInput.value = '';
                         this.adjustTextareaHeight();
-                    } catch (error) {
+                    }).catch((error) => {
                         this.loadingSpinner.classList.remove('visible');
                         
                         if (error instanceof Error && error.message.startsWith('PRESERVE_INPUT:')) {
@@ -1472,7 +1604,7 @@ export class ResponseView extends ItemView {
                             throw error;
                         }
                         this.adjustTextareaHeight();
-                    }
+                    });
                 }
             }
         });
@@ -1624,9 +1756,9 @@ export class ResponseView extends ItemView {
             brainBtn.setAttr('title', this.settings.ollamaThinkingEnabled ? 'Thinking enabled' : 'Thinking disabled');
         }
 
-        brainBtn.addEventListener('click', async (e) => {
+        brainBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            await this.handleOllamaThinkingControlClick(brainBtn);
+            this.handleOllamaThinkingControlClick(brainBtn).catch(console.error);
         });
     }
 
@@ -1677,16 +1809,17 @@ export class ResponseView extends ItemView {
             if ((currentThinkingLevel || 'medium') === level) {
                 item.addClass('selected');
             }
-            item.addEventListener('click', async (e) => {
+            item.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (activeProvider === 'groq') {
                     this.settings.groqThinkingLevel = level;
                 } else {
                     this.settings.ollamaGptOssThinkingLevel = level;
                 }
-                await this.plugin.saveSettings();
-                menuEl.remove();
-                this.updateHeader();
+                this.plugin.saveSettings().then(() => {
+                    menuEl.remove();
+                    this.updateHeader();
+                }).catch(console.error);
             });
         });
 
@@ -1700,10 +1833,10 @@ export class ResponseView extends ItemView {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-ollama-thinking-btn')) {
                 menuEl.remove();
-                document.removeEventListener('click', closeHandler);
+                this.document.removeEventListener('click', closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        window.setTimeout(() => this.document.addEventListener('click', closeHandler), 0);
     }
 
     private showGemini25ThinkingMenu(anchorEl: HTMLElement): void {
@@ -1727,13 +1860,14 @@ export class ResponseView extends ItemView {
             const item = menuEl.createDiv({ cls: 'ollama-thinking-menu-item' });
             item.textContent = option.label;
             if (selected === option.id) item.addClass('selected');
-            item.addEventListener('click', async (e) => {
+            item.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.settings.gemini25ThinkingMode = option.id;
                 this.settings.enableThinkingMode = option.id !== 'off';
-                await this.plugin.saveSettings();
-                menuEl.remove();
-                this.updateHeader();
+                this.plugin.saveSettings().then(() => {
+                    menuEl.remove();
+                    this.updateHeader();
+                }).catch(console.error);
             });
         });
 
@@ -1746,10 +1880,10 @@ export class ResponseView extends ItemView {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-ollama-thinking-btn')) {
                 menuEl.remove();
-                document.removeEventListener('click', closeHandler);
+                this.document.removeEventListener('click', closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        window.setTimeout(() => this.document.addEventListener('click', closeHandler), 0);
     }
 
     private showGemini3ThinkingMenu(anchorEl: HTMLElement): void {
@@ -1773,7 +1907,7 @@ export class ResponseView extends ItemView {
             const item = menuEl.createDiv({ cls: 'ollama-thinking-menu-item' });
             item.textContent = option.label;
             if (selected === option.id) item.addClass('selected');
-            item.addEventListener('click', async (e) => {
+            item.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (option.id === 'off') {
                     this.settings.enableThinkingMode = false;
@@ -1781,9 +1915,10 @@ export class ResponseView extends ItemView {
                     this.settings.gemini3ThinkingLevel = option.id;
                     this.settings.enableThinkingMode = true;
                 }
-                await this.plugin.saveSettings();
-                menuEl.remove();
-                this.updateHeader();
+                this.plugin.saveSettings().then(() => {
+                    menuEl.remove();
+                    this.updateHeader();
+                }).catch(console.error);
             });
         });
 
@@ -1796,10 +1931,10 @@ export class ResponseView extends ItemView {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-ollama-thinking-btn')) {
                 menuEl.remove();
-                document.removeEventListener('click', closeHandler);
+                this.document.removeEventListener('click', closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        window.setTimeout(() => this.document.addEventListener('click', closeHandler), 0);
     }
 
     private setSendButtonState(button: HTMLElement, state: 'send' | 'stop') {
@@ -1894,19 +2029,20 @@ export class ResponseView extends ItemView {
                 modelSpan.addClass('nl-font-size-085em');
                 modelSpan.addClass('nl-color-var--text-muted');
 
-                itemEl.addEventListener('click', async (e) => {
+                itemEl.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const oldId = this.settings.selectedEmbeddingIndexId;
                     this.settings.selectedEmbeddingIndexId = index.id;
-                    await this.plugin.saveSettings();
-                    menuEl.remove();
-                    
-                    
-                    if (oldId !== index.id) {
-                        await this.plugin.embeddingsManager.loadIndex(index.id);
-                    }
-                    
-                    new Notice(`Selected embedding index: ${index.name}`);
+                    this.plugin.saveSettings().then(() => {
+                        menuEl.remove();
+                        
+                        
+                        if (oldId !== index.id) {
+                            return this.plugin.embeddingsManager.loadIndex(index.id);
+                        }
+                    }).then(() => {
+                        new Notice(`Selected embedding index: ${index.name}`);
+                    }).catch(console.error);
                 });
 
                 
@@ -1920,10 +2056,10 @@ export class ResponseView extends ItemView {
         const closeHandler = (e: MouseEvent) => {
             if (!menuEl.contains(e.target as Node) && !anchorEl.contains(e.target as Node)) {
                 menuEl.remove();
-                document.removeEventListener('click', closeHandler);
+                this.document.removeEventListener('click', closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        window.setTimeout(() => this.document.addEventListener('click', closeHandler), 0);
     }
 
     private async showModelMenu() {
@@ -1954,29 +2090,30 @@ export class ResponseView extends ItemView {
         toggleCheckbox.addEventListener('click', (e) => {
             e.stopPropagation(); 
         });
-        toggleCheckbox.addEventListener('change', async () => {
+        toggleCheckbox.addEventListener('change', () => {
             this.settings.autoModeEnabled = toggleCheckbox.checked;
-            await this.plugin.saveSettings();
+            this.plugin.saveSettings().then(() => {
 
-            if (toggleCheckbox.checked) {
-                autoModeToggle.classList.add('active');
-                modelList.classList.add('disabled');
-                
-                if (modelBtn) this.updateModelButton(modelBtn);
-                
-                if (this.thinkingBtnEl) {
-                    this.thinkingBtnEl.remove();
-                    this.thinkingBtnEl = null;
+                if (toggleCheckbox.checked) {
+                    autoModeToggle.classList.add('active');
+                    modelList.classList.add('disabled');
+                    
+                    if (modelBtn) this.updateModelButton(modelBtn);
+                    
+                    if (this.thinkingBtnEl) {
+                        this.thinkingBtnEl.remove();
+                        this.thinkingBtnEl = null;
+                    }
+                } else {
+                    autoModeToggle.classList.remove('active');
+                    modelList.classList.remove('disabled');
+                    
+                    if (modelBtn) this.updateModelButton(modelBtn);
                 }
-            } else {
-                autoModeToggle.classList.remove('active');
-                modelList.classList.remove('disabled');
-                
-                if (modelBtn) this.updateModelButton(modelBtn);
-            }
 
-            
-            menuEl.remove();
+                
+                menuEl.remove();
+            }).catch(console.error);
         });
 
         
@@ -1994,7 +2131,7 @@ export class ResponseView extends ItemView {
             attr: { style: 'width: 100%; box-sizing: border-box;' }
         });
         searchInput.addEventListener('keydown', (e) => e.stopPropagation());
-        setTimeout(() => searchInput.focus(), 100);
+        window.setTimeout(() => searchInput.focus(), 100);
 
         const itemsToFilter: { itemEl: HTMLElement, name: string }[] = [];
         const headersToFilter: { headerEl: HTMLElement, items: HTMLElement[], separatorEl?: HTMLElement }[] = [];
@@ -2106,7 +2243,7 @@ export class ResponseView extends ItemView {
                     setIcon(iconSpan, 'globe');
                 }
 
-                option.addEventListener('click', async () => {
+                option.addEventListener('click', () => {
                     
                     this.settings.aiChatModel = model.id;
                     this.settings.aiChatProvider = model.provider;
@@ -2115,11 +2252,12 @@ export class ResponseView extends ItemView {
                     this.settings.provider = model.provider;
                     if (modelBtn) modelBtn.textContent = model.name;
                     menuEl.remove();
-                    await this.plugin.saveSettings();
-                    
-                    this.updateContextBar();
-                    
-                    this.updateHeader();
+                    this.plugin.saveSettings().then(() => {
+                        
+                        this.updateContextBar();
+                        
+                        this.updateHeader();
+                    }).catch(console.error);
                 });
             });
 
@@ -2155,10 +2293,10 @@ export class ResponseView extends ItemView {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-model-btn')) {
                 menuEl.remove();
-                document.removeEventListener('click', closeHandler);
+                this.document.removeEventListener('click', closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        window.setTimeout(() => this.document.addEventListener('click', closeHandler), 0);
     }
 
     private showAutoSelectionIndicator(selection: { modelName: string; reason: string }) {
@@ -2182,9 +2320,9 @@ export class ResponseView extends ItemView {
         }
 
         
-        setTimeout(() => {
+        window.setTimeout(() => {
             indicator.addClass('nl-opacity-0');
-            setTimeout(() => indicator.remove(), 300);
+            window.setTimeout(() => indicator.remove(), 300);
         }, 5000);
     }
 
@@ -2396,7 +2534,7 @@ export class ResponseView extends ItemView {
                         isBlank = true;
                     } else if (result && typeof result === 'object') {
                         
-                        const r = result as SafeAny;
+                        const r = result as AIResponseResult;
                         const text = r.answer ?? r.response ?? r.content ?? r.text ?? r.message;
                         if (typeof text === 'string' && text.trim() === '') {
                             isBlank = true;
@@ -2442,7 +2580,7 @@ export class ResponseView extends ItemView {
      * Checks if a response is actually an error message disguised as success
      * Services sometimes catch errors and return error messages instead of throwing
      */
-    private isErrorResponse(result: SafeAny, operationName: string): string | false {
+    private isErrorResponse(result: unknown, operationName: string): string | false {
         
         const errorPatterns = [
             'encountered a temporary rate limit',
@@ -2463,12 +2601,9 @@ export class ResponseView extends ItemView {
         if (typeof result === 'string') {
             textToCheck = result.toLowerCase();
         } else if (result && typeof result === 'object') {
-            
-            if (result.answer) textToCheck = result.answer.toLowerCase();
-            else if (result.response) textToCheck = result.response.toLowerCase();
-            else if (result.content) textToCheck = result.content.toLowerCase();
-            else if (result.text) textToCheck = result.text.toLowerCase();
-            else if (result.message) textToCheck = result.message.toLowerCase();
+            const r = result as Record<string, unknown>;
+            const text = r.answer ?? r.response ?? r.content ?? r.text ?? r.message;
+            if (typeof text === 'string') textToCheck = text.toLowerCase();
         }
 
         
@@ -2505,11 +2640,12 @@ export class ResponseView extends ItemView {
         historyToggleOption.createSpan({ text: 'Chat History' });
         const historyToggle = historyToggleOption.createEl('input', { type: 'checkbox' });
         historyToggle.checked = this.settings.aiChatHistoryEnabled;
-        historyToggle.addEventListener('change', async () => {
+        historyToggle.addEventListener('change', () => {
             this.settings.aiChatHistoryEnabled = historyToggle.checked;
-            await this.plugin.saveSettings();
+            this.plugin.saveSettings().then(() => {
             
-            this.updateHeader();
+                this.updateHeader();
+            }).catch(console.error);
         });
 
         
@@ -2523,11 +2659,12 @@ export class ResponseView extends ItemView {
         contextSlider.max = '50';
         contextSlider.step = '1';
         contextSlider.value = this.settings.chatContextSize.toString();
-        contextSlider.addEventListener('input', async () => {
+        contextSlider.addEventListener('input', () => {
             this.settings.chatContextSize = parseInt(contextSlider.value);
             contextLabel.textContent = `Context: ${this.settings.chatContextSize} ${this.settings.chatContextSize === 1 ? 'exchange' : 'exchanges'}`;
-            await this.plugin.saveSettings();
-            this.updateContextBar();
+            this.plugin.saveSettings().then(() => {
+                this.updateContextBar();
+            }).catch(console.error);
         });
 
         
@@ -2535,13 +2672,14 @@ export class ResponseView extends ItemView {
         const hasWallpaper = !!this.settings.chatWallpaperPath;
         setIcon(wallpaperOption, 'image');
         wallpaperOption.createSpan({ text: hasWallpaper ? 'Remove Wallpaper' : 'Add Wallpaper' });
-        wallpaperOption.addEventListener('click', async () => {
+        wallpaperOption.addEventListener('click', () => {
             menuEl.remove();
             if (hasWallpaper) {
                 this.settings.chatWallpaperPath = null;
-                await this.plugin.saveSettings();
-                this.updateWallpaper();
-                new Notice('Wallpaper removed');
+                this.plugin.saveSettings().then(() => {
+                    this.updateWallpaper();
+                    new Notice('Wallpaper removed');
+                }).catch(console.error);
             } else {
                 this.pickWallpaperImage();
             }
@@ -2556,10 +2694,10 @@ export class ResponseView extends ItemView {
             if (!menuEl.contains(e.target as Node) &&
                 !(e.target as Element).closest('.header-ellipsis-btn')) {
                 menuEl.remove();
-                document.removeEventListener('click', closeHandler);
+                this.document.removeEventListener('click', closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        window.setTimeout(() => this.document.addEventListener('click', closeHandler), 0);
     }
 
     private async pickWallpaperImage() {
@@ -2577,7 +2715,7 @@ export class ResponseView extends ItemView {
             return;
         }
 
-        const pickerEl = document.createElement('div');
+        const pickerEl = this.document.createElement('div');
         pickerEl.className = 'wallpaper-picker';
         pickerEl.addClass('nl-position-absolute');
         pickerEl.addClass('nl-z-index-1000');
@@ -2624,15 +2762,15 @@ export class ResponseView extends ItemView {
             });
         }
 
-        document.body.appendChild(pickerEl);
+        this.document.body.appendChild(pickerEl);
 
         const closeHandler = (e: MouseEvent) => {
             if (!pickerEl.contains(e.target as Node)) {
                 pickerEl.remove();
-                document.removeEventListener('click', closeHandler);
+                this.document.removeEventListener('click', closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        window.setTimeout(() => this.document.addEventListener('click', closeHandler), 0);
     }
 
     private async setWallpaper(filePath: string) {
@@ -3059,7 +3197,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
     }
 
     private async sleep(ms: number) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise(resolve => window.setTimeout(resolve, ms));
     }
 
     /**
@@ -3285,12 +3423,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         if (now - this.lastAnswerRenderTime > throttleInterval) {
             if (this.answerRenderTimeout) {
-                clearTimeout(this.answerRenderTimeout);
+                window.clearTimeout(this.answerRenderTimeout);
                 this.answerRenderTimeout = null;
             }
             renderAnswer();
         } else if (!this.answerRenderTimeout) {
-            this.answerRenderTimeout = setTimeout(renderAnswer, throttleInterval - (now - this.lastAnswerRenderTime));
+            this.answerRenderTimeout = window.setTimeout(() => { renderAnswer().catch(console.error); }, throttleInterval - (now - this.lastAnswerRenderTime));
         }
 
         
@@ -3308,12 +3446,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         if (chev) chev.setText(collapsed ? '▸' : '▾');
     }
 
-    private extractGeminiAnswerTextFromResponse(response: SafeAny): string {
-        const parts = response?.candidates?.[0]?.content?.parts;
-        if (!Array.isArray(parts)) return response?.text?.() || '';
+    private extractGeminiAnswerTextFromResponse(response: unknown): string {
+        const r = response as GeminiResponse;
+        const parts = r?.candidates?.[0]?.content?.parts;
+        if (!Array.isArray(parts)) return r?.text?.() || '';
         return parts
-            .filter((part: SafeAny) => typeof part?.text === 'string' && part.text.trim().length > 0 && part?.thought !== true)
-            .map((part: SafeAny) => part.text)
+            .filter((part: GeminiPart) => typeof part?.text === 'string' && part.text.trim().length > 0 && part?.thought !== true)
+            .map((part: GeminiPart) => part.text)
             .join('');
     }
 
@@ -3448,10 +3587,10 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 this.app,
                 this.plugin.mcpService,
                 availableServers,
-                async (selection) => {
+                (selection) => {
                     
                     const enableRateLimit = mcpAutoModel === null ? this.mcpRateLimitEnabled : false;
-                    await this.processMCPQuery(query, selection, mcpAutoModel, enableRateLimit);
+                    this.processMCPQuery(query, selection, mcpAutoModel, enableRateLimit).catch(console.error);
                 },
                 this.plugin.settings.mcpAutoConnect ?? true
             );
@@ -3719,14 +3858,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         }
                         this.currentProgressResponseEl = null;
                         this.currentProgressEl = null;
-                    } catch (ytError: SafeAny) {
-                        
+                    } catch (ytError: unknown) {
+                        const errorMsg = ytError instanceof Error ? ytError.message : 'Failed to process YouTube video.';
                         if (progressResponseEl && progressEl) {
                             this.finalizeResponse(
                                 progressResponseEl,
                                 progressEl,
                                 query,
-                                `Error: ${ytError.message || 'Failed to process YouTube video.'}`,
+                                `Error: ${errorMsg}`,
                                 [],
                                 [],
                                 { modelName: this.settings.model }
@@ -3734,10 +3873,10 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         }
                         this.currentProgressResponseEl = null;
                         this.currentProgressEl = null;
-                        
-                        
+
+
                         if (!this.settings.autoModeEnabled) {
-                            new Notice(ytError.message || 'Failed to process YouTube video.');
+                            new Notice(errorMsg);
                         }
                     }
                     this.isProcessing = false;
@@ -3795,12 +3934,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
                                 
                                 query = finalPrompt;
-                            } catch (transcriptError: SafeAny) {
-                                
+                            } catch (transcriptError: unknown) {
+                                const errorMsg = transcriptError instanceof Error ? transcriptError.message : 'Failed to extract YouTube transcript.';
                                 if (!this.settings.autoModeEnabled) {
-                                    new Notice(transcriptError.message || 'Failed to extract YouTube transcript.');
+                                    new Notice(errorMsg);
                                 }
-                                this.addResponse(query, `Error: ${transcriptError.message || 'Failed to extract YouTube transcript.'}`, [], [], { modelName: this.settings.model });
+                                this.addResponse(query, `Error: ${errorMsg}`, [], [], { modelName: this.settings.model });
                                 this.isProcessing = false;
                                 this.setSendButtonState(this.stopKnowDeepBtn, 'send');
                                 this.updateProcessingUI(1, 1, 'Failed', 'Transcript extraction failed.');
@@ -3808,9 +3947,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                             }
                         }
                     } else {
-                        
+
                         try {
-                            
+
                             const [transcript, videoTitle] = await Promise.all([
                                 ytService.getTranscriptOnly(youtubeUrl),
                                 ytService.getVideoTitle(youtubeUrl)
@@ -3818,7 +3957,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
                             const defaultFolder = this.settings.youtubeTranscriptFolder || 'YouTube Transcripts';
 
-                            
+
                             const savePromise = new Promise<{ fileName: string; folderPath: string } | null>((resolve) => {
                                 const modal = new YouTubeTranscriptModal(
                                     this.app,
@@ -3829,7 +3968,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                                     }
                                 );
 
-                                
+
                                 const originalOnClose = modal.onClose.bind(modal);
                                 modal.onClose = function () {
                                     originalOnClose();
@@ -3892,23 +4031,22 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                                 
                                 
 
-                            } catch (saveError: SafeAny) {
-                                
+                            } catch (saveError: unknown) {
+                                const errorMsg = saveError instanceof Error ? saveError.message : 'Failed to save transcript';
                                 if (!this.settings.autoModeEnabled) {
-                                    new Notice(`Failed to save transcript: ${saveError.message}`);
+                                    new Notice(`Failed to save transcript: ${errorMsg}`);
                                 }
                                 this.isProcessing = false;
                                 this.setSendButtonState(this.stopKnowDeepBtn, 'send');
                                 return;
                             }
 
-                        } catch (transcriptError: SafeAny) {
-                            
-                            
+                        } catch (transcriptError: unknown) {
+                            const errorMsg = transcriptError instanceof Error ? transcriptError.message : 'Failed to extract YouTube transcript.';
                             if (!this.settings.autoModeEnabled) {
-                                new Notice(transcriptError.message || 'Failed to extract YouTube transcript.');
+                                new Notice(errorMsg);
                             }
-                            this.addResponse(query, `Error: ${transcriptError.message || 'Failed to extract YouTube transcript.'}`, [], [], { modelName: this.settings.model });
+                            this.addResponse(query, `Error: ${errorMsg}`, [], [], { modelName: this.settings.model });
                             this.isProcessing = false;
                             this.setSendButtonState(this.stopKnowDeepBtn, 'send');
                             this.updateProcessingUI(1, 1, 'Failed', 'Transcript extraction failed.');
@@ -3993,7 +4131,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                                         
                                         folderFiles.push({ path: file.path, content, similarity: 1.0 });
                                     }
-                                } catch (readError) {
+                                } catch (_readError) {
                                                                     }
                             }
 
@@ -4043,7 +4181,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
                                 
                                 return null;
-                            } catch (readError) {
+                            } catch (_readError) {
                                                                 new Notice(`Could not read file: ${path}`);
                                 return null;
                             }
@@ -4174,8 +4312,8 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
                             
                             const vaultSearchResponse = isFlashSearch
-                                ? await (this.plugin as SafeAny).searchVaultBM25Only(cleanQuery, searchLimit)
-                                : await (this.plugin as SafeAny).searchVault(cleanQuery, searchLimit);
+                                ? await this.plugin.searchVaultBM25Only(cleanQuery, searchLimit)
+                                : await this.plugin.searchVault(cleanQuery, searchLimit);
 
                             const vaultSearchResults = vaultSearchResponse.results;
                             temporalContext = vaultSearchResponse.temporalContext;
@@ -4220,8 +4358,8 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                                 return;
                             }
                             this.updateProcessingUI(1, 1, `Found ${relevantVaultContent.length} relevant items.`);
-                        } catch (error: SafeAny) {
-                                                        const errorMessage = error instanceof Error ? error.message : 'Unknown error during vault search';
+                        } catch (error: unknown) {
+                            const errorMessage = error instanceof Error ? error.message : 'Unknown error during vault search';
 
                             
                             if (!this.settings.autoModeEnabled) {
@@ -4416,7 +4554,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                               ];
                         
                         let messageIndex = 1;
-                        const progressInterval = setInterval(() => {
+                        const progressInterval = window.setInterval(() => {
                             if (messageIndex < progressMessages.length && this.currentProgressEl) {
                                 this.updateResponseProgress(this.currentProgressResponseEl!, this.currentProgressEl, progressMessages[messageIndex]);
                                 messageIndex++;
@@ -4426,7 +4564,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         
                         
                         
-                        let chatHistory: SafeAny[] = [];
+                        let chatHistory: Record<string, unknown>[] = [];
                         if (isVaultWideSearch) {
                             const fullChatHistory = this.getChatHistory();
                             
@@ -4457,7 +4595,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         );
 
                         
-                        clearInterval(progressInterval);
+                        window.clearInterval(progressInterval);
 
                         
                         if (!this.isProcessing) {
@@ -4607,7 +4745,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                               ];
                         
                         let messageIndex = 1;
-                        const progressInterval = setInterval(() => {
+                        const progressInterval = window.setInterval(() => {
                             if (messageIndex < progressMessages.length && this.currentProgressEl) {
                                 this.updateResponseProgress(this.currentProgressResponseEl!, this.currentProgressEl, progressMessages[messageIndex]);
                                 messageIndex++;
@@ -4636,7 +4774,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         );
 
                         
-                        clearInterval(progressInterval);
+                        window.clearInterval(progressInterval);
 
                         
                         if (!this.isProcessing) {
@@ -4744,9 +4882,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     this.currentProgressEl = null;
                 }
 
-        } catch (error: SafeAny) {
+        } catch (error: unknown) {
             errorOccurred = true;
-                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
             
             if (!this.settings.autoModeEnabled) {
@@ -4876,7 +5014,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         backArrow.addClass('nl-transition-all03sease');
                         backArrow.addClass('nl-text-shadow-008pxvar--text-accent');
 
-                        setTimeout(() => {
+                        window.setTimeout(() => {
                             backArrow.addClass('nl-color-');
                             backArrow.addClass('nl-font-weight-');
                             backArrow.addClass('nl-transform-');
@@ -4884,7 +5022,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         }, 5000);
                     }
 
-                    setTimeout(() => {
+                    window.setTimeout(() => {
                         targetEl.addClass('nl-background-color-');
                         targetEl.addClass('nl-opacity-');
                     }, 1000);
@@ -4904,7 +5042,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 }
 
                 if (targetEl) {
-                    const tooltip = document.createElement('div');
+                    const tooltip = this.document.createElement('div');
                     tooltip.classList.add('footnote-tooltip');
                     tooltip.addClass('footnote-tooltip-style');
 
@@ -4916,7 +5054,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     tooltip.setCssProps({ '--tooltip-left':  rect.left + 'px' });
                     tooltip.setCssProps({ '--tooltip-top':  (rect.bottom + 5) + 'px' });
 
-                    document.body.appendChild(tooltip);
+                    this.document.body.appendChild(tooltip);
 
                     const removeTooltip = () => {
                         if (tooltip.parentNode) {
@@ -4925,7 +5063,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     };
 
                     refLink.addEventListener('mouseleave', removeTooltip, { once: true });
-                    setTimeout(removeTooltip, 5000); 
+                    window.setTimeout(removeTooltip, 5000); 
                 }
             });
         });
@@ -4945,7 +5083,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 const id = itemEl.getAttribute('id');
 
                 if (id) {
-                    const backArrow = document.createElement('a');
+                    const backArrow = this.document.createElement('a');
                     backArrow.classList.add('footnote-backref');
                     backArrow.textContent = ' ↩';
                     backArrow.setAttribute('aria-label', 'Back to content');
@@ -4968,7 +5106,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                             refEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             refEl.addClass('nl-background-color-var--text-accent');
                             refEl.addClass('nl-opacity-03');
-                            setTimeout(() => {
+                            window.setTimeout(() => {
                                 refEl.addClass('nl-background-color-');
                                 refEl.addClass('nl-opacity-');
                             }, 500);
@@ -5047,7 +5185,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 }
 
                 
-                const source = sources.find(s => s.path === path) as SafeAny;
+                const source = sources.find(s => s.path === path) as { path: string; relevance: number; url?: string; content?: string } | undefined;
                 if (source && source.url) {
                     return source.url;
                 }
@@ -5062,8 +5200,8 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 }
 
                 
-                if (source && (source as SafeAny).content) {
-                    const sourceMatch = (source as SafeAny).content.match(/Source:\s*(https?:\/\/[^\s\n]+)/);
+                if (source && source.content) {
+                    const sourceMatch = source.content.match(/Source:\s*(https?:\/\/[^\s\n]+)/);
                     if (sourceMatch) {
                         return sourceMatch[1];
                     }
@@ -5081,7 +5219,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
                     if (isYouTubeSource(source.path)) {
                         
-                        getYouTubeUrl(source.path, (source as SafeAny).content).then(url => {
+                        getYouTubeUrl(source.path, (source as { path: string; relevance: number; url?: string; content?: string }).content).then(url => {
                             if (url) {
                                 const videoId = extractYouTubeId(url);
                                 if (videoId) {
@@ -5107,11 +5245,11 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                             text: `[[${source.path}]]`,
                             cls: 'internal-link'
                         });
-                        sourceLink.addEventListener('click', async (e) => {
+                        sourceLink.addEventListener('click', (e) => {
                             e.preventDefault();
                             const file = this.app.vault.getAbstractFileByPath(source.path);
                             if (file instanceof TFile) {
-                                await this.app.workspace.getLeaf().openFile(file);
+                                this.app.workspace.getLeaf().openFile(file).catch(console.error);
                             }
                         });
                     }
@@ -5124,7 +5262,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
                     if (isYouTubeSource(source.path)) {
                         
-                        getYouTubeUrl(source.path, (source as SafeAny).content).then(url => {
+                        getYouTubeUrl(source.path, (source as { path: string; relevance: number; url?: string; content?: string }).content).then(url => {
                             if (url) {
                                 const videoId = extractYouTubeId(url);
                                 if (videoId) {
@@ -5144,17 +5282,17 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                                     });
                                 }
                             }
-                        });
+                        }).catch(console.error);
                     } else {
                         const sourceLink = sourceItem.createEl('a', {
                             text: `${source.path}`,
                             cls: 'internal-link'
                         });
-                        sourceLink.addEventListener('click', async (e) => {
+                        sourceLink.addEventListener('click', (e) => {
                             e.preventDefault();
                             const file = this.app.vault.getAbstractFileByPath(source.path);
                             if (file instanceof TFile) {
-                                await this.app.workspace.getLeaf().openFile(file);
+                                this.app.workspace.getLeaf().openFile(file).catch(console.error);
                             }
                         });
                     }
@@ -5315,11 +5453,11 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     text: `[[${result.path}]]`,
                     cls: 'internal-link'
                 });
-                sourceLink.addEventListener('click', async (e) => {
+                sourceLink.addEventListener('click', (e) => {
                     e.preventDefault();
                     const file = this.app.vault.getAbstractFileByPath(result.path);
                     if (file instanceof TFile) {
-                        await this.app.workspace.getLeaf().openFile(file);
+                        this.app.workspace.getLeaf().openFile(file).catch(console.error);
                     }
                 });
                 citationIndex++;
@@ -5354,11 +5492,11 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     text: `📝 ${result.path}`,
                     cls: 'internal-link'
                 });
-                link.addEventListener('click', async (e) => {
+                link.addEventListener('click', (e) => {
                     e.preventDefault();
                     const file = this.app.vault.getAbstractFileByPath(result.path);
                     if (file instanceof TFile) {
-                        await this.app.workspace.getLeaf().openFile(file);
+                        this.app.workspace.getLeaf().openFile(file).catch(console.error);
                     }
                 });
             });
@@ -5425,7 +5563,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         const regenerateBtn = actionsContainer.createDiv({ cls: 'response-action-btn regenerate-response' });
         regenerateBtn.setAttribute('aria-label', 'Regenerate response');
         setIcon(regenerateBtn, 'refresh-cw');
-        regenerateBtn.addEventListener('click', async () => {
+        regenerateBtn.addEventListener('click', () => {
             const index = this.responses.findIndex(r => r.question === question);
             if (index !== -1) {
                 this.responses.splice(index, 1);
@@ -5435,16 +5573,17 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             this.updateContextBar();
 
             this.loadingSpinner.classList.add('visible');
-            await this.processQuery(question);
-            this.loadingSpinner.classList.remove('visible');
-            this.adjustTextareaHeight();
+            this.processQuery(question).then(() => {
+                this.loadingSpinner.classList.remove('visible');
+                this.adjustTextareaHeight();
+            }).catch(console.error);
             
         });
 
         const saveBtn = actionsContainer.createDiv({ cls: 'response-action-btn save-response' });
         saveBtn.setAttribute('aria-label', 'Save as note');
         setIcon(saveBtn, 'save');
-        saveBtn.addEventListener('click', () => this.saveResponseAsNote(question));
+        saveBtn.addEventListener('click', () => void this.saveResponseAsNote(question));
 
         const copyBtn = actionsContainer.createDiv({ cls: 'response-action-btn copy-response' });
         copyBtn.setAttribute('aria-label', 'Copy response');
@@ -5499,60 +5638,62 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         const defaultFileName = `AI-Response-${new Date().toLocaleString().replace(/[/:]/g, '-')}`;
         const defaultDirectory = this.plugin.settings.saveDirectory?.trim() || '';
 
-        new SaveNoteModal(this.app, defaultFileName, defaultDirectory, this.plugin.settings, async (fileName, directory, templatePath) => {
-            try {
-                const filePath = directory ? normalizePath(`${directory}/${fileName}`) : fileName;
+        new SaveNoteModal(this.app, defaultFileName, defaultDirectory, this.plugin.settings, (fileName, directory, templatePath) => {
+            void (async () => {
+                try {
+                    const filePath = directory ? normalizePath(`${directory}/${fileName}`) : fileName;
 
-                if (directory) {
-                    const dirPath = this.app.vault.getAbstractFileByPath(directory);
-                    if (!dirPath) {
-                        try {
-                            await this.app.vault.createFolder(directory);
-                        } catch (error: SafeAny) {
-                            new Notice(`Failed to create directory: ${directory}`);
-                                                        return;
+                    if (directory) {
+                        const dirPath = this.app.vault.getAbstractFileByPath(directory);
+                        if (!dirPath) {
+                            try {
+                                await this.app.vault.createFolder(directory);
+                            } catch (error: unknown) {
+                                new Notice(`Failed to create directory: ${directory}`);
+                                return;
+                            }
                         }
                     }
-                }
 
-                
-                const hasCitations = /\[\^\d+\]: \[\[/.test(responseToSave.answer);
 
-                
-                const sourcesList = !hasCitations && responseToSave.sources && responseToSave.sources.length > 0
-                    ? '\n\n## Sources\n' + responseToSave.sources
-                        .map(source => `- [[${source.path}]]`)
-                        .join('\n')
-                    : '';
+                    const hasCitations = /\[\^\d+\]: \[\[/.test(responseToSave.answer);
 
-                const webSourcesList = responseToSave.webResults && responseToSave.webResults.length > 0
-                    ? '\n\n## Web Sources\n' + responseToSave.webResults
-                        .map(result => `- [${result.title}](${result.link})`)
-                        .join('\n')
-                    : '';
+                    
+                    const sourcesList = !hasCitations && responseToSave.sources && responseToSave.sources.length > 0
+                        ? '\n\n## Sources\n' + responseToSave.sources
+                            .map(source => `- [[${source.path}]]`)
+                            .join('\n')
+                        : '';
 
-                let contents = [
-                    `> [!question] ${responseToSave.question}\n`,
-                    responseToSave.answer,
-                    sourcesList,
-                    webSourcesList,
-                ].join('\n');
+                    const webSourcesList = responseToSave.webResults && responseToSave.webResults.length > 0
+                        ? '\n\n## Web Sources\n' + responseToSave.webResults
+                            .map(result => `- [${result.title}](${result.link})`)
+                            .join('\n')
+                        : '';
 
-                
-                if (templatePath) {
-                    const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
-                    if (templateFile instanceof TFile) {
-                        const templateContent = await this.app.vault.read(templateFile);
-                        contents = templateContent + '\n\n' + contents;
+                    let contents = [
+                        `> [!question] ${responseToSave.question}\n`,
+                        responseToSave.answer,
+                        sourcesList,
+                        webSourcesList,
+                    ].join('\n');
+
+                    
+                    if (templatePath) {
+                        const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
+                        if (templateFile instanceof TFile) {
+                            const templateContent = await this.app.vault.read(templateFile);
+                            contents = templateContent + '\n\n' + contents;
+                        }
                     }
-                }
 
-                await this.app.vault.create(filePath, contents);
-                new Notice(`Response saved as ${filePath}`);
-            } catch (error: SafeAny) {
-                                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                new Notice(`Error saving response as note: ${errorMessage}`);
-            }
+                    await this.app.vault.create(filePath, contents);
+                    new Notice(`Response saved as ${filePath}`);
+                } catch (error: unknown) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    new Notice(`Error saving response as note: ${errorMessage}`);
+                }
+            })();
         }).open();
     }
 
@@ -5565,63 +5706,65 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         const defaultFileName = `Chat-Session-${new Date().toLocaleString().replace(/[/:]/g, '-')}`;
         const defaultDirectory = this.plugin.settings.saveDirectory?.trim() || '';
 
-        new SaveNoteModal(this.app, defaultFileName, defaultDirectory, this.plugin.settings, async (fileName, directory, templatePath) => {
-            try {
-                const filePath = directory ? normalizePath(`${directory}/${fileName}`) : fileName;
+        new SaveNoteModal(this.app, defaultFileName, defaultDirectory, this.plugin.settings, (fileName, directory, templatePath) => {
+            void (async () => {
+                try {
+                    const filePath = directory ? normalizePath(`${directory}/${fileName}`) : fileName;
 
-                if (directory) {
-                    const dirPath = this.app.vault.getAbstractFileByPath(directory);
-                    if (!dirPath) {
-                        try {
-                            await this.app.vault.createFolder(directory);
-                        } catch (error: SafeAny) {
-                            new Notice(`Failed to create directory: ${directory}`);
-                                                        return;
+                    if (directory) {
+                        const dirPath = this.app.vault.getAbstractFileByPath(directory);
+                        if (!dirPath) {
+                            try {
+                                await this.app.vault.createFolder(directory);
+                            } catch (error: unknown) {
+                                new Notice(`Failed to create directory: ${directory}`);
+                                return;
+                            }
                         }
                     }
-                }
 
-                let contents = [
-                    '# AI Chat Session\n',
-                    ...this.responses.map(r => {
-                        const sourcesList = r.sources && r.sources.length > 0
-                            ? '\nSources:\n' + r.sources.map(source => `- [[${source.path}]]`).join('\n')
-                            : '';
+                    let contents = [
+                        '# AI Chat Session\n',
+                        ...this.responses.map(r => {
+                            const sourcesList = r.sources && r.sources.length > 0
+                                ? '\nSources:\n' + r.sources.map(source => `- [[${source.path}]]`).join('\n')
+                                : '';
 
-                        const webSourcesList = r.webResults && r.webResults.length > 0
-                            ? '\nWeb Sources:\n' + r.webResults.map(result => `- [${result.title}](${result.link})`).join('\n')
-                            : '';
+                            const webSourcesList = r.webResults && r.webResults.length > 0
+                                ? '\nWeb Sources:\n' + r.webResults.map(result => `- [${result.title}](${result.link})`).join('\n')
+                                : '';
 
-                        const mcpToolsList = r.mcpTools && r.mcpTools.length > 0
-                            ? '\nTools Used:\n' + r.mcpTools.map(tool => `- ${tool.server}: ${tool.tool}`).join('\n')
-                            : '';
+                            const mcpToolsList = r.mcpTools && r.mcpTools.length > 0
+                                ? '\nTools Used:\n' + r.mcpTools.map(tool => `- ${tool.server}: ${tool.tool}`).join('\n')
+                                : '';
 
-                        return [
-                            `> [!question] ${r.question}`,
-                            r.answer,
-                            sourcesList,
-                            webSourcesList,
-                            mcpToolsList,
-                            ''
-                        ];
-                    }).flat()
-                ].join('\n');
+                            return [
+                                `> [!question] ${r.question}`,
+                                r.answer,
+                                sourcesList,
+                                webSourcesList,
+                                mcpToolsList,
+                                ''
+                            ];
+                        }).flat()
+                    ].join('\n');
 
-                
-                if (templatePath) {
-                    const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
-                    if (templateFile instanceof TFile) {
-                        const templateContent = await this.app.vault.read(templateFile);
-                        contents = templateContent + '\n\n' + contents;
+                    
+                    if (templatePath) {
+                        const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
+                        if (templateFile instanceof TFile) {
+                            const templateContent = await this.app.vault.read(templateFile);
+                            contents = templateContent + '\n\n' + contents;
+                        }
                     }
-                }
 
-                await this.app.vault.create(filePath, contents);
-                new Notice(`Chat session saved as ${filePath}`);
-            } catch (error: SafeAny) {
-                                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                new Notice(`Error saving chat session: ${errorMessage}`);
-            }
+                    await this.app.vault.create(filePath, contents);
+                    new Notice(`Chat session saved as ${filePath}`);
+                } catch (error: unknown) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    new Notice(`Error saving chat session: ${errorMessage}`);
+                }
+            })();
         }).open();
     }
 
@@ -5720,7 +5863,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             // Reset throttled answer rendering state
             this.lastAnswerRenderTime = 0;
             if (this.answerRenderTimeout) {
-                clearTimeout(this.answerRenderTimeout);
+                window.clearTimeout(this.answerRenderTimeout);
                 this.answerRenderTimeout = null;
             }
 
@@ -5784,7 +5927,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             if (table.parentElement?.classList.contains('table-wrapper')) return;
 
-            const wrapper = document.createElement('div');
+            const wrapper = this.document.createElement('div');
             wrapper.className = 'table-wrapper';
             table.parentNode?.insertBefore(wrapper, table);
             wrapper.appendChild(table);
@@ -5814,7 +5957,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
     ) {
         // Clear any pending throttled render
         if (this.answerRenderTimeout) {
-            clearTimeout(this.answerRenderTimeout);
+            window.clearTimeout(this.answerRenderTimeout);
             this.answerRenderTimeout = null;
         }
 
@@ -5968,7 +6111,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             const renderable = isRenderable(lang);
 
             
-            const wrapper = document.createElement('div');
+            const wrapper = this.document.createElement('div');
             wrapper.className = 'code-block-wrapper';
             pre.parentNode?.insertBefore(wrapper, pre);
             wrapper.appendChild(pre);
@@ -5977,22 +6120,22 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             wrapper.dataset.code = initialCode;
 
             
-            const toolbar = document.createElement('div');
+            const toolbar = this.document.createElement('div');
             toolbar.className = 'code-block-toolbar';
 
             
             if (lang !== 'unknown') {
-                const badge = document.createElement('span');
+                const badge = this.document.createElement('span');
                 badge.className = 'code-lang-badge';
                 badge.textContent = lang;
                 toolbar.appendChild(badge);
             }
 
-            const toolbarRight = document.createElement('div');
+            const toolbarRight = this.document.createElement('div');
             toolbarRight.className = 'code-block-toolbar-right';
 
             
-            const copyBtn = document.createElement('button');
+            const copyBtn = this.document.createElement('button');
             copyBtn.className = 'code-block-btn';
             copyBtn.setAttribute('aria-label', 'Copy code');
             setIcon(copyBtn, 'copy');
@@ -6000,12 +6143,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 const code = wrapper.dataset.code || '';
                 navigator.clipboard.writeText(code);
                 setIcon(copyBtn, 'check');
-                setTimeout(() => setIcon(copyBtn, 'copy'), 1500);
+                window.setTimeout(() => setIcon(copyBtn, 'copy'), 1500);
             });
             toolbarRight.appendChild(copyBtn);
 
             
-            const expandBtn = document.createElement('button');
+            const expandBtn = this.document.createElement('button');
             expandBtn.className = 'code-block-btn';
             expandBtn.setAttribute('aria-label', 'Expand in canvas');
             setIcon(expandBtn, 'maximize-2');
@@ -6045,7 +6188,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             if (lang === 'json') {
-                const outputEl = document.createElement('div');
+                const outputEl = this.document.createElement('div');
                 outputEl.className = 'code-exec-output hidden';
                 wrapper.appendChild(outputEl);
 
@@ -6058,20 +6201,20 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     return;
                 }
 
-                const renderToggleRow = document.createElement('div');
+                const renderToggleRow = this.document.createElement('div');
                 renderToggleRow.className = 'code-exec-toggle-row';
 
-                const renderLabel = document.createElement('span');
+                const renderLabel = this.document.createElement('span');
                 renderLabel.className = 'code-exec-label';
                 renderLabel.textContent = 'Render visualization';
 
-                const renderToggle = document.createElement('div');
+                const renderToggle = this.document.createElement('div');
                 renderToggle.className = 'code-exec-toggle';
                 renderToggle.setAttribute('role', 'switch');
                 renderToggle.setAttribute('aria-checked', 'false');
                 renderToggle.setAttribute('aria-label', 'Render visualization');
 
-                const backBtn = document.createElement('button');
+                const backBtn = this.document.createElement('button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
                 backBtn.addClass('nl-display-none');
@@ -6086,14 +6229,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     backBtn.addClass('nl-display-none');
                 });
 
-                renderToggle.addEventListener('click', async () => {
+                renderToggle.addEventListener('click', () => {
                     if (renderToggle.classList.contains('is-enabled')) return;
                     renderToggle.classList.add('is-enabled');
                     renderToggle.setAttribute('aria-checked', 'true');
                     (pre as HTMLElement).addClass('nl-display-none');
                     outputEl.classList.remove('hidden');
                     backBtn.addClass('nl-display-');
-                    await this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
+                    this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question).catch(console.error);
                 });
 
                 renderToggleRow.appendChild(renderLabel);
@@ -6107,7 +6250,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             if (!executable) return;
 
             
-            const outputEl = document.createElement('div');
+            const outputEl = this.document.createElement('div');
             outputEl.className = 'code-exec-output hidden';
             
             wrapper.appendChild(outputEl);
@@ -6121,21 +6264,21 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 this.runCode(pre as HTMLElement, lang, outputEl, wrapper, true, question);
             } else {
                 
-                const runToggleRow = document.createElement('div');
+                const runToggleRow = this.document.createElement('div');
                 runToggleRow.className = 'code-exec-toggle-row';
 
-                const runLabel = document.createElement('span');
+                const runLabel = this.document.createElement('span');
                 runLabel.className = 'code-exec-label';
                 runLabel.textContent = 'Run code';
 
-                const runToggle = document.createElement('div');
+                const runToggle = this.document.createElement('div');
                 runToggle.className = 'code-exec-toggle';
                 runToggle.setAttribute('role', 'switch');
                 runToggle.setAttribute('aria-checked', 'false');
                 runToggle.setAttribute('aria-label', 'Run code');
 
                 
-                const backBtn = document.createElement('button');
+                const backBtn = this.document.createElement('button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
                 backBtn.addClass('nl-display-none');
@@ -6154,7 +6297,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     wrapper.querySelector('.code-repair-toggle-row')?.remove();
                 });
 
-                runToggle.addEventListener('click', async () => {
+                runToggle.addEventListener('click', () => {
                     if (runToggle.classList.contains('is-enabled')) return;
                     runToggle.classList.add('is-enabled');
                     runToggle.setAttribute('aria-checked', 'true');
@@ -6162,7 +6305,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     (pre as HTMLElement).addClass('nl-display-none');
                     outputEl.classList.remove('hidden');
                     backBtn.addClass('nl-display-');
-                    await this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question);
+                    this.runCode(pre as HTMLElement, lang, outputEl, wrapper, false, question).catch(console.error);
                 });
 
                 runToggleRow.appendChild(runLabel);
@@ -6190,7 +6333,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.classList.add('code-exec-running');
         outputEl.empty();
 
-        const spinner = document.createElement('span');
+        const spinner = this.document.createElement('span');
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         outputEl.appendChild(spinner);
@@ -6202,15 +6345,16 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         if (result.isHtml && result.htmlContent) {
             outputEl.classList.add('code-exec-success');
-            const iframe = document.createElement('iframe');
+            const iframe = this.document.createElement('iframe');
             iframe.className = 'code-exec-iframe';
             iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-modals');
             iframe.srcdoc = result.htmlContent;
             outputEl.appendChild(iframe);
             
             const onMsg = (e: MessageEvent) => {
-                if (e.data?.iframeHeight && iframe.isConnected) {
-                    iframe.setCssProps({ '--iframe-height':  e.data.iframeHeight + 'px' });
+                const data = e.data as unknown as Partial<IframeResizeMessage>;
+                if (data?.iframeHeight && iframe.isConnected) {
+                    iframe.setCssProps({ '--iframe-height':  data.iframeHeight + 'px' });
                     window.removeEventListener('message', onMsg);
                 }
             };
@@ -6222,13 +6366,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             MarkdownRenderer.render(this.app, result.markdownContent, outputEl, '', this);
         } else if (result.success) {
             outputEl.classList.add('code-exec-success');
-            const outputPre = document.createElement('pre');
+            const outputPre = this.document.createElement('pre');
             outputPre.className = 'code-exec-output-text';
             outputPre.textContent = result.output;
             outputEl.appendChild(outputPre);
         } else {
             outputEl.classList.add('code-exec-error');
-            const errorPre = document.createElement('pre');
+            const errorPre = this.document.createElement('pre');
             errorPre.className = 'code-exec-output-text';
             errorPre.textContent = `Error: ${result.error}`;
             if (result.output) {
@@ -6260,21 +6404,21 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             if (wrapper.querySelector('.mermaid-repair-row')) return;
 
-            const repairRow = document.createElement('div');
+            const repairRow = this.document.createElement('div');
             repairRow.className = 'code-exec-toggle-row mermaid-repair-row';
 
-            const repairLabel = document.createElement('span');
+            const repairLabel = this.document.createElement('span');
             repairLabel.className = 'code-exec-label';
             repairLabel.textContent = 'Repair diagram';
 
-            const repairBtn = document.createElement('button');
+            const repairBtn = this.document.createElement('button');
             repairBtn.className = 'code-block-btn';
             repairBtn.setAttribute('aria-label', 'Repair mermaid diagram');
             setIcon(repairBtn, 'wrench');
 
-            repairBtn.addEventListener('click', async () => {
+            repairBtn.addEventListener('click', () => {
                 repairRow.remove();
-                await this.triggerMermaidRepair(originalCode, errorText, preEl, wrapper, question);
+                this.triggerMermaidRepair(originalCode, errorText, preEl, wrapper, question).catch(console.error);
             });
 
             repairRow.appendChild(repairLabel);
@@ -6283,7 +6427,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         };
 
         const checkForError = (root: HTMLElement): string | null => {
-            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            const walker = this.document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
             let node: Text | null;
             while ((node = walker.nextNode() as Text | null)) {
                 if (node.textContent?.includes(MERMAID_ERROR_TEXT)) {
@@ -6317,7 +6461,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         observer.observe(wrapper, { childList: true, subtree: true, characterData: true });
 
         
-        setTimeout(() => observer.disconnect(), MAX_WAIT_MS);
+        window.setTimeout(() => observer.disconnect(), MAX_WAIT_MS);
     }
 
     /**
@@ -6331,13 +6475,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         question = ''
     ) {
         
-        const loadingEl = document.createElement('div');
+        const loadingEl = this.document.createElement('div');
         loadingEl.className = 'code-exec-output code-exec-running';
-        const spinner = document.createElement('span');
+        const spinner = this.document.createElement('span');
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         loadingEl.appendChild(spinner);
-        const loadingText = document.createElement('span');
+        const loadingText = this.document.createElement('span');
         loadingText.className = 'code-exec-label';
         loadingText.textContent = 'Repairing diagram…';
         loadingEl.appendChild(loadingText);
@@ -6367,7 +6511,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             this.saveCodeEdit(question, oldCode, fixedCode, 'mermaid');
 
             
-            const tempContainer = document.createElement('div');
+            const tempContainer = this.document.createElement('div');
             await MarkdownRenderer.render(
                 this.app,
                 '```mermaid\n' + fixedCode + '\n```',
@@ -6386,22 +6530,22 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             this.watchMermaidErrors(rendered as HTMLElement ?? preEl, wrapper, question);
-        } catch (err: SafeAny) {
+        } catch (err: unknown) {
             loadingEl.remove();
 
-            const errRow = document.createElement('div');
+            const errRow = this.document.createElement('div');
             errRow.className = 'code-exec-toggle-row mermaid-repair-row';
-            const errLabel = document.createElement('span');
+            const errLabel = this.document.createElement('span');
             errLabel.className = 'code-exec-label';
             errLabel.addClass('nl-color-remaining-13');
-            errLabel.textContent = `Repair failed: ${err?.message || String(err)}`;
-            const retryBtn = document.createElement('button');
+            errLabel.textContent = `Repair failed: ${err instanceof Error ? err.message : String(err)}`;
+            const retryBtn = this.document.createElement('button');
             retryBtn.className = 'code-block-btn';
             retryBtn.setAttribute('aria-label', 'Retry repair');
             setIcon(retryBtn, 'refresh-cw');
-            retryBtn.addEventListener('click', async () => {
+            retryBtn.addEventListener('click', () => {
                 errRow.remove();
-                await this.triggerMermaidRepair(code, error, preEl, wrapper, question);
+                this.triggerMermaidRepair(code, error, preEl, wrapper, question).catch(console.error);
             });
             errRow.appendChild(errLabel);
             errRow.appendChild(retryBtn);
@@ -6422,24 +6566,24 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.querySelector('.code-repair-toggle-row')?.remove();
         wrapper.querySelector('.code-repair-toggle-row')?.remove();
 
-        const repairRow = document.createElement('div');
+        const repairRow = this.document.createElement('div');
         repairRow.className = 'code-exec-toggle-row code-repair-toggle-row';
 
-        const repairLabel = document.createElement('span');
+        const repairLabel = this.document.createElement('span');
         repairLabel.className = 'code-exec-label';
         repairLabel.textContent = 'Repair code';
 
-        const repairToggle = document.createElement('div');
+        const repairToggle = this.document.createElement('div');
         repairToggle.className = 'code-exec-toggle code-repair-toggle-switch';
         repairToggle.setAttribute('role', 'switch');
         repairToggle.setAttribute('aria-checked', 'false');
         repairToggle.setAttribute('aria-label', 'Repair code');
 
-        repairToggle.addEventListener('click', async () => {
+        repairToggle.addEventListener('click', () => {
             repairToggle.classList.add('is-enabled');
             repairToggle.setAttribute('aria-checked', 'true');
             repairRow.remove();
-            await this.triggerCodeRepair(code, lang, error, preEl, outputEl, wrapper, false, question);
+            this.triggerCodeRepair(code, lang, error, preEl, outputEl, wrapper, false, question).catch(console.error);
         });
 
         repairRow.appendChild(repairLabel);
@@ -6462,7 +6606,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.classList.remove('hidden', 'code-exec-error', 'code-exec-success');
         outputEl.classList.add('code-exec-running');
         outputEl.empty();
-        const spinner = document.createElement('span');
+        const spinner = this.document.createElement('span');
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         outputEl.appendChild(spinner);
@@ -6494,18 +6638,18 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             await this.runCode(preEl, lang, outputEl, wrapper, autoFix);
-        } catch (err: SafeAny) {
+        } catch (err: unknown) {
             outputEl.classList.remove('code-exec-running');
             outputEl.classList.add('code-exec-error');
             outputEl.empty();
-            const errPre = document.createElement('pre');
+            const errPre = this.document.createElement('pre');
             errPre.className = 'code-exec-output-text';
-            errPre.textContent = `Repair failed: ${err?.message || String(err)}`;
+            errPre.textContent = `Repair failed: ${err instanceof Error ? err.message : String(err)}`;
             outputEl.appendChild(errPre);
 
             if (!autoFix) {
                 const currentCode = preEl.querySelector('code')?.textContent || code;
-                this.addRepairToggle(currentCode, lang, err?.message || '', preEl, outputEl, wrapper, question);
+                this.addRepairToggle(currentCode, lang, err instanceof Error ? err.message : '', preEl, outputEl, wrapper, question);
             }
         }
     }
@@ -6535,7 +6679,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 headers: { Authorization: `Bearer ${this.settings.groqApiKey}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 2048 })
             });
-            return response.json.choices[0].message.content;
+            return (response.json as OpenAIChatCompletionResponse).choices?.[0]?.message?.content ?? '';
         }
 
         if (provider === 'openrouter') {
@@ -6548,7 +6692,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 headers: { Authorization: `Bearer ${this.settings.openRouterApiKey}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 2048 })
             });
-            return response.json.choices[0].message.content;
+            return (response.json as OpenAIChatCompletionResponse).choices?.[0]?.message?.content ?? '';
         }
 
         if (provider === 'opencode') {
@@ -6696,7 +6840,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         let isExpanded = false;
         let filesLoaded = false;
 
-        filesToggle.addEventListener('click', async (e) => {
+        filesToggle.addEventListener('click', (e) => {
             e.stopPropagation();
             isExpanded = !isExpanded;
             toggleIcon.classList.toggle('expanded', isExpanded);
@@ -6705,7 +6849,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             if (isExpanded && !filesLoaded) {
                 filesLoaded = true;
-                await this.loadNonIndexedFiles(filesListInner, searchMode);
+                this.loadNonIndexedFiles(filesListInner, searchMode).catch(console.error);
             }
         });
 
@@ -6715,18 +6859,18 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         });
 
         
-        const embeddingsManager = (this.plugin as SafeAny).embeddingsManager;
+        const embeddingsManager = this.plugin.embeddingsManager;
         if (embeddingsManager && typeof embeddingsManager.detectChanges === 'function') {
             
-            const indexConfigs: SafeAny[] = this.settings.indexConfigurations || [];
+            const indexConfigs = this.settings.indexConfigurations || [];
             let targetIndexId: string | null = null;
             if (searchMode === 'flash') {
-                const bm25Config = indexConfigs.find((c: SafeAny) => c.type === 'bm25' && c.enabled)
-                    ?? indexConfigs.find((c: SafeAny) => c.type === 'bm25');
+                const bm25Config = indexConfigs.find((c) => c.type === 'bm25' && c.enabled)
+                    ?? indexConfigs.find((c) => c.type === 'bm25');
                 targetIndexId = bm25Config?.id ?? null;
             } else {
-                const embConfig = indexConfigs.find((c: SafeAny) => c.type === 'embedding' && c.enabled)
-                    ?? indexConfigs.find((c: SafeAny) => c.type === 'embedding');
+                const embConfig = indexConfigs.find((c) => c.type === 'embedding' && c.enabled)
+                    ?? indexConfigs.find((c) => c.type === 'embedding');
                 targetIndexId = embConfig?.id ?? null;
             }
 
@@ -6745,117 +6889,111 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         }
 
         let isIndexing = false;
-        indexBtn.addEventListener('click', async (e) => {
+        indexBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (isIndexing) return;
             isIndexing = true;
             indexBtn.disabled = true;
             indexBtn.textContent = 'Indexing…';
 
-            
-            const notice = new Notice('Incremental Indexing started…', 0);
+            (async () => {
+                const notice = new Notice('Incremental Indexing started…', 0);
 
-            try {
-                
-                const indexConfigs: SafeAny[] = this.settings.indexConfigurations || [];
+                try {
+                    const indexConfigs = this.settings.indexConfigurations || [];
 
-                if (searchMode === 'flash') {
-                    
-                    const bm25Config = indexConfigs.find((c: SafeAny) => c.type === 'bm25' && c.enabled)
-                        ?? indexConfigs.find((c: SafeAny) => c.type === 'bm25');
+                    if (searchMode === 'flash') {
+                        const bm25Config = indexConfigs.find((c) => c.type === 'bm25' && c.enabled)
+                            ?? indexConfigs.find((c) => c.type === 'bm25');
 
-                    if (bm25Config) {
-                        bm25Config.isBuilding = true;
-                        bm25Config.buildProgress = 0;
-                        bm25Config.buildError = undefined;
-                    }
-
-                    await embeddingsManager.buildBM25Index((status: string) => {
-                        const m = status.match(/BM25:(\d+)/);
-                        if (m) {
-                            const pct = parseInt(m[1]);
-                            if (bm25Config) bm25Config.buildProgress = pct;
-                            notice.setMessage(`Incremental Indexing: BM25 ${pct}%`);
+                        if (bm25Config) {
+                            bm25Config.isBuilding = true;
+                            bm25Config.buildProgress = 0;
+                            bm25Config.buildError = undefined;
                         }
-                    });
 
-                    
-                    if (bm25Config) {
-                        const allMdFiles = this.app.vault.getMarkdownFiles();
-                        const bm25FileCount = await embeddingsManager.getBM25FileCount(bm25Config.id);
-                        bm25Config.fileCount = bm25FileCount;
-                        bm25Config.lastUpdated = Date.now();
-                        bm25Config.isBuilding = false;
-                        bm25Config.buildProgress = 0;
-                    }
-                    
-                    const allFiles = this.app.vault.getMarkdownFiles();
-                    const bm25Count = bm25Config ? bm25Config.fileCount : 0;
-                    this.settings.bm25IndexedFiles = allFiles.length > 0
-                        ? Math.round((bm25Count / allFiles.length) * 100) : 0;
-
-                } else {
-                    
-                    const embConfig = indexConfigs.find((c: SafeAny) => c.type === 'embedding' && c.enabled)
-                        ?? indexConfigs.find((c: SafeAny) => c.type === 'embedding');
-
-                    const embModel = embConfig?.model || this.settings.embeddingModel;
-
-                    if (embConfig) {
-                        embConfig.isBuilding = true;
-                        embConfig.buildProgress = 0;
-                        embConfig.buildError = undefined;
-                    }
-
-                    await embeddingsManager.buildEmbeddingIndex(
-                        embModel,
-                        (status: string) => {
-                            const m = status.match(/EMBEDDINGS:(\d+)/);
+                        await embeddingsManager.buildBM25Index((status: string) => {
+                            const m = status.match(/BM25:(\d+)/);
                             if (m) {
                                 const pct = parseInt(m[1]);
-                                if (embConfig) embConfig.buildProgress = pct;
-                                notice.setMessage(`Incremental Indexing: Embeddings ${pct}%`);
+                                if (bm25Config) bm25Config.buildProgress = pct;
+                                notice.setMessage(`Incremental Indexing: BM25 ${pct}%`);
                             }
-                        },
-                        embConfig?.id  
-                    );
+                        });
 
-                    
-                    if (embConfig) {
-                        const allMdFiles = this.app.vault.getMarkdownFiles();
-                        const nonExcluded = allMdFiles.filter((f: SafeAny) => !embeddingsManager.isFileExcluded(f.path, embConfig.id));
-                        const embFileCount = await embeddingsManager.getEmbeddedFileCount(embConfig.id);
-                        embConfig.fileCount = embFileCount;
-                        embConfig.lastUpdated = Date.now();
-                        embConfig.isBuilding = false;
-                        embConfig.buildProgress = 0;
+                        if (bm25Config) {
+                            const allMdFiles = this.app.vault.getMarkdownFiles();
+                            const bm25FileCount = await embeddingsManager.getBM25FileCount(bm25Config.id);
+                            bm25Config.fileCount = bm25FileCount;
+                            bm25Config.lastUpdated = Date.now();
+                            bm25Config.isBuilding = false;
+                            bm25Config.buildProgress = 0;
+                        }
+
+                        const allFiles = this.app.vault.getMarkdownFiles();
+                        const bm25Count = bm25Config ? bm25Config.fileCount : 0;
+                        this.settings.bm25IndexedFiles = allFiles.length > 0
+                            ? Math.round((bm25Count / allFiles.length) * 100) : 0;
+                    } else {
+                        const embConfig = indexConfigs.find((c) => c.type === 'embedding' && c.enabled)
+                            ?? indexConfigs.find((c) => c.type === 'embedding');
+
+                        const embModel = embConfig?.model || this.settings.embeddingModel;
+
+                        if (embConfig) {
+                            embConfig.isBuilding = true;
+                            embConfig.buildProgress = 0;
+                            embConfig.buildError = undefined;
+                        }
+
+                        await embeddingsManager.buildEmbeddingIndex(
+                            embModel,
+                            (status: string) => {
+                                const m = status.match(/EMBEDDINGS:(\d+)/);
+                                if (m) {
+                                    const pct = parseInt(m[1]);
+                                    if (embConfig) embConfig.buildProgress = pct;
+                                    notice.setMessage(`Incremental Indexing: Embeddings ${pct}%`);
+                                }
+                            },
+                            embConfig?.id
+                        );
+
+                        if (embConfig) {
+                            const allMdFiles = this.app.vault.getMarkdownFiles();
+                            const nonExcluded = allMdFiles.filter((f) => !embeddingsManager.isFileExcluded(f.path, embConfig.id));
+                            const embFileCount = await embeddingsManager.getEmbeddedFileCount(embConfig.id);
+                            embConfig.fileCount = embFileCount;
+                            embConfig.lastUpdated = Date.now();
+                            embConfig.isBuilding = false;
+                            embConfig.buildProgress = 0;
+                        }
+
+                        const allFiles = this.app.vault.getMarkdownFiles();
+                        const nonExcluded = allFiles.filter((f) => !embeddingsManager.isFileExcluded(f.path, embConfig?.id));
+                        const embCount = embConfig ? embConfig.fileCount : 0;
+                        this.settings.embeddingIndexedFiles = nonExcluded.length > 0
+                            ? Math.round((embCount / nonExcluded.length) * 100) : 0;
                     }
-                    
-                    const allFiles = this.app.vault.getMarkdownFiles();
-                    const nonExcluded = allFiles.filter((f: SafeAny) => !embeddingsManager.isFileExcluded(f.path, embConfig?.id));
-                    const embCount = embConfig ? embConfig.fileCount : 0;
-                    this.settings.embeddingIndexedFiles = nonExcluded.length > 0
-                        ? Math.round((embCount / nonExcluded.length) * 100) : 0;
+
+                    await this.plugin.saveSettings();
+                    notice.setMessage('Incremental Indexing complete.');
+                    window.setTimeout(() => notice.hide(), 3000);
+
+                    dotWrapper.remove();
+                } catch (err: unknown) {
+                    notice.setMessage(`Indexing failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                    window.setTimeout(() => notice.hide(), 5000);
+                    indexBtn.disabled = false;
+                    indexBtn.textContent = 'Retry';
+                    isIndexing = false;
+
+                    const indexConfigs = this.settings.indexConfigurations || [];
+                    indexConfigs.forEach((c) => { c.isBuilding = false; });
                 }
-
-                await this.plugin.saveSettings();
-                notice.setMessage('Incremental Indexing complete.');
-                setTimeout(() => notice.hide(), 3000);
-
-                
-                dotWrapper.remove();
-
-            } catch (err: SafeAny) {
-                notice.setMessage(`Indexing failed: ${err?.message || 'Unknown error'}`);
-                setTimeout(() => notice.hide(), 5000);
-                indexBtn.disabled = false;
-                indexBtn.textContent = 'Retry';
-                isIndexing = false;
-
-                
-                const indexConfigs: SafeAny[] = this.settings.indexConfigurations || [];
-                indexConfigs.forEach((c: SafeAny) => { c.isBuilding = false; });
-            }
+            })().catch((err) => {
+                console.error('Index click handler failed:', err);
+            });
         });
 
         
@@ -6878,7 +7016,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         });
 
         
-        document.addEventListener('click', () => {
+        this.document.addEventListener('click', () => {
             calloutVisible = false;
             callout.classList.remove('visible');
         }, { capture: true });
@@ -6886,23 +7024,24 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
     private async loadNonIndexedFiles(container: HTMLElement, searchMode: 'vault' | 'flash') {
         try {
-            const embeddingsManager = (this.plugin as SafeAny).embeddingsManager;
+            const embeddingsManager = this.plugin.embeddingsManager;
             if (!embeddingsManager) {
                 container.empty();
                 container.createSpan({ text: 'Unable to load files', cls: 'index-status-files-loading' });
                 return;
             }
 
-            const indexConfigs: SafeAny[] = this.settings.indexConfigurations || [];
+            const indexConfigs = this.settings.indexConfigurations || [];
 
-            
-            let targetConfig: SafeAny = null;
+            let targetConfig: (typeof indexConfigs)[number] | null;
             if (searchMode === 'flash') {
-                targetConfig = indexConfigs.find((c: SafeAny) => c.type === 'bm25' && c.enabled)
-                    ?? indexConfigs.find((c: SafeAny) => c.type === 'bm25');
+                targetConfig = indexConfigs.find((c) => c.type === 'bm25' && c.enabled)
+                    ?? indexConfigs.find((c) => c.type === 'bm25')
+                    ?? null;
             } else {
-                targetConfig = indexConfigs.find((c: SafeAny) => c.type === 'embedding' && c.enabled)
-                    ?? indexConfigs.find((c: SafeAny) => c.type === 'embedding');
+                targetConfig = indexConfigs.find((c) => c.type === 'embedding' && c.enabled)
+                    ?? indexConfigs.find((c) => c.type === 'embedding')
+                    ?? null;
             }
 
             if (!targetConfig) {
@@ -6932,13 +7071,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         version: 'number'
                     };
 
-                    const loadResponse = await OramaWorkerManager.getInstance().load(tempId, data, schema, true);
+                    const loadResponse = await OramaWorkerManager.getInstance().load(tempId, data, schema, true) as { documents?: Array<Record<string, unknown>>; metadata?: { documents?: Array<Record<string, unknown>> } } | undefined;
                     await OramaWorkerManager.getInstance().remove(tempId, ''); 
 
                     const docs = loadResponse?.documents || loadResponse?.metadata?.documents || [];
                     for (const doc of docs) {
-                        if (doc.path && doc.path.endsWith('.md')) {
-                            indexedFilePaths.add(doc.path);
+                        const docPath = String(doc.path || '');
+                        if (docPath && docPath.endsWith('.md')) {
+                            indexedFilePaths.add(docPath);
                         }
                     }
                 } catch { /* treat as empty */ }
@@ -6949,10 +7089,10 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             const allFiles = this.app.vault.getMarkdownFiles();
             const includedFiles = isBM25
                 ? allFiles
-                : allFiles.filter((file: SafeAny) => !embeddingsManager.isFileExcluded(file.path, indexId));
+                : allFiles.filter((file) => !embeddingsManager.isFileExcluded(file.path, indexId));
 
             
-            const nonIndexedFiles = includedFiles.filter((file: SafeAny) => !indexedFilePaths.has(file.path) && (file.stat?.size || 0) > 0);
+            const nonIndexedFiles = includedFiles.filter((file) => !indexedFilePaths.has(file.path) && (file.stat?.size || 0) > 0);
 
             container.empty();
 
@@ -6963,7 +7103,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 countText.createSpan({ text: `${nonIndexedFiles.length}`, cls: 'index-status-files-count' });
                 countText.appendText(` file${nonIndexedFiles.length !== 1 ? 's' : ''} not indexed:`);
 
-                nonIndexedFiles.sort((a: SafeAny, b: SafeAny) => a.path.localeCompare(b.path));
+                nonIndexedFiles.sort((a, b) => a.path.localeCompare(b.path));
 
                 const displayLimit = 50;
                 for (const file of nonIndexedFiles.slice(0, displayLimit)) {
@@ -7035,13 +7175,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         }
     }
 
-    private getFileActionDataForSave(fileActionIds: string[]): { [actionId: string]: Record<string, unknown> } {
-        const actionData: { [actionId: string]: Record<string, unknown> } = {};
+    private getFileActionDataForSave(fileActionIds: string[]): { [actionId: string]: FileActionSaveData } {
+        const actionData: { [actionId: string]: FileActionSaveData } = {};
 
         for (const actionId of fileActionIds) {
             const actionState = this.activeFileActions.get(actionId);
             if (actionState) {
-                actionData[actionId] = {
+                const saveData: FileActionSaveData = {
                     type: actionState.type,
                     fileName: actionState.fileName,
                     status: actionState.status,
@@ -7050,7 +7190,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
                 
                 if (actionState.type === 'edit' && actionState.data) {
-                    (actionData[actionId] as Record<string, unknown>).editData = {
+                    saveData.editData = {
                         filePath: actionState.data.file?.path || '',
                         originalContent: actionState.data.originalContent || '',
                         editedContent: actionState.data.editedContent || '',
@@ -7060,12 +7200,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
                 
                 if (actionState.type === 'create' && actionState.data) {
-                    (actionData[actionId] as Record<string, unknown>).createData = {
+                    saveData.createData = {
                         folderName: actionState.data.folderName || '',
                         creationPrompt: actionState.data.creationPrompt || '',
                         files: actionState.data.files || []
                     };
                 }
+
+                actionData[actionId] = saveData;
             }
         }
 
@@ -7150,7 +7292,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             textArea.setCssProps({ '--response-height':  textArea.scrollHeight + 'px' });
         };
         textArea.addEventListener('input', adjustHeight);
-        setTimeout(adjustHeight, 0); 
+        window.setTimeout(adjustHeight, 0); 
 
         const buttonContainer = editContainer.createDiv({ cls: 'query-edit-buttons' });
 
@@ -7198,7 +7340,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         this.closeContextMenu();
         this.contextMenuOpenFromMore = fromMore;
         
-        const menu = document.createElement('div');
+        const menu = this.document.createElement('div');
         menu.className = 'context-file-menu';
         
         const rect = anchorEl.getBoundingClientRect();
@@ -7207,14 +7349,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         menu.addClass('nl-z-index-9999');
         menu.addClass('nl-min-width-260px');
         
-        const searchInput = document.createElement('input');
+        const searchInput = this.document.createElement('input');
         searchInput.type = 'text';
         searchInput.className = 'context-file-menu-search';
         searchInput.placeholder = 'Search files directly by name, use / for folders';
         menu.appendChild(searchInput);
         this.contextMenuInput = searchInput;
         
-        const listContainer = document.createElement('div');
+        const listContainer = this.document.createElement('div');
         listContainer.className = 'context-file-menu-list';
         menu.appendChild(listContainer);
         
@@ -7233,7 +7375,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         this.selectedFiles.add(file.path);
                         this.renderFileCapsules(this.inputContainer.querySelector('.context-capsule-display') as HTMLElement);
                     },
-                    searchInput as SafeAny, 
+                    searchInput as unknown as HTMLTextAreaElement,
                     curPos
                 );
                 modal.open();
@@ -7249,7 +7391,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         filesInFolder.forEach(file => this.selectedFiles.add(file.path));
                         this.renderFileCapsules(this.inputContainer.querySelector('.context-capsule-display') as HTMLElement);
                     },
-                    searchInput as SafeAny, 
+                    searchInput as unknown as HTMLTextAreaElement,
                     curPos
                 );
                 modal.open();
@@ -7258,10 +7400,10 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             this.renderContextMenuOptions(listContainer, val);
         });
         
-        setTimeout(() => {
-            document.addEventListener('mousedown', this.handleContextMenuOutsideClick, true);
+        window.setTimeout(() => {
+            this.document.addEventListener('mousedown', this.handleContextMenuOutsideClick, true);
         }, 0);
-        document.body.appendChild(menu);
+        this.document.body.appendChild(menu);
         
         const menuHeight = menu.offsetHeight;
         
@@ -7276,14 +7418,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
     private closeContextMenu = () => {
         if (this.contextMenuEl) {
-            document.body.removeChild(this.contextMenuEl);
+            this.document.body.removeChild(this.contextMenuEl);
             this.contextMenuEl = null;
         }
         if (this.contextMenuPreviewEl) {
-            document.body.removeChild(this.contextMenuPreviewEl);
+            this.document.body.removeChild(this.contextMenuPreviewEl);
             this.contextMenuPreviewEl = null;
         }
-        document.removeEventListener('mousedown', this.handleContextMenuOutsideClick, true);
+        this.document.removeEventListener('mousedown', this.handleContextMenuOutsideClick, true);
         this.contextMenuAtIndex = -1;
         this.contextMenuSearchTerm = '';
     };
@@ -7312,7 +7454,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         this.closeContextMenu();
         this.contextMenuOpenFromMore = fromMore;
 
-        const menu = document.createElement('div');
+        const menu = this.document.createElement('div');
         menu.className = 'context-file-menu';
 
         
@@ -7323,7 +7465,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         menu.addClass('nl-min-width-260px');
 
         
-        const listContainer = document.createElement('div');
+        const listContainer = this.document.createElement('div');
         listContainer.className = 'context-file-menu-list';
         menu.appendChild(listContainer);
 
@@ -7331,11 +7473,11 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         this.renderContextMenuOptionsFiltered(listContainer, searchTerm);
 
         
-        setTimeout(() => {
-            document.addEventListener('mousedown', this.handleContextMenuOutsideClick, true);
+        window.setTimeout(() => {
+            this.document.addEventListener('mousedown', this.handleContextMenuOutsideClick, true);
         }, 0);
 
-        document.body.appendChild(menu);
+        this.document.body.appendChild(menu);
 
         
         const menuHeight = menu.offsetHeight;
@@ -7354,7 +7496,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         const lowerSearch = searchTerm.toLowerCase();
 
         
-        const prefixOptions = [
+        const prefixOptions: PrefixOption[] = [
             { label: '@flash', value: '@flash ', action: 'prefix', description: 'Fast BM25 keyword search', hasToggle: true },
             { label: '@vault', value: '@vault ', action: 'prefix', hasToggle: true },
             { label: '@web', value: '@web ', action: 'prefix' },
@@ -7373,17 +7515,17 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         if (matchingPrefixes.length > 0) {
             matchingPrefixes.forEach((opt, index) => {
-                const item = document.createElement('div');
+                const item = this.document.createElement('div');
                 item.className = 'context-file-menu-item';
 
                 
-                if ('badge' in opt && (opt as SafeAny).badge) {
-                    const labelSpan = document.createElement('span');
+                if ('badge' in opt && (opt as PrefixOption).badge) {
+                    const labelSpan = this.document.createElement('span');
                     labelSpan.textContent = opt.label;
 
-                    const badgeSpan = document.createElement('span');
+                    const badgeSpan = this.document.createElement('span');
                     badgeSpan.className = 'feature-badge beta-badge';
-                    badgeSpan.textContent = (opt as SafeAny).badge;
+                    badgeSpan.textContent = (opt as PrefixOption).badge!;
                     badgeSpan.addClass('nl-css-text-remaining-14');
 
                     item.appendChild(labelSpan);
@@ -7423,13 +7565,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             ).slice(0, 10); 
 
             if (matchingFiles.length > 0) {
-                const fileHeader = document.createElement('div');
+                const fileHeader = this.document.createElement('div');
                 fileHeader.className = 'context-file-menu-section-header';
                 fileHeader.textContent = 'Files';
                 container.appendChild(fileHeader);
 
                 matchingFiles.forEach((file, index) => {
-                    const item = document.createElement('div');
+                    const item = this.document.createElement('div');
                     item.className = 'context-file-menu-item';
 
                     const iconSpan = item.createSpan();
@@ -7444,7 +7586,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     if (index === 0) {
                         item.classList.add('selected');
                         
-                        setTimeout(() => this.updateContextMenuPreview(item), 100);
+                        window.setTimeout(() => { this.updateContextMenuPreview(item).catch(console.error); }, 100);
                     }
 
                     item.addEventListener('click', (e) => {
@@ -7453,20 +7595,20 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     });
 
                     
-                    item.addEventListener('mouseenter', async () => {
+                    item.addEventListener('mouseenter', () => {
                         
                         const allItems = container.querySelectorAll('.context-file-menu-item');
                         allItems.forEach(i => i.classList.remove('selected'));
                         
                         item.classList.add('selected');
                         
-                        await this.updateContextMenuPreview(item);
+                        this.updateContextMenuPreview(item).catch(console.error);
                     });
 
                     container.appendChild(item);
                 });
             } else {
-                const noResults = document.createElement('div');
+                const noResults = this.document.createElement('div');
                 noResults.className = 'context-file-menu-item';
                 noResults.textContent = 'No matches found';
                 noResults.addClass('nl-opacity-05');
@@ -7479,7 +7621,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
      * Handles selection of a feature prefix
      * Places prefix at the start of the query
      */
-    private handlePrefixSelection(opt: SafeAny) {
+    private handlePrefixSelection(opt: PrefixOption) {
         
         const atIndex = this.contextMenuAtIndex;
 
@@ -7487,33 +7629,35 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         if (opt.action === 'modal' && opt.modalType === 'youtube') {
-            new YouTubeURLModal(this.app, async (url) => {
-                this.selectedFiles.add(url);
+            new YouTubeURLModal(this.app, (url) => {
+                void (async () => {
+                    this.selectedFiles.add(url);
 
-                
-                const shouldSaveTranscript = this.settings.saveYoutubeTranscripts ?? true;
-
-                if (!shouldSaveTranscript) {
                     
-                    try {
-                        new Notice('Fetching YouTube transcript...');
-                        const ytService = new YouTubeChatService(this.settings, this.rateLimitManager);
-                        const [transcript, videoTitle] = await Promise.all([
-                            ytService.getTranscriptOnly(url),
-                            ytService.getVideoTitle(url)
-                        ]);
+                    const shouldSaveTranscript = this.settings.saveYoutubeTranscripts ?? true;
 
+                    if (!shouldSaveTranscript) {
                         
-                        this.youtubeTranscriptCache.set(url, { transcript, videoTitle });
-                        new Notice('YouTube transcript fetched successfully');
-                    } catch (error: SafeAny) {
-                        new Notice(`Failed to fetch transcript: ${error.message}`);
-                        
-                        this.selectedFiles.delete(url);
+                        try {
+                            new Notice('Fetching YouTube transcript...');
+                            const ytService = new YouTubeChatService(this.settings, this.rateLimitManager);
+                            const [transcript, videoTitle] = await Promise.all([
+                                ytService.getTranscriptOnly(url),
+                                ytService.getVideoTitle(url)
+                            ]);
+
+                            
+                            this.youtubeTranscriptCache.set(url, { transcript, videoTitle });
+                            new Notice('YouTube transcript fetched successfully');
+                        } catch (error: unknown) {
+                            new Notice(`Failed to fetch transcript: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                            
+                            this.selectedFiles.delete(url);
+                        }
                     }
-                }
 
-                this.renderFileCapsules(this.inputContainer.querySelector('.context-capsule-display') as HTMLElement);
+                    this.renderFileCapsules(this.inputContainer.querySelector('.context-capsule-display') as HTMLElement);
+                })();
             }).open();
 
             
@@ -7571,7 +7715,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 return;
             }
 
-            const availableServers = (this.settings.mcpServers || []).filter((s: SafeAny) => !s.disabled);
+            const availableServers = (this.settings.mcpServers || []).filter((s) => !s.disabled);
             if (availableServers.length === 0) {
                 new Notice('No MCP servers configured. Please add servers in settings.');
                 return;
@@ -7586,7 +7730,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     this.pendingMCPSelection = selection;
                     
                     const serverNames = selection.selectedServers
-                        .map((id: string) => this.settings.mcpServers.find((s: SafeAny) => s.id === id)?.name)
+                        .map((id: string) => this.settings.mcpServers.find((s) => s.id === id)?.name)
                         .filter(Boolean)
                         .join(', ');
                     const capsuleDisplay = this.inputContainer?.querySelector('.context-capsule-display') as HTMLElement;
@@ -7765,9 +7909,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             if (!this.contextMenuPreviewEl) {
-                this.contextMenuPreviewEl = document.createElement('div');
+                this.contextMenuPreviewEl = this.document.createElement('div');
                 this.contextMenuPreviewEl.className = 'context-file-preview';
-                document.body.appendChild(this.contextMenuPreviewEl);
+                this.document.body.appendChild(this.contextMenuPreviewEl);
             }
 
             
@@ -7828,12 +7972,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         if (this.contextMenuOpenFromMore && files.length > maxVisible) {
             const remaining = files.slice(maxVisible);
-            const remHeader = document.createElement('div');
+            const remHeader = this.document.createElement('div');
             remHeader.className = 'context-file-menu-section-header';
             remHeader.textContent = 'Added files';
             container.appendChild(remHeader);
             remaining.forEach(path => {
-                const item = document.createElement('div');
+                const item = this.document.createElement('div');
                 item.className = 'context-file-menu-item added';
 
                 
@@ -7873,7 +8017,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 container.appendChild(item);
             });
             
-            const divider = document.createElement('div');
+            const divider = this.document.createElement('div');
             divider.className = 'context-file-menu-divider';
             container.appendChild(divider);
         }
@@ -7886,14 +8030,14 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             .slice()
             .sort((a, b) => b.stat.mtime - a.stat.mtime)
             .slice(0, filter ? allFiles.length : 5); 
-        const recHeader = document.createElement('div');
+        const recHeader = this.document.createElement('div');
         recHeader.className = 'context-file-menu-section-header';
         recHeader.textContent = 'Recent files';
         container.appendChild(recHeader);
         recentFiles.forEach(file => {
             
             if (this.selectedFiles.has(file.path)) return;
-            const item = document.createElement('div');
+            const item = this.document.createElement('div');
             item.className = 'context-file-menu-item';
             const iconSpan = item.createSpan();
             setIcon(iconSpan, this.getFileTypeIcon(file.name));
@@ -7908,12 +8052,12 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             container.appendChild(item);
         });
         
-        const divider2 = document.createElement('div');
+        const divider2 = this.document.createElement('div');
         divider2.className = 'context-file-menu-divider';
         container.appendChild(divider2);
         
         if (!this.contextMenuOpenFromMore) {
-            const prefixOptions = [
+            const prefixOptions: PrefixOption[] = [
                 { label: '@flash', value: '@flash ', action: 'prefix', description: 'Fast BM25 keyword search', hasToggle: true },
                 { label: '@vault', value: '@vault ', action: 'prefix', hasToggle: true },
                 { label: '@web', value: '@web ', action: 'prefix' },
@@ -7924,25 +8068,25 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 { label: '@youtube', value: '@youtube', action: 'modal', modalType: 'youtube' }
             ];
             prefixOptions.forEach(opt => {
-                const item = document.createElement('div');
+                const item = this.document.createElement('div');
                 item.className = 'context-file-menu-item';
 
                 
                 if (opt.hasToggle && opt.value === '@vault ') {
-                    const labelSpan = document.createElement('span');
+                    const labelSpan = this.document.createElement('span');
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = document.createElement('div');
+                    const toggleContainer = this.document.createElement('div');
                     toggleContainer.className = 'vault-citation-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-13');
 
                     
-                    const toggleLabel = document.createElement('span');
+                    const toggleLabel = this.document.createElement('span');
                     toggleLabel.textContent = 'Citations';
                     toggleLabel.addClass('nl-css-text-rem-14');
 
-                    const toggleSwitch = document.createElement('input');
+                    const toggleSwitch = this.document.createElement('input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'vault-citation-toggle';
                     toggleSwitch.checked = this.vaultInlineCitationsEnabled;
@@ -7962,19 +8106,19 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     item.addClass('nl-css-text-rem-15');
                 } else if (opt.hasToggle && opt.value === '@flash ') {
                     
-                    const labelSpan = document.createElement('span');
+                    const labelSpan = this.document.createElement('span');
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = document.createElement('div');
+                    const toggleContainer = this.document.createElement('div');
                     toggleContainer.className = 'flash-citation-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-16');
 
-                    const toggleLabel = document.createElement('span');
+                    const toggleLabel = this.document.createElement('span');
                     toggleLabel.textContent = 'Citations';
                     toggleLabel.addClass('nl-css-text-rem-17');
 
-                    const toggleSwitch = document.createElement('input');
+                    const toggleSwitch = this.document.createElement('input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'flash-citation-toggle';
                     toggleSwitch.checked = this.flashInlineCitationsEnabled;
@@ -7995,16 +8139,16 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     /* TEMPORARILY DISABLED - @agent mode
                     } else if (opt.hasToggle && opt.value === '@agent ') {
                         
-                        const labelContainer = document.createElement('div');
+                        const labelContainer = this.document.createElement('div');
                         labelContainer.addClass('nl-css-text-rem-19');
                         
-                        const labelSpan = document.createElement('span');
+                        const labelSpan = this.document.createElement('span');
                         labelSpan.textContent = opt.label;
                         labelContainer.appendChild(labelSpan);
                         
                         
                         if (opt.badge) {
-                            const badgeSpan = document.createElement('span');
+                            const badgeSpan = this.document.createElement('span');
                             badgeSpan.className = 'feature-badge beta-badge';
                             badgeSpan.textContent = opt.badge;
                             badgeSpan.addClass('nl-css-text-rem-20');
@@ -8013,15 +8157,15 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                         
                         item.appendChild(labelContainer);
                         
-                        const toggleContainer = document.createElement('div');
+                        const toggleContainer = this.document.createElement('div');
                         toggleContainer.className = 'agent-ratelimit-toggle-container';
                         toggleContainer.addClass('nl-css-text-rem-21');
                         
-                        const toggleLabel = document.createElement('span');
+                        const toggleLabel = this.document.createElement('span');
                         toggleLabel.textContent = 'Rate Limit';
                         toggleLabel.addClass('nl-css-text-rem-22');
                         
-                        const toggleSwitch = document.createElement('input');
+                        const toggleSwitch = this.document.createElement('input');
                         toggleSwitch.type = 'checkbox';
                         toggleSwitch.className = 'agent-ratelimit-toggle';
                         toggleSwitch.checked = this.agentRateLimitEnabled;
@@ -8042,19 +8186,19 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     */ 
                 } else if (opt.hasToggle && opt.value === '@mcp ') {
                     
-                    const labelSpan = document.createElement('span');
+                    const labelSpan = this.document.createElement('span');
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = document.createElement('div');
+                    const toggleContainer = this.document.createElement('div');
                     toggleContainer.className = 'mcp-ratelimit-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-24');
 
-                    const toggleLabel = document.createElement('span');
+                    const toggleLabel = this.document.createElement('span');
                     toggleLabel.textContent = 'Delay Limit';
                     toggleLabel.addClass('nl-css-text-rem-25');
 
-                    const toggleSwitch = document.createElement('input');
+                    const toggleSwitch = this.document.createElement('input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'mcp-ratelimit-toggle';
                     toggleSwitch.checked = this.mcpRateLimitEnabled;
@@ -8107,7 +8251,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                             new Notice('MCP support is disabled. Enable it in settings.');
                             return;
                         }
-                        const availableServers = (this.settings.mcpServers || []).filter((s: SafeAny) => !s.disabled);
+const availableServers = (this.settings.mcpServers || []).filter((s) => !s.disabled);
                         if (availableServers.length === 0) {
                             new Notice('No MCP servers configured. Please add servers in settings.');
                             return;
@@ -8119,7 +8263,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                             (selection) => {
                                 this.pendingMCPSelection = selection;
                                 const serverNames = selection.selectedServers
-                                    .map((id: string) => this.settings.mcpServers.find((s: SafeAny) => s.id === id)?.name)
+.map((id: string) => this.settings.mcpServers.find((s) => s.id === id)?.name)
                                     .filter(Boolean)
                                     .join(', ');
                                 const capsuleDisplay = this.inputContainer?.querySelector('.context-capsule-display') as HTMLElement;
@@ -8338,7 +8482,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             this.sessionHistoryModal.remove();
             this.sessionHistoryModal = null;
         }
-        const modal = document.createElement('div');
+        const modal = this.document.createElement('div');
         modal.className = 'ai-chat-session-history-modal';
         
         modal.createDiv({ cls: 'modal-bg' });
@@ -8362,7 +8506,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         const pageInfo = paginationDiv.createSpan({ cls: 'page-info' });
         const nextBtn = paginationDiv.createEl('button', { cls: 'next-page-btn', text: 'Next' });
 
-        document.body.appendChild(modal);
+        this.document.body.appendChild(modal);
         this.sessionHistoryModal = modal;
 
         closeBtn.addEventListener('click', () => {
@@ -8374,7 +8518,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         const pageSize = 20;
         let totalSessions = 0;
         let currentSearchQuery = '';
-        let searchTimeout: NodeJS.Timeout | null = null;
+        let searchTimeout: number | null = null;
 
         const loadPage = async (page: number, searchQuery: string = '') => {
             sessionList.empty();
@@ -8396,9 +8540,9 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 paginationDiv.addClass('nl-display-none');
             } else {
                 
-                const fragment = document.createDocumentFragment();
+                const fragment = this.document.createDocumentFragment();
                 sessions.forEach(meta => {
-                    const card = document.createElement('div');
+                    const card = this.document.createElement('div');
                     card.className = 'session-card';
 
                     const sessionInfo = card.createDiv({ cls: 'session-info' });
@@ -8442,26 +8586,28 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                         text: new Date(meta.updatedAt).toLocaleString() 
                     });
 
-                    card.addEventListener('click', async () => {
-                        await this.loadAIChatSession(meta.id);
-                        modal.remove();
-                        this.sessionHistoryModal = null;
+                    card.addEventListener('click', () => {
+                        this.loadAIChatSession(meta.id).then(() => {
+                            modal.remove();
+                            this.sessionHistoryModal = null;
+                        }).catch(console.error);
                     });
-                    const deleteBtn = document.createElement('button');
+                    const deleteBtn = this.document.createElement('button');
                     deleteBtn.className = 'delete-session-btn';
                     setIcon(deleteBtn, 'trash-2');
                     deleteBtn.title = 'Delete session';
-                    deleteBtn.addEventListener('click', async (e) => {
+                    deleteBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        await this.aiChatSessionManager.deleteSession(meta.id);
-                        card.remove();
-                        totalSessions--;
-                        updatePagination();
-                        
-                        if (sessionList.querySelectorAll('.session-card').length === 0 && currentPage > 0) {
-                            currentPage--;
-                            await loadPage(currentPage, currentSearchQuery);
-                        }
+                        this.aiChatSessionManager.deleteSession(meta.id).then(() => {
+                            card.remove();
+                            totalSessions--;
+                            updatePagination();
+                            
+                            if (sessionList.querySelectorAll('.session-card').length === 0 && currentPage > 0) {
+                                currentPage--;
+                                return loadPage(currentPage, currentSearchQuery);
+                            }
+                        }).catch(console.error);
                     });
                     card.appendChild(deleteBtn);
                     fragment.appendChild(card);
@@ -8489,13 +8635,13 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         
         searchInput.addEventListener('input', () => {
             if (searchTimeout) {
-                clearTimeout(searchTimeout);
+                window.clearTimeout(searchTimeout);
             }
 
-            searchTimeout = setTimeout(async () => {
+            searchTimeout = window.setTimeout(() => {
                 currentSearchQuery = searchInput.value.trim();
                 currentPage = 0; 
-                await loadPage(currentPage, currentSearchQuery);
+                loadPage(currentPage, currentSearchQuery).catch(console.error);
             }, 300); 
         });
 
@@ -8510,18 +8656,18 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             }
         });
 
-        prevBtn.addEventListener('click', async () => {
+        prevBtn.addEventListener('click', () => {
             if (currentPage > 0) {
                 currentPage--;
-                await loadPage(currentPage, currentSearchQuery);
+                loadPage(currentPage, currentSearchQuery).catch(console.error);
             }
         });
 
-        nextBtn.addEventListener('click', async () => {
+        nextBtn.addEventListener('click', () => {
             const totalPages = Math.ceil(totalSessions / pageSize);
             if (currentPage < totalPages - 1) {
                 currentPage++;
-                await loadPage(currentPage, currentSearchQuery);
+                loadPage(currentPage, currentSearchQuery).catch(console.error);
             }
         });
 
@@ -8583,38 +8729,39 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         const session = await this.aiChatSessionManager.loadSession(sessionId);
         if (session) {
 
-            this.responses = session.messages.map((m: SafeAny) => ({
+            this.responses = session.messages.map((m) => {
+                return {
                 question: m.question,
                 answer: m.answer,
                 context: m.context || [],
                 timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
-                sources: m.sources || [],
-                webResults: m.webResults || [],
-                
+                sources: (m.sources || []) as Array<{ path: string; relevance: number }>,
+                webResults: (m.webResults || []) as unknown as WebSearchResult[],
+
 
                 id: m.id,
                 sessionId: m.sessionId,
                 fileActionIds: m.fileActionIds,
-                fileActionData: m.fileActionData,
-                
+                fileActionData: m.fileActionData as { [actionId: string]: FileActionData } | undefined,
+
                 modelName: m.modelName,
                 totalTokens: m.totalTokens,
                 responseTimeMs: m.responseTimeMs,
-                
+
                 agentSteps: m.agentSteps,
                 isAgentResponse: m.isAgentResponse,
                 vaultAnswer: m.vaultAnswer,
                 vaultResults: m.vaultResults,
-                
-                
+
+
                 fileOperations: m.fileOperations || [],
-                
-                mcpTools: m.mcpTools || [],
-                
-                searchMode: m.searchMode,
-                
+
+                mcpTools: (m.mcpTools || []) as Response['mcpTools'],
+
+                searchMode: m.searchMode as Response['searchMode'],
+
                 vaultIndexName: m.vaultIndexName
-            }));
+            }}) as Response[];
 
             this.currentSessionId = sessionId;
 
@@ -8630,7 +8777,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     btn.addClass('has-instructions');
                     
                     const matchedItem = this.settings.savedSystemInstructions?.find(
-                        (s: SafeAny) => s.instructions === this.currentSystemInstructions
+                        (s: { name: string; instructions: string; icon?: string }) => s.instructions === this.currentSystemInstructions
                     );
                     if (matchedItem?.icon) {
                         btn.empty();
@@ -8739,7 +8886,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
     private restoreFileActionCapsule(actionId: string, container: HTMLElement, response: Response) {
 
         
-        const savedActionData = response.fileActionData?.[actionId];
+        const savedActionData = response.fileActionData?.[actionId] as FileActionSaveData | undefined;
 
         
         let type: 'edit' | 'create' = savedActionData?.type || 'create';
@@ -8765,9 +8912,9 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             id: actionId,
             type: type,
             fileName: fileName,
-            status: savedActionData?.status || 'completed',
+            status: (savedActionData?.status || 'completed') as FileActionState['status'],
             element: capsule,
-            data: savedActionData ? this.reconstructActionData(savedActionData) : null,
+            data: savedActionData ? this.reconstructActionData(savedActionData) || undefined : undefined,
             isApplied: savedActionData?.isApplied || false,
             originalFileContent: savedActionData?.editData?.originalContent
         };
@@ -8816,23 +8963,37 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         capsule.addClass('nl-display-flex');
     }
 
-    private reconstructActionData(savedActionData: SafeAny): SafeAny {
+    private reconstructActionData(savedActionData: FileActionSaveData): FileActionResult | null {
         if (savedActionData.type === 'edit' && savedActionData.editData) {
-            
-            const filePath = savedActionData.editData.filePath;
+            const editData = savedActionData.editData;
+            const filePath = editData.filePath;
             const file = filePath ? this.app.vault.getAbstractFileByPath(filePath) : null;
 
             return {
+                type: 'edit',
+                editData: {
+                    filePath: filePath,
+                    originalContent: editData.originalContent || '',
+                    editedContent: editData.editedContent || '',
+                    editPrompt: editData.editPrompt || ''
+                },
                 file: file || { path: filePath, basename: filePath?.split('/').pop() || 'Unknown' },
-                originalContent: savedActionData.editData.originalContent || '',
-                editedContent: savedActionData.editData.editedContent || '',
-                editPrompt: savedActionData.editData.editPrompt || ''
+                originalContent: editData.originalContent || '',
+                editedContent: editData.editedContent || '',
+                editPrompt: editData.editPrompt || ''
             };
         } else if (savedActionData.type === 'create' && savedActionData.createData) {
+            const createData = savedActionData.createData;
             return {
-                folderName: savedActionData.createData.folderName || 'New Files',
-                creationPrompt: savedActionData.createData.creationPrompt || '',
-                files: Array.isArray(savedActionData.createData.files) ? savedActionData.createData.files : []
+                type: 'create',
+                createData: {
+                    folderName: createData.folderName || 'New Files',
+                    creationPrompt: createData.creationPrompt || '',
+                    files: Array.isArray(createData.files) ? createData.files : []
+                },
+                folderName: createData.folderName || 'New Files',
+                creationPrompt: createData.creationPrompt || '',
+                files: Array.isArray(createData.files) ? createData.files : []
             };
         }
         return null;
@@ -8878,7 +9039,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 if (actionState.type === 'create' && actionState.data) {
                     
                     try {
-                        await this.deleteFilesFromPlan(actionState.data);
+                        await this.deleteFilesFromPlan(actionState.data as FileCreationPlan);
                         actionState.isApplied = false;
                         new Notice(`Deleted created files from "${actionState.data.folderName}". Click accept to recreate.`);
                     } catch (err) {
@@ -8911,7 +9072,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
     }
 
     
-    createFileActionCapsule(type: 'edit' | 'create', fileName: string, data?: SafeAny): string {
+    createFileActionCapsule(type: 'edit' | 'create', fileName: string, data?: FileActionResult): string {
         const actionId = `file-action-${++this.fileActionCounter}`;
 
         const actionState: FileActionState = {
@@ -8919,7 +9080,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             type,
             fileName,
             status: 'processing',
-            element: null as SafeAny, 
+            element: null as unknown as HTMLElement,
             data
         };
 
@@ -8951,10 +9112,10 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
         
         const nameEl = capsule.createDiv({ cls: 'file-action-name' });
-        if ((actionState as SafeAny).fileName && (actionState as SafeAny).fileName.includes('[[') && (actionState as SafeAny).fileName.includes(']]')) {
-            MarkdownRenderer.render(this.app, (actionState as SafeAny).fileName, nameEl, '', this);
+        if (actionState.fileName && actionState.fileName.includes('[[') && actionState.fileName.includes(']]')) {
+            MarkdownRenderer.render(this.app, actionState.fileName, nameEl, '', this);
         } else {
-            nameEl.textContent = (actionState as SafeAny).fileName;
+            nameEl.textContent = actionState.fileName;
         }
 
         
@@ -9032,8 +9193,8 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             import('../tools/fileCreateTool').then(mod => {
                 if (mod.FileCreationReviewModal) {
                     try {
-                        new mod.FileCreationReviewModal(this.app, data, this.plugin.settings, (acceptedPlan: SafeAny) => {
-                            this.acceptFileAction(actionId, acceptedPlan);
+                        new mod.FileCreationReviewModal(this.app, data as unknown as FileCreationPlan, this.plugin.settings, (acceptedPlan: unknown) => {
+                            this.acceptFileAction(actionId, acceptedPlan as FileActionResult);
                         }).open();
                     } catch (modalError) {
                                                 new Notice('Failed to create create modal: ' + (modalError instanceof Error ? modalError.message : 'Unknown error'));
@@ -9047,7 +9208,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         }
     }
 
-    async acceptFileAction(actionId: string, data?: SafeAny) {
+    async acceptFileAction(actionId: string, data?: FileActionResult) {
         const actionState = this.activeFileActions.get(actionId);
         if (!actionState) return;
 
@@ -9078,20 +9239,20 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 if (plan && plan.nodes && Array.isArray(plan.nodes)) {
                     
                     const targetFolder = plan.folderName || 'New Files';
-                    await this.createCanvasFile(targetFolder, plan);
+                    await this.createCanvasFile(targetFolder, plan as CanvasData);
                     actionState.isApplied = true;
                     new Notice(`Created canvas file in folder: ${targetFolder}`);
                 } else if (actionState.isExcalidraw || (plan && plan.type === 'excalidraw')) {
                     
                     const targetFolder = actionState.fileName || 'New Files';
-                    await this.createExcalidrawFile(targetFolder, plan);
+                    await this.createExcalidrawFile(targetFolder, plan as ExcalidrawData);
                     actionState.isApplied = true;
                     new Notice(`Created Excalidraw diagram in folder: ${targetFolder}`);
                 } else {
                     
-                    await this.createFilesFromPlan(plan);
+                    await this.createFilesFromPlan(plan as FileCreationPlan);
                     actionState.isApplied = true;
-                    new Notice(`Created ${plan.files.length} file(s) in folder: ${plan.folderName}. Click reject to delete.`);
+                    new Notice(`Created ${plan?.files?.length || 0} file(s) in folder: ${plan?.folderName || 'Unknown'}. Click reject to delete.`);
                 }
             } catch (err) {
                 new Notice('Error creating files: ' + (err instanceof Error ? err.message : String(err)));
@@ -9129,7 +9290,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                             new Notice(`Deleted Excalidraw file from "${folderPath}". Click accept to recreate.`);
                         } else {
                             
-                            await this.deleteFilesFromPlan(actionState.data);
+                        await this.deleteFilesFromPlan(actionState.data as FileCreationPlan);
                             actionState.isApplied = false;
                             new Notice(`Deleted created files from "${actionState.data.folderName}". Click accept to recreate.`);
                         }
@@ -9229,7 +9390,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         statusEl.className = `file-action-status ${actionState.status}`;
     }
 
-    private async deleteFilesFromPlan(plan: SafeAny): Promise<void> {
+    private async deleteFilesFromPlan(plan: FileCreationPlan): Promise<void> {
         if (!plan || !plan.folderName || !Array.isArray(plan.files)) {
             throw new Error('Invalid file creation plan for deletion');
         }
@@ -9251,7 +9412,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         try {
             const folder = this.app.vault.getAbstractFileByPath(plan.folderName);
             if (folder && folder instanceof this.app.vault.adapter.constructor && 'children' in folder) {
-                const folderChildren = (folder as SafeAny).children;
+                const folderChildren = (folder as TFolder).children;
                 if (folderChildren && folderChildren.length === 0) {
                     await this.app.vault.delete(folder);
                 }
@@ -9261,7 +9422,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         }
     }
 
-    async processFileCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: SafeAny[] = [], autoSelectedModel: ModelSelection | null = null) {
+    async processFileCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: ContextFile[] = [], autoSelectedModel: ModelSelection | null = null) {
         try {
             const actionState = this.activeFileActions.get(actionId);
             if (!actionState) return;
@@ -9325,7 +9486,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         return filePath;
     }
 
-    async processCanvasCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: SafeAny[] = [], autoSelectedModel: ModelSelection | null = null) {
+    async processCanvasCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: ContextFile[] = [], autoSelectedModel: ModelSelection | null = null) {
         try {
             const actionState = this.activeFileActions.get(actionId);
             if (!actionState) return;
@@ -9350,7 +9511,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
             
             const canvasJSON = processDiagramContent(markdown, 'canvas');
-            const canvasData = JSON.parse(canvasJSON);
+            const canvasData = JSON.parse(canvasJSON) as CanvasParseResult;
 
             
             const folder = targetFolder || 'New Files';
@@ -9384,7 +9545,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         }
     }
 
-    async processExcalidrawCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: SafeAny[] = [], autoSelectedModel: ModelSelection | null = null) {
+    async processExcalidrawCreate(actionId: string, prompt: string, targetFolder?: string, contextFiles: ContextFile[] = [], autoSelectedModel: ModelSelection | null = null) {
         try {
             const actionState = this.activeFileActions.get(actionId);
             if (!actionState) return;
@@ -9409,7 +9570,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
             
             const excalidrawJSON = processDiagramContent(markdown, 'excalidraw');
-            const excalidrawData = JSON.parse(excalidrawJSON);
+            const excalidrawData = JSON.parse(excalidrawJSON) as ExcalidrawParseResult;
 
             
             const folder = targetFolder || 'New Files';
@@ -9418,7 +9579,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             
             excalidrawData.folderName = folder;
             excalidrawData.targetPath = fullPath;
-            actionState.data = excalidrawData;
+            actionState.data = excalidrawData as unknown as FileActionResult;
             actionState.isExcalidraw = true;
 
             
@@ -9436,7 +9597,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
             
             if (actionState.element && actionState.element.classList.contains('historical')) {
-                await this.acceptFileAction(actionId, excalidrawData);
+                await this.acceptFileAction(actionId, excalidrawData as unknown as FileActionResult);
             }
 
         } catch (error) {
@@ -9444,7 +9605,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
         }
     }
 
-    private async generateDiagramMarkdown(context: SafeAny, type: 'canvas' | 'excalidraw'): Promise<string> {
+    private async generateDiagramMarkdown(context: DiagramGenerationContext, type: 'canvas' | 'excalidraw'): Promise<string> {
         const provider = context.settings.provider;
         let apiKey: string = '';
 
@@ -9483,7 +9644,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
         let contextInfo = '';
         if (context.contextFiles.length > 0) {
-            contextInfo = `\n\nCONTEXT FILES PROVIDED:\n${context.contextFiles.map((f: SafeAny) => `- ${f.basename}:\n${f.content.substring(0, 1500)}`).join('\n\n')}`;
+            contextInfo = `\n\nCONTEXT FILES PROVIDED:\n${context.contextFiles.map((f: ContextFile) => `- ${f.basename}:\n${f.content.substring(0, 1500)}`).join('\n\n')}`;
         }
 
         const systemPrompt = `You are an expert at creating hierarchical diagram outlines.
@@ -9515,7 +9676,7 @@ IMPORTANT RULES:
         if (provider === 'groq') {
             const { GroqService } = await import('../services/groqService');
             const groqService = new GroqService(apiKey);
-            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9531,7 +9692,7 @@ IMPORTANT RULES:
         } else if (provider === 'openrouter') {
             const { OpenRouterService } = await import('../services/openRouterService');
             const openRouterService = new OpenRouterService(apiKey);
-            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9547,7 +9708,7 @@ IMPORTANT RULES:
         } else if (provider === 'ollama') {
             const { OllamaService } = await import('../services/ollamaService');
             const ollamaService = new OllamaService(context.settings.ollamaBaseUrl, context.settings.ollamaApiKey);
-            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9563,7 +9724,7 @@ IMPORTANT RULES:
         } else if (provider === 'nvidia') {
             const { NvidiaService } = await import('../services/nvidiaService');
             const nvidiaService = new NvidiaService(apiKey);
-            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9578,7 +9739,7 @@ IMPORTANT RULES:
             );
         } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
             const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(provider)!;
-            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9608,7 +9769,7 @@ IMPORTANT RULES:
         return aiText;
     }
 
-    private async getInitialFileStructure(context: SafeAny): Promise<SafeAny> {
+    private async getInitialFileStructure(context: DiagramGenerationContext): Promise<FileCreationPlan | null> {
         
         const provider = context.settings.provider;
         let apiKey: string = '';
@@ -9651,7 +9812,7 @@ IMPORTANT RULES:
             
             let contextInfo = '';
             if (context.contextFiles.length > 0) {
-                contextInfo = `\n\nCONTEXT FILES PROVIDED:\n${context.contextFiles.map((f: SafeAny) => `- ${f.basename}: ${f.content.substring(0, 200)}...`).join('\n')}`;
+                contextInfo = `\n\nCONTEXT FILES PROVIDED:\n${context.contextFiles.map((f: ContextFile) => `- ${f.basename}: ${f.content.substring(0, 200)}...`).join('\n')}`;
             }
 
             if (context.webSearchEnabled) {
@@ -9700,7 +9861,7 @@ CRITICAL:
                 const { GroqService } = await import('../services/groqService');
                 const groqService = new GroqService(apiKey);
                 
-                const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+                const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                     role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                     content: h.parts[0].text
                 }));
@@ -9718,7 +9879,7 @@ CRITICAL:
                 const { OpenRouterService } = await import('../services/openRouterService');
                 const openRouterService = new OpenRouterService(apiKey);
                 
-                const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+                const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                     role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                     content: h.parts[0].text
                 }));
@@ -9738,7 +9899,7 @@ CRITICAL:
                     context.settings.ollamaApiKey
                 );
                 
-                const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+                const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                     role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                     content: h.parts[0].text
                 }));
@@ -9760,7 +9921,7 @@ CRITICAL:
             } else if (provider === 'nvidia') {
                 const { NvidiaService } = await import('../services/nvidiaService');
                 const nvidiaService = new NvidiaService(apiKey);
-                const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+                const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                     role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                     content: h.parts[0].text
                 }));
@@ -9775,7 +9936,7 @@ CRITICAL:
                 );
             } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
                 const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(provider)!;
-                const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+                const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                     role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                     content: h.parts[0].text
                 }));
@@ -9811,7 +9972,7 @@ CRITICAL:
                 });
 
                 const result = await chat.sendMessage(systemPrompt + '\n\n' + userPrompt);
-                aiText = (this.extractGeminiAnswerTextFromResponse(result.response) || result.response.text()).trim();
+                aiText = (this.extractGeminiAnswerTextFromResponse(result.response as unknown as GeminiResponse) || result.response.text()).trim();
             }
 
             if (!aiText || aiText.length === 0) {
@@ -9830,7 +9991,7 @@ CRITICAL:
         }
     }
 
-    private async generateDetailedFileContent(initialPlan: SafeAny, context: SafeAny, autoSelectedModel: ModelSelection | null = null): Promise<SafeAny> {
+    private async generateDetailedFileContent(initialPlan: FileCreationPlan, context: DiagramGenerationContext, autoSelectedModel: ModelSelection | null = null): Promise<FileCreationPlan> {
         const enhancedFiles = [];
 
         for (let i = 0; i < initialPlan.files.length; i++) {
@@ -9863,7 +10024,7 @@ CRITICAL:
         };
     }
 
-    private async generateSingleFileContent(file: SafeAny, context: SafeAny): Promise<string> {
+    private async generateSingleFileContent(file: { name: string; extension?: string; description?: string }, context: DiagramGenerationContext): Promise<string> {
         
         const provider = context.settings.provider;
         let apiKey: string = '';
@@ -9908,7 +10069,7 @@ CONTEXT PROVIDED:`;
 
         
         if (context.contextFiles.length > 0) {
-            systemPrompt += `\n\nRELEVANT CONTEXT FILES:\n${context.contextFiles.map((f: SafeAny) => `- ${f.basename}: ${f.content.substring(0, 300)}...`).join('\n')}`;
+            systemPrompt += `\n\nRELEVANT CONTEXT FILES:\n${context.contextFiles.map((f: ContextFile) => `- ${f.basename}: ${f.content.substring(0, 300)}...`).join('\n')}`;
         }
 
         systemPrompt += `\n\nORIGINAL USER REQUEST: ${context.userPrompt}
@@ -9923,7 +10084,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
             const { GroqService } = await import('../services/groqService');
             const groqService = new GroqService(apiKey);
             
-            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9941,7 +10102,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
             const { OpenRouterService } = await import('../services/openRouterService');
             const openRouterService = new OpenRouterService(apiKey);
             
-            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9961,7 +10122,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
                 context.settings.ollamaApiKey
             );
             
-            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9983,7 +10144,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         } else if (provider === 'nvidia') {
             const { NvidiaService } = await import('../services/nvidiaService');
             const nvidiaService = new NvidiaService(apiKey);
-            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -9998,7 +10159,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
             );
         } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
             const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(provider)!;
-            const convertedHistory = (context.chatHistory || []).map((h: SafeAny) => ({
+            const convertedHistory = (context.chatHistory || []).map((h: ChatHistoryEntry) => ({
                 role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
                 content: h.parts[0].text
             }));
@@ -10022,9 +10183,9 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
             const genAI = new GoogleGenerativeAI(apiKey);
 
             
-            const modelConfig: SafeAny = { model: context.settings.model };
+            const modelConfig = { model: context.settings.model } as unknown as import('@google/generative-ai').ModelParams;
             if (context.webSearchEnabled && context.webSearchService) {
-                modelConfig.tools = [context.webSearchService.getGoogleSearchToolConfig()];
+                modelConfig.tools = [context.webSearchService.getGoogleSearchToolConfig()] as unknown as import('@google/generative-ai').Tool[];
             }
 
             const model = genAI.getGenerativeModel(modelConfig);
@@ -10050,7 +10211,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         return content;
     }
 
-    private extractAndValidateJSON(aiText: string): SafeAny {
+    private extractAndValidateJSON(aiText: string): FileCreationPlan | null {
 
         
         const strategies = [
@@ -10128,7 +10289,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
                 return null;
     }
 
-    private cleanAndParseJSON(jsonStr: string): SafeAny {
+    private cleanAndParseJSON(jsonStr: string): FileCreationPlan | null {
         if (!jsonStr || !jsonStr.trim()) return null;
 
         
@@ -10146,12 +10307,12 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
 
         
         try {
-            const parsed = JSON.parse(cleaned);
+            const parsed = JSON.parse(cleaned) as FileCreationPlan;
 
             
             if (parsed && typeof parsed === 'object' && parsed.folderName && Array.isArray(parsed.files)) {
                 
-                parsed.files = parsed.files.map((file: SafeAny) => ({
+                parsed.files = parsed.files.map((file: { name?: string; description?: string; content?: string; extension?: string }) => ({
                     name: file.name || 'Untitled',
                     description: file.description || '',
                     content: file.content || '# New File\n\nContent not generated.',
@@ -10171,10 +10332,10 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
                 aggressiveCleaned = aggressiveCleaned.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '');
 
                 
-                const parsed = JSON.parse(aggressiveCleaned);
+                const parsed = JSON.parse(aggressiveCleaned) as FileCreationPlan;
 
                 if (parsed && typeof parsed === 'object' && parsed.folderName && Array.isArray(parsed.files)) {
-                    parsed.files = parsed.files.map((file: SafeAny) => ({
+                    parsed.files = parsed.files.map((file: { name?: string; description?: string; content?: string; extension?: string }) => ({
                         name: file.name || 'Untitled',
                         description: file.description || '',
                         content: file.content || '# New File\n\nContent not generated.',
@@ -10217,7 +10378,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         }
     }
 
-    private createFallbackPlan(prompt: string, targetFolder?: string): SafeAny {
+    private createFallbackPlan(prompt: string, targetFolder?: string): FileCreationPlan {
         
         const folderName = targetFolder || 'New Files';
         const fileName = this.extractFileNameFromPrompt(prompt) || 'New File';
@@ -10249,7 +10410,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         return 'New File';
     }
 
-    private async createFilesFromPlan(plan: SafeAny): Promise<void> {
+    private async createFilesFromPlan(plan: FileCreationPlan): Promise<void> {
         if (!plan || !plan.folderName || !Array.isArray(plan.files)) {
             throw new Error('Invalid file creation plan');
         }
@@ -10277,8 +10438,8 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
                     try {
                         const templateContent = await this.app.vault.read(templateFile);
                         finalContent = templateContent + '\n\n' + finalContent;
-                    } catch (readError) {
-                                            }
+                    } catch (_readError) {
+                                        }
                 }
             }
 
@@ -10299,7 +10460,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         }
     }
 
-    private async createCanvasFile(folderPath: string, canvasData: SafeAny): Promise<void> {
+    private async createCanvasFile(folderPath: string, canvasData: CanvasData): Promise<void> {
         if (!canvasData || !canvasData.nodes || !Array.isArray(canvasData.nodes)) {
             throw new Error('Invalid canvas data: missing nodes array.');
         }
@@ -10323,7 +10484,7 @@ IMPORTANT: Return ONLY the markdown content for this specific file. Do not inclu
         await this.app.vault.create(finalPath, jsonContent);
     }
 
-    private async createExcalidrawFile(folderPath: string, excalidrawData: SafeAny): Promise<void> {
+    private async createExcalidrawFile(folderPath: string, excalidrawData: ExcalidrawData): Promise<void> {
         if (!excalidrawData || !excalidrawData.elements || !Array.isArray(excalidrawData.elements)) {
             throw new Error('Invalid Excalidraw data: missing elements array.');
         }
@@ -10382,10 +10543,10 @@ ${jsonContent}
 
         
         const nameEl = capsule.createDiv({ cls: 'file-action-name' });
-        if ((actionState as SafeAny).fileName && (actionState as SafeAny).fileName.includes('[[') && (actionState as SafeAny).fileName.includes(']]')) {
-            MarkdownRenderer.render(this.app, (actionState as SafeAny).fileName, nameEl, '', this);
+        if (actionState.fileName && actionState.fileName.includes('[[') && actionState.fileName.includes(']]')) {
+            MarkdownRenderer.render(this.app, actionState.fileName, nameEl, '', this);
         } else {
-            nameEl.textContent = (actionState as SafeAny).fileName;
+            nameEl.textContent = actionState.fileName;
         }
         
         const statusEl = capsule.createDiv({ cls: 'file-action-status' });
@@ -10506,7 +10667,7 @@ ${jsonContent}
             'Synthesizing answer...'
         ];
         let messageIndex = 1;
-        const progressInterval = setInterval(() => {
+        const progressInterval = window.setInterval(() => {
             if (messageIndex < progressMessages.length && this.currentProgressEl) {
                 this.updateResponseProgress(this.currentProgressResponseEl!, this.currentProgressEl, progressMessages[messageIndex]);
                 messageIndex++;
@@ -10643,7 +10804,7 @@ ${jsonContent}
             
             
             
-            const serverGroups = new Map<string, SafeAny[]>();
+            const serverGroups = new Map<string, Record<string, unknown>[]>();
             for (const serverId of selection.selectedServers) {
                 const serverConfig = this.settings.mcpServers.find(s => s.id === serverId);
                 if (!serverConfig) continue;
@@ -10677,7 +10838,7 @@ ${jsonContent}
                     this.updateProcessingUI.bind(this),
                     this.updateProcessingMessageAndSnippet.bind(this),
                     formattedMCPTools,
-                    async (toolCall: SafeAny) => {
+                    async (toolCall: Record<string, unknown>): Promise<Record<string, unknown>> => {
                         
                         if (!this.isProcessing || this.currentAbortController?.signal.aborted) {
                             throw new DOMException('Processing stopped by user', 'AbortError');
@@ -10693,7 +10854,7 @@ ${jsonContent}
                                 calledTools.push({ server: toolResult.serverName, tool: toolResult.toolName });
                             }
                         }
-                        return toolResult;
+                        return toolResult as unknown as Record<string, unknown>;
                     },
                     autoSelectedModel,
                     isAutoToolMode,
@@ -10706,7 +10867,7 @@ ${jsonContent}
                                 
                 
                 if (!this.isProcessing) {
-                    clearInterval(progressInterval);
+                    window.clearInterval(progressInterval);
                     if (this.currentProgressResponseEl && this.currentProgressEl) {
                         this.finalizeResponse(
                             this.currentProgressResponseEl,
@@ -10760,7 +10921,7 @@ ${jsonContent}
 
         } catch (error) {
             
-            clearInterval(progressInterval);
+            window.clearInterval(progressInterval);
             
             const isAbortError = error instanceof DOMException && error.name === 'AbortError';
             if (!isAbortError) {
@@ -10810,7 +10971,7 @@ ${jsonContent}
             }
         } finally {
             
-            clearInterval(progressInterval);
+            window.clearInterval(progressInterval);
             this.isProcessing = false;
             this.setSendButtonState(this.stopKnowDeepBtn, 'send');
             
@@ -10931,6 +11092,7 @@ class CodeCanvasModal extends Modal {
     private onSave?: (newCode: string) => void;
     private onUpdate?: (newCode: string) => void;
     public onCloseCallback?: () => void;
+    get document() { return this.containerEl.ownerDocument; }
 
     constructor(app: App, code: string, language: string, onSave?: (newCode: string) => void, onUpdate?: (newCode: string) => void) {
         super(app);
@@ -10975,7 +11137,7 @@ class CodeCanvasModal extends Modal {
         copyBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(this.code);
             setIcon(copyBtn, 'check');
-            setTimeout(() => setIcon(copyBtn, 'copy'), 1500);
+            window.setTimeout(() => setIcon(copyBtn, 'copy'), 1500);
         });
 
         const closeBtn = headerActions.createEl('button', { cls: 'code-canvas-btn' });
@@ -11057,15 +11219,16 @@ class CodeCanvasModal extends Modal {
             if (lang === 'json') {
                 const result = await executeCode(code, 'json');
                 if (result.isHtml && result.htmlContent) {
-                    const iframe = document.createElement('iframe');
+                    const iframe = this.document.createElement('iframe');
                     iframe.className = 'code-exec-iframe code-canvas-iframe';
                     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
                     iframe.srcdoc = result.htmlContent;
                     previewArea.addClass('nl-padding-0');
                     previewArea.appendChild(iframe);
                     const onMsg = (e: MessageEvent) => {
-                        if (e.data?.iframeHeight) {
-                            iframe.setCssProps({ '--iframe-height':  e.data.iframeHeight + 'px' });
+                        const data = e.data as unknown as Partial<IframeResizeMessage>;
+                        if (data?.iframeHeight) {
+                            iframe.setCssProps({ '--iframe-height':  data.iframeHeight + 'px' });
                             window.removeEventListener('message', onMsg);
                         }
                     };
@@ -11091,10 +11254,10 @@ class CodeCanvasModal extends Modal {
 
         refreshBtn.addEventListener('click', render);
 
-        let debounceTimer: ReturnType<typeof setTimeout>;
+        let debounceTimer: number;
         codeArea.addEventListener('input', () => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(render, 600);
+            window.clearTimeout(debounceTimer);
+            debounceTimer = window.setTimeout(render, 600);
             saveBtn.toggleClass('nl-display-none', !(codeArea.value !== this.code));
             if (this.onUpdate) this.onUpdate(codeArea.value);
         });
@@ -11105,7 +11268,7 @@ class CodeCanvasModal extends Modal {
             this.code = newCode;
             saveBtn.addClass('nl-display-none');
             setIcon(saveIcon, 'check');
-            setTimeout(() => setIcon(saveIcon, 'save'), 1500);
+            window.setTimeout(() => setIcon(saveIcon, 'save'), 1500);
         });
 
         render();
@@ -11182,7 +11345,7 @@ class CodeCanvasModal extends Modal {
             outputArea.empty();
 
             if (result.isHtml && result.htmlContent) {
-                const iframe = document.createElement('iframe');
+                const iframe = this.document.createElement('iframe');
                 iframe.className = 'code-exec-iframe code-canvas-iframe';
                 iframe.setAttribute('sandbox',
                     'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-modals allow-popups'
@@ -11190,8 +11353,9 @@ class CodeCanvasModal extends Modal {
                 iframe.srcdoc = result.htmlContent;
                 outputArea.appendChild(iframe);
                 const onMsg = (e: MessageEvent) => {
-                    if (e.data?.iframeHeight && iframe.isConnected) {
-                        iframe.setCssProps({ '--iframe-height':  e.data.iframeHeight + 'px' });
+                    const data = e.data as unknown as Partial<IframeResizeMessage>;
+                    if (data?.iframeHeight && iframe.isConnected) {
+                        iframe.setCssProps({ '--iframe-height':  data.iframeHeight + 'px' });
                         window.removeEventListener('message', onMsg);
                     }
                 };
@@ -11225,16 +11389,16 @@ class CodeCanvasModal extends Modal {
             this.code = newCode;
             saveBtn.addClass('nl-display-none');
             setIcon(saveIcon, 'check');
-            setTimeout(() => setIcon(saveIcon, 'save'), 1500);
+            window.setTimeout(() => setIcon(saveIcon, 'save'), 1500);
         });
 
         
         if (lang === 'html' || lang === 'css' || lang === 'svg') {
-            run();
-            let debounceTimer: ReturnType<typeof setTimeout>;
+            void run();
+            let debounceTimer: number;
             codeArea.addEventListener('input', () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(run, 800);
+                window.clearTimeout(debounceTimer);
+                debounceTimer = window.setTimeout(() => { run().catch(console.error); }, 800);
             });
         }
     }

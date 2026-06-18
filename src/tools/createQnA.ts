@@ -1,4 +1,4 @@
-import { ButtonComponent, Notice, MarkdownRenderer, Component, Modal, Setting, TFile, requestUrl } from 'obsidian';
+import { App, ButtonComponent, Notice, MarkdownRenderer, Component, Modal, Setting, TFile, requestUrl } from 'obsidian';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AISettings, getModelTemperature, getModelTopP } from '../settings';
 import { DirectorySuggester } from '../utils/directorySuggester';
@@ -12,6 +12,14 @@ import { UnifiedProviderManager } from '../services/unifiedProviderManager';
 interface OpenAIErrorResponse {
   error: {
     message: string;
+  };
+}
+
+interface GeminiPart {
+  text?: string;
+  inlineData?: {
+    mimeType: string;
+    data: string;
   };
 }
 
@@ -31,9 +39,9 @@ export interface QASettings {
 
 export class QnAManager {
   private settings: AISettings;
-  private app: SafeAny;
+  private app: App;
 
-  constructor(app: SafeAny, settings: AISettings) {
+  constructor(app: App, settings: AISettings) {
     this.app = app;
     this.settings = settings;
   }
@@ -155,7 +163,7 @@ export class QnAManager {
         const prompt = `Analyze the provided content carefully and generate exactly ${qaSettings.numQuestions} comprehensive study questions. Follow these requirements exactly:\n\n1. Content Coverage:\n   - Each question MUST cover different key concepts from the content\n   - Questions should require understanding of relationships between multiple concepts\n   - Ensure all major topics from the content are addressed across the ${qaSettings.numQuestions} questions\n   - Questions should test deep understanding, not just recall\n\n2. Question Structure:\n   - Make each question detailed and specific\n   - Use **bold** for key terms and concepts\n   - Include relevant context in the questions\n   - Questions should encourage critical thinking and analysis\n\n3. Formatting Requirements:\n   - Use consistent markdown formatting throughout\n   - Each question should be on its own line\n   - NO numbering, NO bullet points, NO prefixes (e.g., "Question 1:", "- ").\n   - NO introductory text or explanatory notes (e.g., "Here are your questions:").\n   - Ensure proper placement of markdown symbols.\n\nExample of desired output format for 2 questions:\nHow does **X** interact with **Y**?\nWhat are the implications of **Z** on **A**?\n\n${qaSettings.customPrompt ? `Additional context for question generation: ${qaSettings.customPrompt}\n\n` : ''}${formattedContent ? `Here are the notes to analyze:\n\n${formattedContent}\n\n` : ''}Generate exactly ${qaSettings.numQuestions} comprehensive questions now:`;
 
         // Build message parts with multimodal inputs
-        const messageParts: SafeAny[] = [{ text: prompt }];
+        const messageParts: GeminiPart[] = [{ text: prompt }];
         
         // Add multimodal inputs (images, PDFs, audio, video) for inline data
         const inlineInputs = multimodalInputs.filter(input => input.type === 'inline' && input.data);
@@ -169,7 +177,7 @@ export class QnAManager {
         }
 
         const result = await model.generateContent({
-          contents: [{ role: "user", parts: messageParts }],
+          contents: [{ role: "user", parts: messageParts as unknown as Array<{ text: string }> }],
           generationConfig: {
             temperature: getModelTemperature(modelId, this.settings),
             topK: 40,
@@ -712,7 +720,7 @@ export class QASettingsModal extends Modal {
   private saveDirectory: string;
   private customPrompt: string = '';
 
-  constructor(app: SafeAny, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: QASettings) => void) {
+  constructor(app: App, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: QASettings) => void) {
     super(app);
     this.initialSelectedPaths = initialSelectedPaths;
     this.onSubmit = onSubmit;

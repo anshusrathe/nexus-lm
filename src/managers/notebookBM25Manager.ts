@@ -229,15 +229,15 @@ export class NotebookBM25Manager {
                 },
                 tolerance: 1,
                 limit
-            });
+            }) as { results?: { hits?: Array<{ document: Record<string, unknown>, score: number }> } } | undefined;
 
             if (searchResponse && searchResponse.results?.hits) {
-                return searchResponse.results.hits.map((hit: { document: Record<string, unknown>, score: number }) => {
+                return searchResponse.results.hits.map((hit) => {
                     const doc = hit.document;
                     return {
-                        path: doc.path,
-                        chunkIndex: doc.chunkIndex,
-                        content: doc.content || '',
+                        path: String(doc.path || ''),
+                        chunkIndex: Number(doc.chunkIndex || 0),
+                        content: String(doc.content || ''),
                         score: hit.score
                     };
                 });
@@ -272,7 +272,7 @@ export class NotebookBM25Manager {
                     const data = await this.app.vault.adapter.readBinary(indexPath);
                     
                     // Yield to event loop
-                    await new Promise(resolve => setTimeout(resolve, 0));
+                    await new Promise(resolve => window.setTimeout(resolve, 0));
                     
                     // Steps 2 & 3: Offload Restoration to Orama Worker (50% - 75%)
                     if (restoreNotice) restoreNotice.setMessage(`[Nexus] Restoring notebook index: 60% (Processing in background...)`);
@@ -289,12 +289,12 @@ export class NotebookBM25Manager {
                         lastModified: 'number'
                     };
 
-                    const loadResponse = await OramaWorkerManager.getInstance().load(this.notebookId, data, schema, true);
+                    const loadResponse = await OramaWorkerManager.getInstance().load(this.notebookId, data, schema, true) as { metadata?: Record<string, unknown>; documents?: Array<Record<string, unknown>> };
                     const metadata = loadResponse.metadata;
                     const shadowDocs = loadResponse.documents || [];
                     
                     // Yield to event loop
-                    await new Promise(resolve => setTimeout(resolve, 0));
+                    await new Promise(resolve => window.setTimeout(resolve, 0));
                     
                     // Step 4: Finalizing (90% - 100%)
                     if (restoreNotice) restoreNotice.setMessage(`[Nexus] Restoring notebook index: 90% (Finalizing...)`);
@@ -303,15 +303,15 @@ export class NotebookBM25Manager {
                         this.index = {
                             ...this.index, 
                             ...metadata, // Recover all stats (sourceHashes, etc.)
-                            documents: shadowDocs, // Use documents from metadata
-                            lastUpdated: metadata.lastUpdated || Date.now(),
-                            version: metadata.version || NOTEBOOK_INDEX_VERSION
+                            documents: shadowDocs as unknown as NotebookDocumentChunk[],
+                            lastUpdated: (metadata.lastUpdated as number) || Date.now(),
+                            version: (metadata.version as number) || NOTEBOOK_INDEX_VERSION
                         };
                                             }
                     
                     if (restoreNotice) {
                         restoreNotice.setMessage(`[Nexus] Notebook index restored!`);
-                        setTimeout(() => restoreNotice?.hide(), 2000);
+                        window.setTimeout(() => restoreNotice?.hide(), 2000);
                     }
                 }
                 this.indexLoaded = true;
@@ -319,7 +319,7 @@ export class NotebookBM25Manager {
                 // Failed to load index
                 if (restoreNotice) {
                     restoreNotice.setMessage(`[Nexus] Notebook index restoration failed.`);
-                    setTimeout(() => restoreNotice?.hide(), 3000);
+                    window.setTimeout(() => restoreNotice?.hide(), 3000);
                 }
                 this.indexLoaded = true; // Mark as loaded even on error to prevent retry loops
             } finally {
@@ -476,7 +476,7 @@ export class NotebookBM25Manager {
                 }
 
                 // Yield to event loop between files to prevent UI freeze
-                await new Promise(resolve => setTimeout(resolve, 5));
+                await new Promise(resolve => window.setTimeout(resolve, 5));
 
                 const content = await this.app.vault.read(file);
 
@@ -537,7 +537,7 @@ export class NotebookBM25Manager {
                     
                     // Yield to event loop every 10 chunks to prevent UI freeze
                     if (i % 10 === 0) {
-                        await new Promise(resolve => setTimeout(resolve, 0));
+                        await new Promise(resolve => window.setTimeout(resolve, 0));
                     }
                 }
 

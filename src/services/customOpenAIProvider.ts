@@ -24,18 +24,18 @@ export class CustomOpenAIProvider extends BaseProvider {
         this.apiKey = apiKey;
     }
 
-    private sanitizeMessages(messages: SafeAny[]): SafeAny[] {
+    private sanitizeMessages(messages: UnifiedMessage[]): UnifiedMessage[] {
         return messages.filter(msg => {
             const hasTextContent = typeof msg.content === 'string' && msg.content.trim().length > 0;
             const hasArrayContent = Array.isArray(msg.content) && msg.content.length > 0;
-            const hasToolCalls = msg.tool_calls && msg.tool_calls.length > 0;
-            const isToolResult = msg.role === 'tool';
+            const hasToolCalls = 'tool_calls' in msg && Array.isArray((msg as unknown as Record<string, unknown>).tool_calls) && ((msg as unknown as Record<string, unknown>).tool_calls as unknown[]).length > 0;
+            const isToolResult = 'role' in msg && (msg as unknown as Record<string, unknown>).role === 'tool';
             
             // Keep if it has valid content OR tool calls OR it's a tool result
             return hasTextContent || hasArrayContent || hasToolCalls || isToolResult;
         }).map(msg => {
             // Ensure tool results have at least some content
-            if (msg.role === 'tool') {
+            if ('role' in msg && (msg as unknown as Record<string, unknown>).role === 'tool') {
                 let content = msg.content;
                 if (!content || (typeof content === 'string' && content.trim() === '')) {
                     content = 'Success (no output)';
@@ -44,10 +44,10 @@ export class CustomOpenAIProvider extends BaseProvider {
             }
             
             // If assistant message has empty content but has tool_calls, ensure content is null or removed
-            if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+            if (msg.role === 'assistant' && 'tool_calls' in msg && Array.isArray((msg as Record<string, unknown>).tool_calls) && ((msg as Record<string, unknown>).tool_calls as unknown[]).length > 0) {
                 if (msg.content === '' || msg.content === null) {
                     const newMsg = { ...msg };
-                    delete (newMsg as unknown as SafeAny).content;
+                    delete (newMsg as Record<string, unknown>).content;
                     return newMsg;
                 }
             }
@@ -67,7 +67,14 @@ export class CustomOpenAIProvider extends BaseProvider {
         // Wait for rate limit clearance if needed (conservative estimate)
         await RateLimitManager.getInstance().waitForClearance(this.id, modelId, 1000);
 
-        const body: SafeAny = {
+        const body: {
+            model: string;
+            messages: UnifiedMessage[];
+            stream: boolean;
+            temperature?: number;
+            top_p?: number;
+            max_tokens?: number;
+        } = {
             model: modelId,
             messages: this.sanitizeMessages(messages),
             stream: false
@@ -91,7 +98,7 @@ export class CustomOpenAIProvider extends BaseProvider {
             });
 
             if (response.status >= 400) {
-                const errorData = typeof response.json === 'object' ? response.json : {};
+                const errorData = (typeof response.json === 'object' ? response.json : {}) as { error?: { message?: string } };
                 throw new Error(`${this.name} API error: ${response.status} ${errorData.error?.message || 'Request failed'}`);
             }
 
@@ -103,23 +110,26 @@ export class CustomOpenAIProvider extends BaseProvider {
             });
             RateLimitManager.getInstance().updateFromHeaders(this.id, modelId, headersObj);
 
-            const data = response.json;
+            const data: OpenAIChatCompletionResponse = response.json;
             
             // Record API call usage
             if (data.usage) {
-                RateLimitManager.getInstance().recordApiCall(this.id, modelId, data.usage.total_tokens);
+                RateLimitManager.getInstance().recordApiCall(this.id, modelId, data.usage.total_tokens ?? 0);
             }
 
             return {
-                text: data.choices[0]?.message?.content || '',
+                text: data.choices?.[0]?.message?.content || '',
                 usage: data.usage ? {
-                    promptTokens: data.usage.prompt_tokens,
-                    completionTokens: data.usage.completion_tokens,
-                    totalTokens: data.usage.total_tokens
+                    promptTokens: data.usage.prompt_tokens ?? 0,
+                    completionTokens: data.usage.completion_tokens ?? 0,
+                    totalTokens: data.usage.total_tokens ?? 0
                 } : undefined
             };
         } catch (error) {
-            throw error;
+            if (error instanceof Error) {
+                throw error;
+            }
+            throw new Error(String(error));
         }
     }
 
@@ -145,7 +155,14 @@ export class CustomOpenAIProvider extends BaseProvider {
         };
 
         const buildBody = (stream: boolean) => {
-            const body: SafeAny = { 
+            const body: {
+                model: string;
+                messages: UnifiedMessage[];
+                stream: boolean;
+                temperature?: number;
+                top_p?: number;
+                max_tokens?: number;
+            } = { 
                 model: modelId, 
                 messages: this.sanitizeMessages(messages), 
                 stream 
@@ -175,7 +192,11 @@ export class CustomOpenAIProvider extends BaseProvider {
             );
             return { text: fullContent };
         } catch (error) {
-                    }
+            if (error instanceof Error) {
+                throw error;
+            }
+            throw new Error(String(error));
+        }
 
         // Fallback: requestUrl simulated streaming (cross-platform)
         const respHeaders = await simulatedStream(
@@ -199,13 +220,13 @@ export class CustomOpenAIProvider extends BaseProvider {
     async generateContentWithTools(
         modelId: string,
         messages: UnifiedMessage[],
-        tools: SafeAny[],
+        tools: Array<Record<string, unknown>>,
         options: UnifiedGenerationOptions & { toolChoice?: string },
-        executeToolsCallback?: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
+        executeToolsCallback?: (toolCalls: Array<Record<string, unknown>>) => Promise<Array<Record<string, unknown>>>,
         streamCallback?: (chunk: string) => void
     ): Promise<{ content: string; totalTokens?: number }> {
         let fullContent = '';
-        let conversationMessages = [...messages] as unknown as SafeAny[];
+        let conversationMessages = [...messages] as unknown as UnifiedMessage[];
         let totalTokens = 0;
         let toolRoundsExecuted = 0;
         const MAX_CONTINUATION_NUDGES = 3;
@@ -216,7 +237,16 @@ export class CustomOpenAIProvider extends BaseProvider {
             if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
             await RateLimitManager.getInstance().waitForClearance(this.id, modelId, 1000);
 
-            const requestBody: SafeAny = {
+            const requestBody: {
+                model: string;
+                messages: UnifiedMessage[];
+                stream: boolean;
+                temperature?: number;
+                top_p?: number;
+                max_tokens?: number;
+                tools?: Array<Record<string, unknown>>;
+                tool_choice?: string;
+            } = {
                 model: modelId,
                 messages: this.sanitizeMessages(conversationMessages),
                 stream: false
@@ -246,7 +276,7 @@ export class CustomOpenAIProvider extends BaseProvider {
                 });
 
                 if (response.status >= 400) {
-                    const errorData = typeof response.json === 'object' ? response.json : {};
+                    const errorData = (typeof response.json === 'object' ? response.json : {}) as { error?: { message?: string } };
                     throw new Error(`${this.name} API error: ${response.status} ${errorData.error?.message || 'Request failed'}`);
                 }
 
@@ -257,18 +287,18 @@ export class CustomOpenAIProvider extends BaseProvider {
                 });
                 RateLimitManager.getInstance().updateFromHeaders(this.id, modelId, headersObj);
 
-                const data = response.json;
+                const data: OpenAIChatCompletionResponse = response.json;
                 
                 if (data.usage) {
-                    totalTokens += (data.usage.total_tokens || 0);
-                    RateLimitManager.getInstance().recordApiCall(this.id, modelId, data.usage.total_tokens);
+                    totalTokens += (data.usage.total_tokens ?? 0);
+                    RateLimitManager.getInstance().recordApiCall(this.id, modelId, data.usage.total_tokens ?? 0);
                 }
 
-                const message = data.choices[0]?.message;
+                const message = data.choices?.[0]?.message;
                 if (!message) break;
 
                 // Add assistant message to conversation
-                conversationMessages.push(message);
+                conversationMessages.push(message as unknown as UnifiedMessage);
 
                 // Check for tool calls
                 if (message.tool_calls && message.tool_calls.length > 0) {
@@ -279,20 +309,20 @@ export class CustomOpenAIProvider extends BaseProvider {
                     }
                     
                     if (executeToolsCallback) {
-                        const toolResults = await executeToolsCallback(message.tool_calls);
+                        const toolResults = await executeToolsCallback(message.tool_calls as unknown as Array<Record<string, unknown>>);
                         
                         for (let i = 0; i < message.tool_calls.length; i++) {
-                            const toolCall = message.tool_calls[i];
+                            const toolCall = message.tool_calls[i] as unknown as { id?: string; function?: { name: string }; name?: string };
                             const toolResult = toolResults[i];
                             
                             conversationMessages.push({
                                 role: 'tool',
                                 tool_call_id: toolCall.id,
-                                name: toolCall.function.name,
+                                name: toolCall.function?.name || toolCall.name || 'unknown',
                                 content: toolResult.success 
                                     ? toolResult.content 
                                     : `Error: ${toolResult.error}`
-                            });
+                            } as unknown as UnifiedMessage);
                         }
                         continue;
                     } else {
@@ -319,7 +349,10 @@ export class CustomOpenAIProvider extends BaseProvider {
 
                 break;
             } catch (error) {
-                throw error;
+                if (error instanceof Error) {
+                    throw error;
+                }
+                throw new Error(String(error));
             }
         }
 

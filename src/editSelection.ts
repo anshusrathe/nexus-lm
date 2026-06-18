@@ -1,11 +1,11 @@
-import { App, Modal, Editor, Notice, ButtonComponent, Setting, MarkdownView, EditorPosition } from 'obsidian';
+import { App, Modal, Editor, Notice, ButtonComponent, MarkdownView, EditorPosition } from 'obsidian';
 import { AISettings } from './settings';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GroqService, ChatMessage, GroqApiError } from './services/groqService';
 import { UnifiedProviderManager, UnifiedMessage } from './services/unifiedProviderManager';
-import { OllamaService } from './services/ollamaService';
-import { OpenRouterService } from './services/openRouterService';
-import { NvidiaService } from './services/nvidiaService';
+import { OllamaService, ChatMessage as OllamaChatMessage } from './services/ollamaService';
+import { OpenRouterService, ChatMessage as OpenRouterChatMessage } from './services/openRouterService';
+import { NvidiaService, ChatMessage as NvidiaChatMessage } from './services/nvidiaService';
 
 /**
  * Modal for editing selected text in the editor
@@ -85,10 +85,10 @@ export class EditSelectionModal extends Modal {
             });
 
         // Handle Enter key with Ctrl/Cmd
-        this.queryInput.addEventListener('keydown', async (e: KeyboardEvent) => {
+        this.queryInput.addEventListener('keydown', (e: KeyboardEvent) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                await this.handleProceed();
+                void this.handleProceed();
             }
         });
     }
@@ -220,7 +220,7 @@ async function getAIEditForSelection(query: string, selectedText: string, settin
             { role: 'user', content: userPrompt }
         ];
 
-        const result = await ollamaService.generateContent(settings.model, messages as unknown as SafeAny);
+        const result = await ollamaService.generateContent(settings.model, messages as unknown as OllamaChatMessage[]);
         const trimmedResult = result.trim();
         if (trimmedResult && trimmedResult.length > 0) {
             return trimmedResult;
@@ -238,7 +238,7 @@ async function getAIEditForSelection(query: string, selectedText: string, settin
             { role: 'user', content: userPrompt }
         ];
 
-        const result = await openRouterService.generateContent(settings.model, messages as unknown as SafeAny);
+        const result = await openRouterService.generateContent(settings.model, messages as unknown as OpenRouterChatMessage[]);
         const trimmedResult = result.trim();
         if (trimmedResult && trimmedResult.length > 0) {
             return trimmedResult;
@@ -256,7 +256,7 @@ async function getAIEditForSelection(query: string, selectedText: string, settin
             { role: 'user', content: userPrompt }
         ];
 
-        const result = await nvidiaService.generateContent(settings.model, messages as unknown as SafeAny);
+        const result = await nvidiaService.generateContent(settings.model, messages as unknown as NvidiaChatMessage[]);
         const trimmedResult = result.trim();
         if (trimmedResult && trimmedResult.length > 0) {
             return trimmedResult;
@@ -429,7 +429,7 @@ function injectFloatingDiffWidget(
     viewDoc.addEventListener('keydown', escapeHandler);
     
     // Auto cleanup after 60 seconds
-    setTimeout(() => {
+    window.setTimeout(() => {
         if (overlay.parentElement) {
             const currentContent = editor.getValue();
             if (currentContent.includes(marker)) {

@@ -1,27 +1,68 @@
 import { App, Notice } from 'obsidian';
 import { requestUrl } from 'obsidian';
 import { AISettings, getProviderForModel, getModelTemperature, getModelTopP, getGeminiThinkingConfig, Provider } from '../settings';
-import { GoogleGenerativeAI, Part, GenerateContentCandidate, GroundingMetadata } from '@google/generative-ai';
+import { GoogleGenerativeAI, Part, GenerateContentCandidate, GroundingMetadata, StartChatParams } from '@google/generative-ai';
 import { WebSearchService, SearchResult as WebSearchResult } from './webSearch';
 import { MultimodalInput } from '../utils/multimodalUtils';
 import { GroqService, ChatMessage as GroqChatMessage, GroqApiError, convertChatHistoryForGroq, isGroqWebSearchCapable, isGroqGptOssModel, WebSource, GroqStreamEvent, GROQ_VISION_MODEL, GroqContentPart, GeminiHistoryMessage } from './groqService';
 import { OpenRouterService, ChatMessage as OpenRouterChatMessage, OpenRouterApiError } from './openRouterService';
-import { OllamaService, OllamaApiError } from './ollamaService';
-import { NvidiaService, NvidiaApiError } from './nvidiaService';
+import { OllamaService, OllamaApiError, OllamaStreamEvent, ChatMessage as OllamaChatMessage } from './ollamaService';
+import { NvidiaService, NvidiaApiError, ChatMessage as NvidiaChatMessage } from './nvidiaService';
 import { RateLimitManager } from '../utils/rateLimitManager';
 import { GeminiService } from './geminiService';
 import { ModelSelection } from '../modelSelector';
 import { UnifiedProviderManager, UnifiedMessage } from './unifiedProviderManager';
-import { sanitizeServerName } from '../mcp/mcpToolCalling';
 import { TaskType } from '../utils/tokenEstimator';
 import {
     MCPExecutionLedger,
+    MCPPlanStep,
     MAX_SYNTHESIS_ATTEMPTS,
     buildFallbackPlan,
     createLedger,
     buildSynthesisFromLedger
 } from '../mcp/mcpExecutionLedger';
 
+
+interface OpenAITool {
+    type?: string;
+    function?: {
+        name?: string;
+        description?: string;
+        arguments?: string | Record<string, unknown>;
+        parameters?: Record<string, unknown>;
+    };
+    [key: string]: unknown;
+}
+
+interface LocalGroqToolCall {
+    id: string;
+    type: string;
+    function: { name: string; arguments: string; };
+}
+
+interface LocalToolResult {
+    success: boolean;
+    content: string;
+    error?: string;
+}
+
+interface OpenAIMessage {
+    role: string;
+    content?: string | GroqContentPart[];
+    name?: string;
+    tool_call_id?: string;
+    tool_calls?: Array<{
+        id?: string;
+        type?: string;
+        function?: {
+            name: string;
+            arguments: string;
+        };
+        name?: string;
+    }>;
+    images?: (string | undefined)[];
+    tool_name?: string;
+}
 
 type ProgressCallback = (step: number, totalSteps: number, message: string, contentSnippet?: string) => void;
 
@@ -86,7 +127,7 @@ export class BasicChatService {
         for (const part of content.parts) {
             const text = part?.text || '';
             if (!text) continue;
-            if ((part as SafeAny).thought === true) {
+            if ((part as unknown as Record<string, unknown>).thought === true) {
                 updateSnippetUI('Thinking...', text);
                 continue;
             }
@@ -231,7 +272,7 @@ Instructions:
                 const generationStep = 0; 
                 updateProcessingUI(generationStep, totalSteps, 'Generating response...', `Input query: ${enhancedQuery}`); 
 
-                const chatConfig: Record<string, SafeAny> = {
+                const chatConfig: Record<string, unknown> = {
                     history: isQuickSearchFollowUp ? [] : chatHistory,
                     generationConfig: {
                         temperature: getModelTemperature(this.settings.model, this.settings),
@@ -249,13 +290,13 @@ Instructions:
                 const geminiThinkingConfig = getGeminiThinkingConfig(this.settings.model, this.settings);
                 if (geminiThinkingConfig) {
                     if (!chatConfig.generationConfig) chatConfig.generationConfig = {};
-                    (chatConfig.generationConfig as Record<string, SafeAny>).thinkingConfig = geminiThinkingConfig.thinkingConfig;
+                    (chatConfig.generationConfig as Record<string, unknown>).thinkingConfig = geminiThinkingConfig.thinkingConfig;
                     
                     if (!chatConfig.tools) {
                         chatConfig.tools = [];
                     }
-                    if (!(chatConfig.tools as Record<string, SafeAny>[]).some((tool: SafeAny) => tool.urlContext !== undefined)) {
-                        (chatConfig.tools as Record<string, SafeAny>[]).push({ urlContext: {} });
+                    if (!(chatConfig.tools as Record<string, unknown>[]).some((tool: Record<string, unknown>) => tool.urlContext !== undefined)) {
+                        (chatConfig.tools as Record<string, unknown>[]).push({ urlContext: {} });
                     }
                 }
 
@@ -312,7 +353,7 @@ Instructions:
                     });
                 }
                 
-                const streamResult = await model.startChat(chatConfig as unknown as SafeAny).sendMessageStream(messageParts as unknown as SafeAny, { signal: abortSignal });
+                            const streamResult = await model.startChat(chatConfig as StartChatParams).sendMessageStream(messageParts as unknown as Part[], { signal: abortSignal });
 
                 for await (const chunk of streamResult.stream) {
                     if (abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -330,9 +371,9 @@ Instructions:
                     if (candidate.groundingMetadata) {
                         responseText = this.addCitations(responseText, candidate.groundingMetadata);
                         
-                        webResults = (candidate.groundingMetadata as SafeAny).groundingChunks?.map((chunk: { web?: { title?: string, uri?: string } }) => ({
-                            title: chunk.web?.title || 'Unknown Source',
-                            link: chunk.web?.uri || '#',
+                        webResults = ((candidate.groundingMetadata as ExtendedGroundingMetadata).groundingChunks)?.map((chunk: Record<string, unknown>) => ({
+                            title: (chunk.web as Record<string, string>)?.title || 'Unknown Source',
+                            link: (chunk.web as Record<string, string>)?.uri || '#',
                             snippet: '', 
                         })) || [];
                     }
@@ -599,7 +640,7 @@ Instructions:
                             const genAI = new GoogleGenerativeAI(this.settings.geminiApiKey || this.settings.apiKey);
                             const model = genAI.getGenerativeModel({ model: geminiModel });
                             
-                            const chatConfig: Record<string, SafeAny> = {
+                            const chatConfig: Record<string, unknown> = {
                                 history: isQuickSearchFollowUp ? [] : chatHistory,
                                 generationConfig: {
                                     temperature: getModelTemperature(this.settings.model, this.settings),
@@ -614,7 +655,7 @@ Instructions:
                                 text: `${systemPrompt}\n\n${context.length > 0 ? context.join('\n\n') + '\n\n' : ''}Question: ${enhancedQuery}`
                             }];
                             
-                            const streamResult = await model.startChat(chatConfig as unknown as SafeAny).sendMessageStream(messageParts as unknown as SafeAny, { signal: abortSignal });
+                const streamResult = await model.startChat(chatConfig as StartChatParams).sendMessageStream(messageParts as unknown as Part[], { signal: abortSignal });
                             
                             for await (const chunk of streamResult.stream) {
                                 if (abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -627,9 +668,9 @@ Instructions:
                                 const candidate = finalResponse.candidates[0];
                                 if (candidate.groundingMetadata) {
                                     responseText = this.addCitations(responseText, candidate.groundingMetadata);
-                                    webResults = candidate.groundingMetadata.groundingChunks?.map((chunk: SafeAny) => ({
-                                        title: chunk.web?.title || 'Unknown Source',
-                                        link: chunk.web?.uri || '#',
+                                    webResults = ((candidate.groundingMetadata as ExtendedGroundingMetadata).groundingChunks)?.map((chunk: Record<string, unknown>) => ({
+                                        title: (chunk.web as Record<string, string>)?.title || 'Unknown Source',
+                                        link: (chunk.web as Record<string, string>)?.uri || '#',
                                         snippet: '',
                                     })) || [];
                                 }
@@ -702,7 +743,7 @@ Instructions:
                         updateProcessingUI(generationStep, totalSteps, 'Generating response with OpenRouter...', `Input query: ${enhancedQuery}`);
                         
                         
-                        const generationOptions: SafeAny = {
+                        const generationOptions: Record<string, unknown> = {
                             temperature: getModelTemperature(this.settings.model, this.settings),
                             maxTokens: 8192,
                             topP: getModelTopP(this.settings.model, this.settings)
@@ -754,7 +795,7 @@ Instructions:
                 const hasImages = imageInputs.length > 0;
 
                 
-                const ollamaMessages: SafeAny[] = [
+                const ollamaMessages: OpenAIMessage[] = [
                     {
                         role: 'system',
                         content: hasImages ? systemPrompt : `${systemPrompt}\n\n${context.length > 0 ? context.join('\n\n') + '\n\n' : ''}`
@@ -770,7 +811,7 @@ Instructions:
                 }
 
                 
-                const userMessage: SafeAny = {
+                const userMessage: GroqChatMessage = {
                     role: 'user',
                     content: enhancedQuery
                 };
@@ -780,7 +821,7 @@ Instructions:
                 
                 if (hasImages) {
                     updateProcessingUI(generationStep, totalSteps, `Processing ${imageInputs.length} image(s) with Ollama vision...`);
-                    userMessage.images = imageInputs.map(img => img.data); 
+                    (userMessage as unknown as Record<string, unknown>).images = imageInputs.map(img => img.data); 
                     
                     
                     let multimodalContent = '';
@@ -818,7 +859,7 @@ Instructions:
                                 
                                 if (searchResults.results.length > 0) {
                                     
-                                    const webContext = this.formatOllamaWebSearchResults(searchResults.results);
+                                    const webContext = this.formatOllamaWebSearchResults(searchResults.results as unknown as OpenAITool[]);
                                     
                                     
                                     ollamaMessages[0].content += `\n\n${webContext}`;
@@ -850,7 +891,7 @@ Instructions:
                     let contentBuffer = '';
                     await ollamaService.generateContentStreamEvents(
                         this.settings.model,
-                        ollamaMessages,
+                        ollamaMessages as OllamaChatMessage[],
                         (evt) => {
                             if (evt.type === 'thinking') {
                                 updateSnippetUI('Thinking...', evt.text);
@@ -894,7 +935,7 @@ Instructions:
                 const generationStep = 0;
                 
                 
-                const nvidiaMessages: SafeAny[] = [
+                const nvidiaMessages: OpenAIMessage[] = [
                     {
                         role: 'system',
                         content: `${systemPrompt}\n\n${context.length > 0 ? context.join('\n\n') + '\n\n' : ''}`
@@ -926,7 +967,7 @@ Instructions:
                     try {
                         responseText = await nvidiaService.generateContentStream(
                             this.settings.model,
-                            nvidiaMessages,
+                            nvidiaMessages as NvidiaChatMessage[],
                             {
                                 temperature: getModelTemperature(this.settings.model, this.settings),
                                 maxTokens: 8192,
@@ -942,7 +983,7 @@ Instructions:
                     } catch (streamError) {
                                                 responseText = await nvidiaService.generateContent(
                             this.settings.model,
-                            nvidiaMessages,
+                            nvidiaMessages as NvidiaChatMessage[],
                             {
                                 temperature: getModelTemperature(this.settings.model, this.settings),
                                 maxTokens: 8192,
@@ -972,7 +1013,7 @@ Instructions:
                     ...convertChatHistoryForGroq(isQuickSearchFollowUp ? [] : chatHistory, currentModel, this.getContextWindowSize())
                 ];
 
-                const unifiedMessages: SafeAny[] = [...baseMessages];
+                const unifiedMessages: OpenAIMessage[] = [...baseMessages];
                 
                 
                 const customModel = this.settings.customModels?.find(m => m.id === currentModel);
@@ -985,7 +1026,7 @@ Instructions:
                 if (isVisionCapable) {
                     const inlineInputs = multimodalInputs.filter(input => input.type === 'inline' && input.data && input.mimeType.startsWith('image/'));
                     if (inlineInputs.length > 0) {
-                        const contentParts: SafeAny[] = [{ type: 'text', text: enhancedQuery }];
+                        const contentParts: GroqContentPart[] = [{ type: 'text', text: enhancedQuery }];
                         for (const input of inlineInputs) {
                             contentParts.push({
                                 type: 'image_url',
@@ -1005,7 +1046,7 @@ Instructions:
                 if (unifiedProvider.streamContent) {
                     const response = await unifiedProvider.streamContent(
                         currentModel,
-                        unifiedMessages,
+                        unifiedMessages as UnifiedMessage[],
                         (chunk: string) => {
                             responseText += chunk;
                             updateSnippetUI('Generating response...', chunk);
@@ -1023,7 +1064,7 @@ Instructions:
                 } else {
                     const response = await unifiedProvider.generateContent(
                         currentModel,
-                        unifiedMessages,
+                        unifiedMessages as UnifiedMessage[],
                         {
                             temperature: getModelTemperature(currentModel, this.settings),
                             topP: getModelTopP(currentModel, this.settings),
@@ -1082,7 +1123,7 @@ Instructions:
 
             return { answer: responseText, webResults: isQuickSearchFollowUp ? [] : webResults, totalTokens };
 
-        } catch (error: SafeAny) { 
+        } catch (error: unknown) { 
                           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
              
              
@@ -1098,14 +1139,15 @@ Instructions:
     /**
      * Identifies and auto-disables models that return permanent errors (auth, payment, not found).
      */
-    private async handlePermanentModelError(error: SafeAny) {
-        const status = error.status || error.statusCode || error.httpStatus;
-        const message = error.message || '';
+    private async handlePermanentModelError(error: unknown) {
+        const errObj = error as Record<string, unknown>;
+        const status = (errObj.status || errObj.statusCode || errObj.httpStatus) as number | undefined;
+        const message = ((error instanceof Error ? error.message : null) || (errObj.message as string) || '');
         
         
         const permanentErrors = [401, 402, 403, 404];
         
-        if (permanentErrors.includes(status) || 
+        if (permanentErrors.includes(status!) || 
             message.includes('Insufficient credits') || 
             message.includes('Model not found') ||
             message.includes('Authentication failed') ||
@@ -1137,8 +1179,8 @@ Instructions:
      * @returns The text with footnote citations and definitions appended.
      */
     private addCitations(text: string, groundingMetadata: GroundingMetadata): string {
-        const supports = (groundingMetadata as SafeAny).groundingSupports as Record<string, unknown>[];
-        const chunks = (groundingMetadata as SafeAny).groundingChunks as Record<string, unknown>[];
+        const supports = (groundingMetadata as ExtendedGroundingMetadata).groundingSupports;
+        const chunks = (groundingMetadata as ExtendedGroundingMetadata).groundingChunks;
 
         if (!supports || !chunks || supports.length === 0 || chunks.length === 0) {
             return text;
@@ -1159,14 +1201,14 @@ Instructions:
 
         for (const support of sortedSupports) {
             const endIndex = (support.segment as Record<string, unknown>)?.endIndex as number;
-            if (endIndex === undefined || !(support.groundingChunkIndices as number[])?.length) {
+            if (endIndex === undefined || !((support as Record<string, unknown>).groundingChunkIndices as number[])?.length) {
                 continue;
             }
 
             
             const footnoteNumbers: number[] = [];
             
-            for (const chunkIndex of (support.groundingChunkIndices as number[])) {
+            for (const chunkIndex of ((support as Record<string, unknown>).groundingChunkIndices as number[])) {
                 const chunk = chunks[chunkIndex];
                 const uri = (chunk?.web as Record<string, unknown>)?.uri as string;
                 
@@ -1261,7 +1303,7 @@ Instructions:
      * @param results Array of web search results from Ollama
      * @returns Formatted context string with web search results
      */
-    private formatOllamaWebSearchResults(results: SafeAny[]): string {
+    private formatOllamaWebSearchResults(results: OpenAITool[]): string {
         if (!results || results.length === 0) {
             return '';
         }
@@ -1347,7 +1389,7 @@ Instructions:
         updateProcessingUI: ProgressCallback,
         updateSnippetUI: SnippetUpdateCallback,
         mcpTools: Record<string, unknown>[],
-        executeToolCallback: (toolCall: Record<string, SafeAny>) => Promise<Record<string, SafeAny>>,
+        executeToolCallback: (toolCall: Record<string, unknown>) => Promise<Record<string, unknown>>,
         autoSelection: ModelSelection | null = null,
         isAutoToolMode: boolean = false,
         
@@ -1393,7 +1435,7 @@ Instructions:
                 promiseFactory: (signal: AbortSignal) => Promise<T>, 
                 ms: number
             ): Promise<T> & { resetTimer: () => void; disableTimer: () => void } => {
-                let timer: ReturnType<typeof setTimeout> | null;
+                let timer: number | null;
                 let rejectFn: (err: Error) => void;
                 const internalAbort = new AbortController();
                 
@@ -1405,7 +1447,7 @@ Instructions:
 
                 const timeout = new Promise<never>((_, reject) => {
                     rejectFn = reject;
-                    timer = setTimeout(() => {
+                    timer = window.setTimeout(() => {
                         internalAbort.abort(); 
                         reject(new Error(`__MCP_TIMEOUT__: model did not respond within ${ms / 1000}s`));
                     }, ms);
@@ -1419,14 +1461,14 @@ Instructions:
                 const passPromise = promiseFactory(internalAbort.signal);
                 const raced = Promise.race([passPromise, timeout, abortPromise]).finally(() => {
                     if (timer) {
-                        clearTimeout(timer);
+                        window.clearTimeout(timer);
                         timer = null;
                     }
                 }) as Promise<T> & { resetTimer: () => void; disableTimer: () => void };
 
                 raced.resetTimer = () => {
-                    if (timer) clearTimeout(timer);
-                    timer = setTimeout(() => {
+                    if (timer) window.clearTimeout(timer);
+                    timer = window.setTimeout(() => {
                         internalAbort.abort();
                         rejectFn(new Error(`__MCP_TIMEOUT__: model did not respond within ${ms / 1000}s`));
                     }, ms);
@@ -1434,7 +1476,7 @@ Instructions:
 
                 raced.disableTimer = () => {
                     if (timer) {
-                        clearTimeout(timer);
+                        window.clearTimeout(timer);
                         timer = null;
                     }
                 };
@@ -1463,7 +1505,7 @@ Instructions:
             
             
             if (autoSelection === null) {
-                const toolNames = mcpTools.map((t: SafeAny) => t.function?.name).filter(Boolean);
+                const toolNames = mcpTools.map((t: OpenAITool) => t.function?.name).filter(Boolean);
 
                 
                 
@@ -1474,14 +1516,14 @@ Instructions:
                             if (srvTools.length === 0) continue;
                             lines.push(`### Server: ${srvName}`);
                             for (const t of srvTools) {
-                                const n = (t as unknown as SafeAny).function?.name || 'unknown';
-                                const d = (t as unknown as SafeAny).function?.description || 'No description';
+                                const n = (t as unknown as OpenAITool).function?.name || 'unknown';
+                                const d = (t as unknown as OpenAITool).function?.description || 'No description';
                                 lines.push(`- ${n}: ${d}`);
                             }
                         }
                         return lines.join('\n');
                     }
-                    return mcpTools.map((t: SafeAny) => {
+                    return mcpTools.map((t: OpenAITool) => {
                         const name = t.function?.name || 'unknown';
                         const desc = t.function?.description || 'No description';
                         return `- ${name}: ${desc}`;
@@ -1550,7 +1592,7 @@ ${mcpContext}`;
                               Array.from(serverGroups.entries())
                                   .filter(([, t]) => t.length > 0)
                                   .map(([srvName, srvTools]) =>
-                                      `- Server "${srvName}": ${srvTools.map((t: SafeAny) => t.function?.name).filter(Boolean).join(', ')}`
+                                      `- Server "${srvName}": ${srvTools.map((t: OpenAITool) => t.function?.name).filter(Boolean).join(', ')}`
                                   ).join('\n')
                             : '';
 
@@ -1597,15 +1639,15 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                         const planningTools = [selectionTool];
                         let extractedTools: string[] = [];
 
-                        const planningExecCb = async (toolCalls: SafeAny[]) => {
+                        const planningExecCb = async (toolCalls: OpenAITool[]) => {
                             if (abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
                             for (const tc of toolCalls) {
                                 if (tc.function?.name === 'submit_tool_selection') {
                                     try {
                                         const args = typeof tc.function.arguments === 'string' 
-                                            ? JSON.parse(tc.function.arguments) 
+                                            ? JSON.parse(tc.function.arguments) as { selected_tools?: unknown[] }
                                             : tc.function.arguments;
-                                        if (args.selected_tools && Array.isArray(args.selected_tools)) {
+                                        if (args?.selected_tools && Array.isArray(args.selected_tools)) {
                                             extractedTools = args.selected_tools;
                                         }
                                     } catch (e) {
@@ -1615,28 +1657,28 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                             return toolCalls.map(() => ({ success: true, content: 'Selection received.' }));
                         };
 
-                        const planningOptions: SafeAny = { temperature: 0.1, abortSignal };
+                        const planningOptions: { temperature: number; abortSignal?: AbortSignal } = { temperature: 0.1, abortSignal };
 
                         if (planningProvider === 'groq') {
                             const gs = new GroqService(this.settings.groqApiKey,
-                                (h: SafeAny) => this.rateLimitManager.updateFromHeaders('groq', this.settings.model, h));
-                            await gs.generateContentWithTools(this.settings.model, planningMessages as SafeAny[], planningTools, { ...planningOptions, toolChoice: 'required' }, planningExecCb);
+                                (h: Headers) => this.rateLimitManager.updateFromHeaders('groq', this.settings.model, h));
+                            await gs.generateContentWithTools(this.settings.model, planningMessages as GroqChatMessage[], planningTools, { ...planningOptions, toolChoice: 'required' }, planningExecCb as unknown as (toolCalls: LocalGroqToolCall[]) => Promise<LocalToolResult[]>);
                         } else if (planningProvider === 'gemini') {
                             const gs = new GeminiService(this.settings.geminiApiKey || this.settings.apiKey,
-                                (h: SafeAny) => this.rateLimitManager.updateFromHeaders('gemini', this.settings.model, h));
+                                (h: Headers) => this.rateLimitManager.updateFromHeaders('gemini', this.settings.model, h));
                             await gs.generateContentWithTools(this.settings.model, planningMessages, planningTools, { ...planningOptions, maxOutputTokens: 1024 }, planningExecCb);
                         } else if (planningProvider === 'openrouter') {
                             const ors = new OpenRouterService(this.settings.openRouterApiKey,
-                                (h: SafeAny) => this.rateLimitManager.updateFromHeaders('openrouter', this.settings.model, h));
-                            await ors.generateContentWithTools(this.settings.model, planningMessages as SafeAny[], planningTools, { ...planningOptions, toolChoice: 'required' }, planningExecCb);
+                                (h: Headers) => this.rateLimitManager.updateFromHeaders('openrouter', this.settings.model, h));
+                            await ors.generateContentWithTools(this.settings.model, planningMessages as unknown as OpenRouterChatMessage[], planningTools as unknown as Record<string, unknown>[], { ...planningOptions, toolChoice: 'required' }, planningExecCb as unknown as Parameters<typeof ors.generateContentWithTools>[4]);
                         } else if (planningProvider === 'ollama') {
                             const os = new OllamaService(this.settings.ollamaBaseUrl || 'http://localhost:11434', this.settings.ollamaApiKey,
-                                (h: SafeAny) => this.rateLimitManager.updateFromHeaders('ollama', this.settings.model, h));
-                            await os.generateContentWithTools(this.settings.model, planningMessages as SafeAny[], planningTools, planningOptions, planningExecCb);
+                                (h: Headers) => this.rateLimitManager.updateFromHeaders('ollama', this.settings.model, h));
+                            await os.generateContentWithTools(this.settings.model, planningMessages as unknown as OllamaChatMessage[], planningTools as ProviderTool[], planningOptions, planningExecCb as unknown as Parameters<typeof os.generateContentWithTools>[4]);
                         } else if (UnifiedProviderManager.getInstance().hasProvider(planningProvider)) {
                             const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(planningProvider)!;
                             if (unifiedProvider.generateContentWithTools) {
-                                await unifiedProvider.generateContentWithTools(this.settings.model, planningMessages as SafeAny[], planningTools, planningOptions, planningExecCb);
+                                await unifiedProvider.generateContentWithTools(this.settings.model, planningMessages as unknown as UnifiedMessage[], planningTools as unknown as Record<string, unknown>[], planningOptions, planningExecCb as unknown as Parameters<NonNullable<typeof unifiedProvider.generateContentWithTools>>[4]);
                             }
                         }
 
@@ -1644,7 +1686,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                             
                             plannedTools = extractedTools.map(selected => {
                                 if (toolNames.includes(selected)) return selected;
-                                const match = toolNames.find(tn => tn.endsWith(`__${selected}`));
+                                const match = toolNames.find(tn => tn!.endsWith(`__${selected}`));
                                 return match || selected;
                             }).filter(tn => toolNames.includes(tn));
                             
@@ -1655,7 +1697,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
 
                 
                 const toolsToUse = plannedTools
-                    ? mcpTools.filter((t: SafeAny) => plannedTools!.includes(t.function?.name))
+                    ? mcpTools.filter((t: OpenAITool) => plannedTools!.includes(t.function?.name || ''))
                     : mcpTools;
 
                 
@@ -1668,7 +1710,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                     .filter(([, tools]) => tools.length > 0)
                     .sort((a, b) => {
                         if (!plannedTools || plannedTools.length === 0) return 0;
-                        const firstIndexOf = ([, tools]: [string, SafeAny[]]) => {
+                        const firstIndexOf = ([, tools]: [string, OpenAITool[]]) => {
                             let minIdx = Infinity;
                             for (const t of tools) {
                                 const name = t.function?.name;
@@ -1683,11 +1725,11 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                 const isMultiServer = serverEntries.length > 1;
 
                 
-                const getFilteredServerTools = (serverTools: SafeAny[]): SafeAny[] => {
+                const getFilteredServerTools = (serverTools: OpenAITool[]): OpenAITool[] => {
                     if (!plannedTools || plannedTools.length === 0) {
                         return serverTools;
                     }
-                    return serverTools.filter((t: SafeAny) => plannedTools.includes(t.function?.name));
+                    return serverTools.filter((t: OpenAITool) => plannedTools.includes(t.function?.name || ''));
                 };
 
                 
@@ -1723,12 +1765,12 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                         if (waitMs > 0) {
                             updateSnippetUI(`Rate limited — waiting ${Math.ceil(waitMs / 1000)}s...`);
                             updateProcessingUI(2, 3, `TPM error, waiting ${Math.ceil(waitMs / 1000)}s before retrying...`);
-                                                        await new Promise(resolve => setTimeout(resolve, waitMs));
+                                                        await new Promise(resolve => window.setTimeout(resolve, waitMs));
                         }
                     }
                 };
 
-                const messages: SafeAny[] = [{ role: 'system', content: systemPrompt }];
+                const messages: OpenAIMessage[] = [{ role: 'system', content: systemPrompt }];
                 if (chatHistory.length > 0) {
                     messages.push(...convertChatHistoryForGroq(chatHistory, this.settings.model, this.getContextWindowSize()));
                 }
@@ -1767,18 +1809,18 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
 
                 
                 const executeToolsForServer = async (
-                    tools: SafeAny[],
+                    tools: OpenAITool[],
                     serverName: string,
                     toolChoiceVal: 'auto' | 'required'
                 ): Promise<{ content: string; totalTokens?: number }> => {
-                    const estimateToolTokens = (tool: SafeAny): number => {
+                    const estimateToolTokens = (tool: OpenAITool): number => {
                         try { return Math.ceil(JSON.stringify(tool).length / 4); } catch { return 300; }
                     };
 
-                    const chunkToolsFn = (toolsArr: SafeAny[]): SafeAny[][] => {
+                    const chunkToolsFn = (toolsArr: OpenAITool[]): OpenAITool[][] => {
                         const budget = Math.max(2000, Math.floor(modelTPM * 0.5));
-                        const chunks: SafeAny[][] = [];
-                        let current: SafeAny[] = [];
+                        const chunks: OpenAITool[][] = [];
+                        let current: OpenAITool[] = [];
                         let currentTokens = 0;
                         for (const tool of toolsArr) {
                             const t = estimateToolTokens(tool);
@@ -1804,7 +1846,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
 
                         await checkAndApplyCooldown(this.settings.model, provider);
 
-                        const execCb = async (toolCalls: SafeAny[]) => {
+                        const execCb = async (toolCalls: OpenAITool[]) => {
                             if (abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
                             const results = [];
                             for (const toolCall of toolCalls) {
@@ -1815,7 +1857,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                                 try {
                                     const result = await executeToolCallback(toolCall);
                                     const snippet = result?.content || (result?.error ? `Error: ${result.error}` : '(no output)');
-                                    updateSnippetUI(`✓ ${toolName}`, snippet);
+                                    updateSnippetUI(`✓ ${toolName}`, String(snippet));
                                     results.push(result);
                                 } catch (err) {
                                     const errMsg = err instanceof Error ? err.message : String(err);
@@ -1831,62 +1873,63 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                             if (provider === 'groq') {
                                 const gs = new GroqService(this.settings.groqApiKey,
                                     (h) => this.rateLimitManager.updateFromHeaders('groq', this.settings.model, h));
-                                chunkResult = await gs.generateContentWithTools(this.settings.model, messages as SafeAny[], chunk,
-                                    { temperature: getModelTemperature(this.settings.model, this.settings, 'groq' as SafeAny), topP: getModelTopP(this.settings.model, this.settings, 'groq' as SafeAny), toolChoice: toolChoiceVal, abortSignal },
-                                    execCb);
+                                chunkResult = await gs.generateContentWithTools(this.settings.model, messages as GroqChatMessage[], chunk as ProviderTool[],
+                                    { temperature: getModelTemperature(this.settings.model, this.settings, 'groq' as Provider), topP: getModelTopP(this.settings.model, this.settings, 'groq' as Provider), toolChoice: toolChoiceVal, abortSignal },
+                                    execCb as unknown as (toolCalls: LocalGroqToolCall[]) => Promise<LocalToolResult[]>);
                             } else if (provider === 'gemini') {
                                 const { GeminiService: GS } = await import('./geminiService');
                                 const gs = new GS(this.settings.geminiApiKey || this.settings.apiKey,
                                     (h) => this.rateLimitManager.updateFromHeaders('gemini', this.settings.model, h));
-                                chunkResult = await gs.generateContentWithTools(this.settings.model, messages, chunk,
+                                chunkResult = await 
+gs.generateContentWithTools(this.settings.model, messages as unknown as Array<{ role: string; content?: string; tool_calls?: Array<{ id?: string; type?: string; function?: { name: string; arguments: string }; name?: string }> }>, chunk as ProviderTool[],
                                     {
-                                        temperature: getModelTemperature(this.settings.model, this.settings, 'gemini' as SafeAny),
+                                        temperature: getModelTemperature(this.settings.model, this.settings, 'gemini' as Provider),
                                         maxOutputTokens: 8192,
-                                        topP: getModelTopP(this.settings.model, this.settings, 'gemini' as SafeAny),
+                                        topP: getModelTopP(this.settings.model, this.settings, 'gemini' as Provider),
                                         thinkingConfig: getGeminiThinkingConfig(this.settings.model, this.settings)?.thinkingConfig,
                                         abortSignal
                                     },
-                                    execCb,
-                                    (thinking) => updateSnippetUI('Thinking...', thinking));
+                                    execCb as unknown as Parameters<typeof gs.generateContentWithTools>[4],
+                                    (thinking: string) => updateSnippetUI('Thinking...', thinking));
                             } else if (provider === 'openrouter') {
                                 const { OpenRouterService: ORS } = await import('./openRouterService');
                                 const ors = new ORS(this.settings.openRouterApiKey,
                                     (h) => this.rateLimitManager.updateFromHeaders('openrouter', this.settings.model, h));
-                                chunkResult = await ors.generateContentWithTools(this.settings.model, messages as SafeAny[], chunk,
-                                    { temperature: getModelTemperature(this.settings.model, this.settings, 'openrouter' as SafeAny), topP: getModelTopP(this.settings.model, this.settings, 'openrouter' as SafeAny), toolChoice: toolChoiceVal, abortSignal },
-                                    execCb);
+                                chunkResult = await ors.generateContentWithTools(this.settings.model, messages as unknown as OpenRouterChatMessage[], chunk as ProviderTool[],
+                                    { temperature: getModelTemperature(this.settings.model, this.settings, 'openrouter' as Provider), topP: getModelTopP(this.settings.model, this.settings, 'openrouter' as Provider), toolChoice: toolChoiceVal, abortSignal },
+                                    execCb as unknown as Parameters<typeof ors.generateContentWithTools>[4]);
                             } else if (provider === 'ollama') {
                                 const { OllamaService: OS } = await import('./ollamaService');
                                 const os = new OS(this.settings.ollamaBaseUrl || 'http://localhost:11434', this.settings.ollamaApiKey,
                                     (h) => this.rateLimitManager.updateFromHeaders('ollama', this.settings.model, h));
                                 const useReqUrl = this.settings.ollamaMode === 'cloud' ? requestUrl : undefined;
-                                chunkResult = await os.generateContentWithTools(this.settings.model, messages as SafeAny[], chunk,
-                                    { temperature: getModelTemperature(this.settings.model, this.settings, 'ollama' as SafeAny), think: ollamaThinkOption, abortSignal },
-                                    execCb, useReqUrl,
-                                    (thinking) => updateSnippetUI('Thinking...', thinking));
+                                chunkResult = await os.generateContentWithTools(this.settings.model, messages as unknown as OllamaChatMessage[], chunk as ProviderTool[],
+                                    { temperature: getModelTemperature(this.settings.model, this.settings, 'ollama' as Provider), think: ollamaThinkOption, abortSignal },
+                                    execCb as unknown as Parameters<typeof os.generateContentWithTools>[4], useReqUrl,
+                                    (thinking: string) => updateSnippetUI('Thinking...', thinking));
                             } else if (provider === 'nvidia') {
                                 const { NvidiaService: NS } = await import('./nvidiaService');
                                 const ns = new NS(this.settings.nvidiaApiKey,
                                     (h) => this.rateLimitManager.updateFromHeaders('nvidia', this.settings.model, h));
-                                chunkResult = await ns.generateContentWithTools(this.settings.model, messages as SafeAny[], chunk,
-                                    { temperature: getModelTemperature(this.settings.model, this.settings, 'nvidia' as SafeAny), maxTokens: 8192, topP: getModelTopP(this.settings.model, this.settings, 'nvidia' as SafeAny), toolChoice: toolChoiceVal, abortSignal },
-                                    execCb);
+                                chunkResult = await ns.generateContentWithTools(this.settings.model, messages as unknown as NvidiaChatMessage[], chunk as ProviderTool[],
+                                    { temperature: getModelTemperature(this.settings.model, this.settings, 'nvidia' as Provider), maxTokens: 8192, topP: getModelTopP(this.settings.model, this.settings, 'nvidia' as Provider), toolChoice: toolChoiceVal, abortSignal },
+                                    execCb as unknown as Parameters<typeof ns.generateContentWithTools>[4]);
                             } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
                                 const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(provider)!;
                                 if (unifiedProvider.generateContentWithTools) {
-                                    chunkResult = await unifiedProvider.generateContentWithTools(
+                                    chunkResult = await unifiedProvider.generateContentWithTools!(
                                         this.settings.model,
-                                        messages as SafeAny[],
-                                        chunk,
+                                        messages as unknown as UnifiedMessage[],
+                                        chunk as ProviderTool[],
                                         {
-                                            temperature: getModelTemperature(this.settings.model, this.settings, provider as SafeAny),
+                                            temperature: getModelTemperature(this.settings.model, this.settings, provider as Provider),
                                             maxTokens: 8192,
-                                            topP: getModelTopP(this.settings.model, this.settings, provider as SafeAny),
+                                            topP: getModelTopP(this.settings.model, this.settings, provider as Provider),
                                             toolChoice: toolChoiceVal,
                                             abortSignal
                                         },
-                                        execCb,
-                                        (thinking) => updateSnippetUI('Thinking...', thinking)
+                                        execCb as unknown as Parameters<NonNullable<typeof unifiedProvider.generateContentWithTools>>[4],
+                                        (thinking: string) => updateSnippetUI('Thinking...', thinking)
                                     );
                                 } else {
                                     throw new Error(`Provider ${provider} does not support tool calling (required for MCP)`);
@@ -1913,7 +1956,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                                 setModelCooldown(this.settings.model, provider, rateLimitMs);
                                 updateSnippetUI(`Rate limited — waiting ${rateLimitSeconds}s before retry...`);
                                 updateProcessingUI(2, 3, `TPM error, waiting ${rateLimitSeconds}s before retrying...`);
-                                await new Promise(resolve => setTimeout(resolve, rateLimitMs));
+                                await new Promise(resolve => window.setTimeout(resolve, rateLimitMs));
                                 chunkIdx--;
                                 continue;
                             }
@@ -2016,7 +2059,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                             const gs = new GroqService(this.settings.groqApiKey,
                                 (h) => this.rateLimitManager.updateFromHeaders('groq', this.settings.model, h));
                             consolidatedAnswer = await gs.generateContent(
-                                this.settings.model, multiServerSynthPrompt as SafeAny[],
+                                this.settings.model, multiServerSynthPrompt as GroqChatMessage[],
                                 { temperature: getModelTemperature(this.settings.model, this.settings), topP: getModelTopP(this.settings.model, this.settings) }
                             );
                         } else if (provider === 'gemini') {
@@ -2063,11 +2106,11 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                             const { NvidiaService: NS } = await import('./nvidiaService');
                             const ns = new NS(this.settings.nvidiaApiKey,
                                 (h) => this.rateLimitManager.updateFromHeaders('nvidia', this.settings.model, h));
-                            consolidatedAnswer = await ns.generateContent(this.settings.model, multiServerSynthPrompt as SafeAny[],
+                            consolidatedAnswer = await ns.generateContent(this.settings.model, multiServerSynthPrompt as NvidiaChatMessage[],
                                 { temperature: getModelTemperature(this.settings.model, this.settings), maxTokens: 8192, topP: getModelTopP(this.settings.model, this.settings) });
                         } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
                             const up = UnifiedProviderManager.getInstance().getProvider(provider)!;
-                            const res = await up.generateContent(this.settings.model, multiServerSynthPrompt as SafeAny[],
+                            const res = await up.generateContent(this.settings.model, multiServerSynthPrompt as UnifiedMessage[],
                                 { temperature: getModelTemperature(this.settings.model, this.settings), maxTokens: 8192, topP: getModelTopP(this.settings.model, this.settings) });
                             consolidatedAnswer = res.text;
                         }
@@ -2093,14 +2136,14 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                 updateSnippetUI('Running tool calls...');
 
                 
-                const estimateToolTokens = (tool: SafeAny): number => {
+                const estimateToolTokens = (tool: OpenAITool): number => {
                     try { return Math.ceil(JSON.stringify(tool).length / 4); } catch { return 300; }
                 };
 
-                const chunkTools = (tools: SafeAny[]): SafeAny[][] => {
+                const chunkTools = (tools: OpenAITool[]): OpenAITool[][] => {
                     const budget = Math.max(2000, Math.floor(modelTPM * 0.5));
-                    const chunks: SafeAny[][] = [];
-                    let current: SafeAny[] = [];
+                    const chunks: OpenAITool[][] = [];
+                    let current: OpenAITool[] = [];
                     let currentTokens = 0;
                     for (const tool of tools) {
                         const t = estimateToolTokens(tool);
@@ -2164,7 +2207,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                 
                 await checkAndApplyCooldown(this.settings.model, provider);
 
-                const execCb = async (toolCalls: SafeAny[]) => {
+                const execCb = async (toolCalls: OpenAITool[]) => {
                     const results = [];
                     for (const toolCall of toolCalls) {
                         const toolName = toolCall.function?.name || toolCall.name || 'unknown';
@@ -2173,7 +2216,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                         try {
                             const result = await executeToolCallback(toolCall);
                             const snippet = result?.content || (result?.error ? `Error: ${result.error}` : '(no output)');
-                            updateSnippetUI(`✓ ${toolName}`, snippet);
+                            updateSnippetUI(`✓ ${toolName}`, String(snippet));
                             results.push(result);
                         } catch (err) {
                             if (err instanceof DOMException && err.name === 'AbortError') {
@@ -2202,62 +2245,63 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                         if (provider === 'groq') {
                             const gs = new GroqService(this.settings.groqApiKey,
                                 (h) => this.rateLimitManager.updateFromHeaders('groq', this.settings.model, h));
-                            chunkResult = await gs.generateContentWithTools(this.settings.model, messages as SafeAny[], chunk,
-                                { temperature: getModelTemperature(this.settings.model, this.settings, 'groq' as SafeAny), topP: getModelTopP(this.settings.model, this.settings, 'groq' as SafeAny), toolChoice, abortSignal },
-                                execCb);
+                            chunkResult = await gs.generateContentWithTools(this.settings.model, messages as GroqChatMessage[], chunk as ProviderTool[],
+                                { temperature: getModelTemperature(this.settings.model, this.settings, 'groq' as Provider), topP: getModelTopP(this.settings.model, this.settings, 'groq' as Provider), toolChoice, abortSignal },
+                                execCb as unknown as (toolCalls: LocalGroqToolCall[]) => Promise<LocalToolResult[]>);
                         } else if (provider === 'gemini') {
                             const { GeminiService: GS } = await import('./geminiService');
                             const gs = new GS(this.settings.geminiApiKey || this.settings.apiKey,
                                 (h) => this.rateLimitManager.updateFromHeaders('gemini', this.settings.model, h));
-                            chunkResult = await gs.generateContentWithTools(this.settings.model, messages, chunk,
+                            chunkResult = await 
+gs.generateContentWithTools(this.settings.model, messages as unknown as Array<{ role: string; content?: string; tool_calls?: Array<{ id?: string; type?: string; function?: { name: string; arguments: string }; name?: string }> }>, chunk as ProviderTool[],
                                 {
-                                    temperature: getModelTemperature(this.settings.model, this.settings, 'gemini' as SafeAny),
+                                    temperature: getModelTemperature(this.settings.model, this.settings, 'gemini' as Provider),
                                     maxOutputTokens: 8192,
-                                    topP: getModelTopP(this.settings.model, this.settings, 'gemini' as SafeAny),
+                                    topP: getModelTopP(this.settings.model, this.settings, 'gemini' as Provider),
                                     thinkingConfig: getGeminiThinkingConfig(this.settings.model, this.settings)?.thinkingConfig,
                                     abortSignal
                                 },
-                                execCb,
-                                (thinking) => updateSnippetUI('Thinking...', thinking));
+                                execCb as unknown as Parameters<typeof gs.generateContentWithTools>[4],
+                                (thinking: string) => updateSnippetUI('Thinking...', thinking));
                         } else if (provider === 'openrouter') {
                             const { OpenRouterService: ORS } = await import('./openRouterService');
                             const ors = new ORS(this.settings.openRouterApiKey,
                                 (h) => this.rateLimitManager.updateFromHeaders('openrouter', this.settings.model, h));
-                            chunkResult = await ors.generateContentWithTools(this.settings.model, messages as SafeAny[], chunk,
-                                { temperature: getModelTemperature(this.settings.model, this.settings, 'openrouter' as SafeAny), topP: getModelTopP(this.settings.model, this.settings, 'openrouter' as SafeAny), toolChoice, abortSignal },
-                                execCb);
+                            chunkResult = await ors.generateContentWithTools(this.settings.model, messages as unknown as OpenRouterChatMessage[], chunk as ProviderTool[],
+                                { temperature: getModelTemperature(this.settings.model, this.settings, 'openrouter' as Provider), topP: getModelTopP(this.settings.model, this.settings, 'openrouter' as Provider), toolChoice, abortSignal },
+                                execCb as unknown as Parameters<typeof ors.generateContentWithTools>[4]);
                         } else if (provider === 'ollama') {
                             const { OllamaService: OS } = await import('./ollamaService');
                             const os = new OS(this.settings.ollamaBaseUrl || 'http://localhost:11434', this.settings.ollamaApiKey,
                                 (h) => this.rateLimitManager.updateFromHeaders('ollama', this.settings.model, h));
                             const useReqUrl = this.settings.ollamaMode === 'cloud' ? requestUrl : undefined;
-                            chunkResult = await os.generateContentWithTools(this.settings.model, messages as SafeAny[], chunk,
-                                { temperature: getModelTemperature(this.settings.model, this.settings, 'ollama' as SafeAny), think: ollamaThinkOption, abortSignal },
-                                execCb, useReqUrl,
-                                (thinking) => updateSnippetUI('Thinking...', thinking));
+                            chunkResult = await os.generateContentWithTools(this.settings.model, messages as unknown as OllamaChatMessage[], chunk as ProviderTool[],
+                                { temperature: getModelTemperature(this.settings.model, this.settings, 'ollama' as Provider), think: ollamaThinkOption, abortSignal },
+                                execCb as unknown as Parameters<typeof os.generateContentWithTools>[4], useReqUrl,
+                                (thinking: string) => updateSnippetUI('Thinking...', thinking));
                         } else if (provider === 'nvidia') {
                             const { NvidiaService: NS } = await import('./nvidiaService');
                             const ns = new NS(this.settings.nvidiaApiKey,
                                 (h) => this.rateLimitManager.updateFromHeaders('nvidia', this.settings.model, h));
-                            chunkResult = await ns.generateContentWithTools(this.settings.model, messages as SafeAny[], chunk,
-                                { temperature: getModelTemperature(this.settings.model, this.settings, 'nvidia' as SafeAny), maxTokens: 8192, topP: getModelTopP(this.settings.model, this.settings, 'nvidia' as SafeAny), toolChoice, abortSignal },
-                                execCb);
+                            chunkResult = await ns.generateContentWithTools(this.settings.model, messages as unknown as NvidiaChatMessage[], chunk as ProviderTool[],
+                                { temperature: getModelTemperature(this.settings.model, this.settings, 'nvidia' as Provider), maxTokens: 8192, topP: getModelTopP(this.settings.model, this.settings, 'nvidia' as Provider), toolChoice, abortSignal },
+                                execCb as unknown as Parameters<typeof ns.generateContentWithTools>[4]);
                         } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
                             const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(provider)!;
                             if (unifiedProvider.generateContentWithTools) {
-                                chunkResult = await unifiedProvider.generateContentWithTools(
+                                chunkResult = await unifiedProvider.generateContentWithTools!(
                                     this.settings.model,
-                                    messages as SafeAny[],
-                                    chunk,
+                                    messages as unknown as UnifiedMessage[],
+                                    chunk as ProviderTool[],
                                     {
-                                        temperature: getModelTemperature(this.settings.model, this.settings, provider as SafeAny),
+                                        temperature: getModelTemperature(this.settings.model, this.settings, provider as Provider),
                                         maxTokens: 8192,
-                                        topP: getModelTopP(this.settings.model, this.settings, provider as SafeAny),
+                                        topP: getModelTopP(this.settings.model, this.settings, provider as Provider),
                                         toolChoice,
                                         abortSignal
                                     },
-                                    execCb,
-                                    (thinking) => updateSnippetUI('Thinking...', thinking)
+                                    execCb as unknown as Parameters<NonNullable<typeof unifiedProvider.generateContentWithTools>>[4],
+                                    (thinking: string) => updateSnippetUI('Thinking...', thinking)
                                 );
                             } else {
                                 throw new Error(`Provider ${provider} does not support tool calling (required for MCP)`);
@@ -2296,12 +2340,12 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                             updateProcessingUI(2, 3, `TPM error, waiting ${waitSeconds}s before retrying...`);
                             
                             
-                                                        await new Promise(resolve => setTimeout(resolve, rateLimitMs));
+                                                        await new Promise(resolve => window.setTimeout(resolve, rateLimitMs));
                             
                             
                             
                             const systemMsg = messages[0];
-                            const userMsg = messages.find((m: SafeAny) => m.role === 'user' && m.content === enhancedQuery);
+                            const userMsg = messages.find((m: OpenAIMessage) => m.role === 'user' && m.content === enhancedQuery);
                             if (systemMsg && userMsg) {
                                 messages.length = 0;
                                 messages.push(systemMsg);
@@ -2319,7 +2363,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                             
                             
                             const systemMsg = messages[0];
-                            const userMsg = messages.find((m: SafeAny) => m.role === 'user' && m.content === enhancedQuery);
+                            const userMsg = messages.find((m: OpenAIMessage) => m.role === 'user' && m.content === enhancedQuery);
                             if (systemMsg && userMsg && messages.length > 2) {
                                 messages.length = 0;
                                 messages.push(systemMsg);
@@ -2396,7 +2440,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                             if (provider === 'groq') {
                                 const gs = new GroqService(this.settings.groqApiKey,
                                     (h) => this.rateLimitManager.updateFromHeaders('groq', this.settings.model, h));
-                                synthResult = await gs.generateContent(this.settings.model, synthMessages as SafeAny[],
+                                synthResult = await gs.generateContent(this.settings.model, synthMessages as GroqChatMessage[],
                                     { temperature: getModelTemperature(this.settings.model, this.settings), topP: getModelTopP(this.settings.model, this.settings) });
                             } else if (provider === 'gemini') {
                                 const { GeminiService: GS } = await import('./geminiService');
@@ -2441,13 +2485,13 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                                 const { NvidiaService: NS } = await import('./nvidiaService');
                                 const ns = new NS(this.settings.nvidiaApiKey,
                                     (h) => this.rateLimitManager.updateFromHeaders('nvidia', this.settings.model, h));
-                                synthResult = await ns.generateContent(this.settings.model, synthMessages as SafeAny[],
+                                synthResult = await ns.generateContent(this.settings.model, synthMessages as NvidiaChatMessage[],
                                     { temperature: getModelTemperature(this.settings.model, this.settings), maxTokens: 8192, topP: getModelTopP(this.settings.model, this.settings) });
                             } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
                                 const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(provider)!;
                                 const response = await unifiedProvider.generateContent(
                                     this.settings.model,
-                                    synthMessages as SafeAny[],
+                                    synthMessages as UnifiedMessage[],
                                     {
                                         temperature: getModelTemperature(this.settings.model, this.settings),
                                         maxTokens: 8192,
@@ -2479,7 +2523,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                                 if (enableRateLimit) {
                                     updateSnippetUI(`Rate limited — waiting ${Math.ceil(waitMs / 1000)}s...`);
                                     updateProcessingUI(2, 3, `TPM error, waiting ${Math.ceil(waitMs / 1000)}s before retrying...`);
-                                    await new Promise(resolve => setTimeout(resolve, waitMs));
+                                    await new Promise(resolve => window.setTimeout(resolve, waitMs));
                                 }
                                 i--; 
                             } else if (isTPMError) {
@@ -2515,7 +2559,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
             updateSnippetUI('Analysing query and available tools...');
 
             
-            const toolNames = mcpTools.map((t: SafeAny) => t.function?.name).filter(Boolean);
+            const toolNames = mcpTools.map((t: OpenAITool) => t.function?.name).filter(Boolean);
 
             
             
@@ -2526,14 +2570,14 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                         if (srvTools.length === 0) continue;
                         lines.push(`### Server: ${srvName}`);
                         for (const t of srvTools) {
-                            const n = (t as unknown as SafeAny).function?.name || 'unknown';
-                            const d = (t as unknown as SafeAny).function?.description || 'No description';
+                            const n = (t as unknown as OpenAITool).function?.name || 'unknown';
+                            const d = (t as unknown as OpenAITool).function?.description || 'No description';
                             lines.push(`- ${n}: ${d}`);
                         }
                     }
                     return lines.join('\n');
                 }
-                return mcpTools.map((t: SafeAny) => {
+                return mcpTools.map((t: OpenAITool) => {
                     const name = t.function?.name || 'unknown';
                     const desc = t.function?.description || 'No description';
                     return `- ${name}: ${desc}`;
@@ -2597,7 +2641,7 @@ ${isAutoToolMode
 ${mcpContext}`;
 
             
-            const messages: SafeAny[] = [{ role: 'system', content: systemPrompt }];
+            const messages: OpenAIMessage[] = [{ role: 'system', content: systemPrompt }];
             if (chatHistory.length > 0) {
                 messages.push(...convertChatHistoryForGroq(chatHistory, this.settings.model, this.getContextWindowSize()));
             }
@@ -2653,7 +2697,7 @@ ${mcpContext}`;
                               Array.from(serverGroups.entries())
                                   .filter(([, t]) => t.length > 0)
                                   .map(([srvName, srvTools]) =>
-                                      `- Server "${srvName}": ${srvTools.map((t: SafeAny) => t.function?.name).filter(Boolean).join(', ')}`
+                                      `- Server "${srvName}": ${srvTools.map((t: OpenAITool) => t.function?.name).filter(Boolean).join(', ')}`
                                   ).join('\n')
                             : '';
 
@@ -2700,15 +2744,15 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                         const planningTools = [selectionTool];
                         let extractedTools: string[] = [];
 
-                        const planningExecCb = async (toolCalls: SafeAny[]) => {
+                        const planningExecCb = async (toolCalls: OpenAITool[]) => {
                             if (abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
                             for (const tc of toolCalls) {
                                 if (tc.function?.name === 'submit_tool_selection') {
                                     try {
                                         const args = typeof tc.function.arguments === 'string' 
-                                            ? JSON.parse(tc.function.arguments) 
+                                            ? JSON.parse(tc.function.arguments) as { selected_tools?: unknown[] }
                                             : tc.function.arguments;
-                                        if (args.selected_tools && Array.isArray(args.selected_tools)) {
+                                        if (args?.selected_tools && Array.isArray(args.selected_tools)) {
                                             extractedTools = args.selected_tools;
                                         }
                                     } catch (e) {
@@ -2718,38 +2762,38 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                             return toolCalls.map(() => ({ success: true, content: 'Selection received.' }));
                         };
 
-                        const planningOptions: SafeAny = { temperature: 0.1, abortSignal };
+                        const planningOptions: { temperature: number; abortSignal?: AbortSignal } = { temperature: 0.1, abortSignal };
 
                         if (planningProvider === 'groq') {
                             const gs = new GroqService(this.settings.groqApiKey,
-                                (h: SafeAny) => this.rateLimitManager.updateFromHeaders('groq', planningModelId, h));
-                            await gs.generateContentWithTools(planningModelId, planningMessages as SafeAny[], planningTools, { ...planningOptions, toolChoice: 'required' }, planningExecCb);
+                                (h: Headers) => this.rateLimitManager.updateFromHeaders('groq', planningModelId, h));
+                            await gs.generateContentWithTools(planningModelId, planningMessages as GroqChatMessage[], planningTools, { ...planningOptions, toolChoice: 'required' }, planningExecCb as unknown as (toolCalls: LocalGroqToolCall[]) => Promise<LocalToolResult[]>);
                         } else if (planningProvider === 'gemini') {
                             const gs = new GeminiService(this.settings.geminiApiKey || this.settings.apiKey,
-                                (h: SafeAny) => this.rateLimitManager.updateFromHeaders('gemini', planningModelId, h));
+                                (h: Headers) => this.rateLimitManager.updateFromHeaders('gemini', planningModelId, h));
                             await gs.generateContentWithTools(planningModelId, planningMessages, planningTools, { ...planningOptions, maxOutputTokens: 1024 }, planningExecCb);
                         } else if (planningProvider === 'openrouter') {
                             const ors = new OpenRouterService(this.settings.openRouterApiKey,
-                                (h: SafeAny) => this.rateLimitManager.updateFromHeaders('openrouter', planningModelId, h));
-                            await ors.generateContentWithTools(planningModelId, planningMessages as SafeAny[], planningTools, { ...planningOptions, toolChoice: 'required' }, planningExecCb);
+                                (h: Headers) => this.rateLimitManager.updateFromHeaders('openrouter', planningModelId, h));
+                            await ors.generateContentWithTools(planningModelId, planningMessages as unknown as OpenRouterChatMessage[], planningTools as unknown as Record<string, unknown>[], { ...planningOptions, toolChoice: 'required' }, planningExecCb as unknown as Parameters<typeof ors.generateContentWithTools>[4]);
                         } else if (planningProvider === 'ollama') {
                             const os = new OllamaService(this.settings.ollamaBaseUrl || 'http://localhost:11434', this.settings.ollamaApiKey,
-                                (h: SafeAny) => this.rateLimitManager.updateFromHeaders('ollama', planningModelId, h));
-                            await os.generateContentWithTools(planningModelId, planningMessages as SafeAny[], planningTools, planningOptions, planningExecCb);
+                                (h: Headers) => this.rateLimitManager.updateFromHeaders('ollama', planningModelId, h));
+                            await os.generateContentWithTools(planningModelId, planningMessages as unknown as OllamaChatMessage[], planningTools as ProviderTool[], planningOptions, planningExecCb as unknown as Parameters<typeof os.generateContentWithTools>[4]);
                         } else if (UnifiedProviderManager.getInstance().hasProvider(planningProvider)) {
                             const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(planningProvider)!;
                             if (unifiedProvider.generateContentWithTools) {
-                                await unifiedProvider.generateContentWithTools(planningModelId, planningMessages as SafeAny[], planningTools, planningOptions, planningExecCb);
+                                await unifiedProvider.generateContentWithTools(planningModelId, planningMessages as unknown as UnifiedMessage[], planningTools as unknown as Record<string, unknown>[], planningOptions, planningExecCb as unknown as Parameters<NonNullable<typeof unifiedProvider.generateContentWithTools>>[4]);
                             }
                         }
 
                         
                         const plannedNames = extractedTools.map(selected => {
                             if (toolNames.includes(selected)) return selected;
-                            return toolNames.find(tn => tn.endsWith(`__${selected}`)) || selected;
+                            return toolNames.find(tn => tn!.endsWith(`__${selected}`)) || selected;
                         }).filter(tn => toolNames.includes(tn));
                         
-                        const filteredTools = mcpTools.filter((t: SafeAny) => plannedNames.includes(t.function?.name));
+                        const filteredTools = mcpTools.filter((t: OpenAITool) => plannedNames.includes(t.function?.name || ''));
                         const plan = buildFallbackPlan(enhancedQuery, filteredTools);
                         ledger = createLedger(plan);
                                                 planCreated = true;
@@ -2798,17 +2842,17 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
 
             
             
-            const estimateToolTokens = (tool: SafeAny): number => {
+            const estimateToolTokens = (tool: OpenAITool): number => {
                 try { return Math.ceil(JSON.stringify(tool).length / 4); } catch { return 300; }
             };
 
             
             
-            const chunkTools = (tools: SafeAny[], modelTPM: number): SafeAny[][] => {
+            const chunkTools = (tools: OpenAITool[], modelTPM: number): OpenAITool[][] => {
                 
                 const budget = Math.max(2000, Math.floor(modelTPM * 0.5));
-                const chunks: SafeAny[][] = [];
-                let current: SafeAny[] = [];
+                const chunks: OpenAITool[][] = [];
+                let current: OpenAITool[] = [];
                 let currentTokens = 0;
                 for (const tool of tools) {
                     const t = estimateToolTokens(tool);
@@ -2856,7 +2900,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
             
 
             
-            const executeToolsViaModel = async (toolCalls: SafeAny[], passLabel: string) => {
+            const executeToolsViaModel = async (toolCalls: OpenAITool[], passLabel: string) => {
                 const results = new Array(toolCalls.length);
                 const promises = toolCalls.map(async (toolCall, i) => {
                     if (passAbandoned) {
@@ -2880,7 +2924,7 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                             return;
                         }
                         const snippet = result?.content || (result?.error ? `Error: ${result.error}` : '(no output)');
-                        updateSnippetUI(`✓ ${label}`, snippet);
+                        updateSnippetUI(`✓ ${label}`, String(snippet));
 
                         
                         const existingStep = ledger!.plan.steps.find(
@@ -2888,22 +2932,22 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
                         );
                         if (existingStep) {
                             existingStep.status = 'completed';
-                            existingStep.result = result?.content || snippet;
+                            existingStep.result = String(result?.content || snippet);
                             ledger!.completedSteps.push(existingStep.stepId);
                         } else {
                             const dynId = `dyn_${toolName}_${Date.now()}_${i}`;
                             const dynStep = {
                                 stepId: dynId,
-                                toolName,
+                                toolName: String(toolName),
                                 arguments: toolCall.function?.arguments
                                     ? (typeof toolCall.function.arguments === 'string'
-                                        ? (() => { try { return JSON.parse(toolCall.function.arguments); } catch { return {}; } })()
+                                        ? (() => { try { return JSON.parse(toolCall.function.arguments) as Record<string, unknown>; } catch { return {}; } })()
                                         : toolCall.function.arguments)
                                     : {},
                                 dependsOn: [],
                                 rationale: `model-driven (${passLabel})`,
                                 status: 'completed' as const,
-                                result: result?.content || snippet,
+                                result: String(result?.content || snippet),
                                 retryCount: 0,
                                 maxRetries: 2
                             };
@@ -2931,17 +2975,17 @@ Be extremely selective and choose only the minimal set of tools needed. If no to
             const invokeToolsOnModel = async (
                 modelId: string,
                 provider: string,
-                passTools: SafeAny[],
+                passTools: OpenAITool[],
                 passLabel: string,
                 toolChoice: 'auto' | 'required' | 'none',
                 signal?: AbortSignal
             ): Promise<{ content: string; totalTokens?: number }> => {
-                const execCb = (toolCalls: SafeAny[]) => executeToolsViaModel(toolCalls, passLabel);
+                const execCb = (toolCalls: OpenAITool[]) => executeToolsViaModel(toolCalls, passLabel);
 
                 const effectiveSignal = signal || abortSignal;
 
                 
-                const passToolNames = passTools.map((t: SafeAny) => t.function?.name).filter(Boolean);
+                const passToolNames = passTools.map((t: OpenAITool) => t.function?.name).filter(Boolean);
                 const passToolListText = passToolNames.length > 0
                     ? (isAutoToolMode
                         ? `\n\nYou have ${passToolNames.length} tool(s) available for this step: ${passToolNames.join(', ')}.\n\nOnly call tools from this list.`
@@ -2962,7 +3006,7 @@ CRITICAL: The user CANNOT see the tool execution results. If you provide a final
 ${mcpContext}`;
 
                 
-                const passMessages: SafeAny[] = [{ role: 'system', content: passSystemPrompt }];
+                const passMessages: OpenAIMessage[] = [{ role: 'system', content: passSystemPrompt }];
                 if (chatHistory.length > 0) {
                     passMessages.push(...convertChatHistoryForGroq(chatHistory, modelId, this.getContextWindowSize()));
                 }
@@ -3028,7 +3072,7 @@ ${mcpContext}`;
 
                     
                     const completedToolNames = new Set(allCompletedSteps.map(s => s.toolName));
-                    const remainingInChunk = passToolNames.filter(name => !completedToolNames.has(name));
+                    const remainingInChunk = passToolNames.filter(name => !completedToolNames.has(name!));
 
                     if (remainingInChunk.length === 0) {
                         
@@ -3049,14 +3093,15 @@ ${mcpContext}`;
                 if (provider === 'groq') {
                     const gs = new GroqService(this.settings.groqApiKey,
                         (h) => this.rateLimitManager.updateFromHeaders('groq', modelId, h));
-                    return gs.generateContentWithTools(modelId, passMessages as SafeAny[], passTools,
+                    return gs.generateContentWithTools(modelId, passMessages as GroqChatMessage[], passTools as ProviderTool[],
                         { temperature: getModelTemperature(modelId, this.settings), topP: getModelTopP(modelId, this.settings), toolChoice, abortSignal: effectiveSignal },
-                        execCb);
+                        execCb as unknown as (toolCalls: LocalGroqToolCall[]) => Promise<LocalToolResult[]>);
                 } else if (provider === 'gemini') {
                     const { GeminiService: GS } = await import('./geminiService');
                     const gs = new GS(this.settings.geminiApiKey || this.settings.apiKey,
                         (h) => this.rateLimitManager.updateFromHeaders('gemini', modelId, h));
-                    return gs.generateContentWithTools(modelId, passMessages, passTools,
+                    return gs.generateContentWithTools(modelId, passMessages as 
+unknown as Array<{ role: string; content?: string; tool_calls?: Array<{ id?: string; type?: string; function?: { name: string; arguments: string }; name?: string }> }>, passTools as ProviderTool[],
                         {
                             temperature: getModelTemperature(modelId, this.settings),
                             maxOutputTokens: 8192,
@@ -3064,14 +3109,14 @@ ${mcpContext}`;
                             thinkingConfig: getGeminiThinkingConfig(modelId, this.settings)?.thinkingConfig,
                             abortSignal: effectiveSignal
                         },
-                        execCb);
+                        execCb as unknown as Parameters<typeof gs.generateContentWithTools>[4]);
                 } else if (provider === 'openrouter') {
                     const { OpenRouterService: ORS } = await import('./openRouterService');
                     const ors = new ORS(this.settings.openRouterApiKey,
                         (h) => this.rateLimitManager.updateFromHeaders('openrouter', modelId, h));
-                    return ors.generateContentWithTools(modelId, passMessages as SafeAny[], passTools,
+                    return ors.generateContentWithTools(modelId, passMessages as unknown as OpenRouterChatMessage[], passTools as ProviderTool[],
                         { temperature: getModelTemperature(modelId, this.settings), topP: getModelTopP(modelId, this.settings), toolChoice, abortSignal: effectiveSignal },
-                        execCb);
+                        execCb as unknown as Parameters<typeof ors.generateContentWithTools>[4]);
                 } else if (provider === 'ollama') {
                     const { OllamaService: OS } = await import('./ollamaService');
                     const os = new OS(this.settings.ollamaBaseUrl || 'http://localhost:11434', this.settings.ollamaApiKey,
@@ -3080,12 +3125,12 @@ ${mcpContext}`;
                     
                     
                     
-                    const ollamaMessages = passMessages.map((m: SafeAny) => {
+                    const ollamaMessages = passMessages.map((m: OpenAIMessage) => {
                         if (m.role === 'assistant' && m.tool_calls) {
                             return {
                                 role: 'assistant',
                                 content: m.content || '',
-                                tool_calls: m.tool_calls.map((tc: SafeAny, idx: number) => ({
+                                tool_calls: m.tool_calls.map((tc: { function?: { name?: string; arguments?: string }; name?: string }, idx: number) => ({
                                     type: 'function',
                                     function: {
                                         index: idx,
@@ -3093,7 +3138,7 @@ ${mcpContext}`;
                                         arguments: (() => {
                                             try {
                                                 return typeof tc.function?.arguments === 'string'
-                                                    ? JSON.parse(tc.function.arguments)
+                                                    ? JSON.parse(tc.function.arguments) as Record<string, unknown>
                                                     : (tc.function?.arguments || {});
                                             } catch { return {}; }
                                         })()
@@ -3110,23 +3155,23 @@ ${mcpContext}`;
                         }
                         return m;
                     });
-                    return os.generateContentWithTools(modelId, ollamaMessages as SafeAny[], passTools,
+                    return os.generateContentWithTools(modelId, ollamaMessages as unknown as OllamaChatMessage[], passTools as ProviderTool[],
                         { temperature: getModelTemperature(modelId, this.settings), abortSignal: effectiveSignal },
-                        execCb, useReqUrl);
+                        execCb as unknown as Parameters<typeof os.generateContentWithTools>[4], useReqUrl);
                 } else if (provider === 'nvidia') {
                     const { NvidiaService: NS } = await import('./nvidiaService');
                     const ns = new NS(this.settings.nvidiaApiKey,
                         (h) => this.rateLimitManager.updateFromHeaders('nvidia', modelId, h));
-                    return ns.generateContentWithTools(modelId, passMessages as SafeAny[], passTools,
+                    return ns.generateContentWithTools(modelId, passMessages as unknown as NvidiaChatMessage[], passTools as ProviderTool[],
                         { temperature: getModelTemperature(modelId, this.settings), maxTokens: 8192, topP: getModelTopP(modelId, this.settings), toolChoice, abortSignal: effectiveSignal },
-                        execCb);
+                        execCb as unknown as Parameters<typeof ns.generateContentWithTools>[4]);
                 } else if (UnifiedProviderManager.getInstance().hasProvider(provider)) {
                     const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(provider)!;
                     if (unifiedProvider.generateContentWithTools) {
-                        return unifiedProvider.generateContentWithTools(
+                        return unifiedProvider.generateContentWithTools!(
                             modelId,
-                            passMessages as SafeAny[],
-                            passTools,
+                            passMessages as unknown as UnifiedMessage[],
+                            passTools as ProviderTool[],
                             {
                                 temperature: getModelTemperature(modelId, this.settings),
                                 maxTokens: 8192,
@@ -3134,8 +3179,8 @@ ${mcpContext}`;
                                 toolChoice,
                                 abortSignal: effectiveSignal
                             },
-                            execCb,
-                            (thinking) => updateSnippetUI('Thinking...', thinking)
+                            execCb as unknown as Parameters<NonNullable<typeof unifiedProvider.generateContentWithTools>>[4],
+                            (thinking: string) => updateSnippetUI('Thinking...', thinking)
                         );
                     } else {
                         throw new Error(`Provider ${provider} does not support tool calling (required for MCP)`);
@@ -3150,7 +3195,7 @@ ${mcpContext}`;
             
             
             const runToolPass = async (
-                passTools: SafeAny[],
+                passTools: OpenAITool[],
                 passLabel: string,
                 toolChoice: 'auto' | 'required' | 'none'
             ): Promise<{ content: string; totalTokens?: number; isFinalAnswer: boolean } | null> => {
@@ -3181,7 +3226,7 @@ ${mcpContext}`;
                         if (waitMs > 0) {
                                                         updateSnippetUI(`Rate limited — waiting ${Math.ceil(waitMs / 1000)}s for cooldown...`);
                             updateProcessingUI(1, 2, `TPM error, waiting ${Math.ceil(waitMs / 1000)}s before retrying...`);
-                            await new Promise(resolve => setTimeout(resolve, waitMs));
+                            await new Promise(resolve => window.setTimeout(resolve, waitMs));
                         }
                     }
 
@@ -3320,12 +3365,12 @@ ${mcpContext}`;
             
             
             
-            const plannedStepToolNames = ledger?.plan?.steps?.map((s: SafeAny) => s.toolName) || [];
+            const plannedStepToolNames = ledger?.plan?.steps?.map((s: MCPPlanStep) => s.toolName) || [];
             const serverEntries = Array.from(serverGroups.entries())
                 .filter(([, tools]) => tools.length > 0)
                 .sort((a, b) => {
                     if (plannedStepToolNames.length === 0) return 0;
-                    const firstIndexOf = ([, tools]: [string, SafeAny[]]) => {
+                    const firstIndexOf = ([, tools]: [string, OpenAITool[]]) => {
                         let minIdx = Infinity;
                         for (const t of tools) {
                             const name = t.function?.name;
@@ -3342,17 +3387,17 @@ ${mcpContext}`;
 
             
             const plannedToolNames = ledger?.plan?.steps?.map(s => s.toolName) || [];
-            const filterToolsByPlan = (tools: SafeAny[]): SafeAny[] => {
+            const filterToolsByPlan = (tools: OpenAITool[]): OpenAITool[] => {
                 if (plannedToolNames.length === 0) {
                     
                     return tools;
                 }
-                return tools.filter((t: SafeAny) => {
+                return tools.filter((t: OpenAITool) => {
                     const toolName = t.function?.name;
                     if (toolName && (toolName.includes('thinking') || toolName.includes('thought') || toolName === 'submit_tool_selection')) {
                         return true;
                     }
-                    return plannedToolNames.includes(toolName);
+                    return plannedToolNames.includes(toolName!);
                 });
             };
 
@@ -3454,7 +3499,7 @@ ${mcpContext}`;
             const streamProviderForSynthesis = async (
                 provider: string,
                 modelId: string,
-                msgs: SafeAny[],
+                msgs: OpenAIMessage[],
                 onToken: (token: string) => void,
                 onThinking?: (thinking: string) => void,
                 signal?: AbortSignal
@@ -3471,8 +3516,8 @@ ${mcpContext}`;
                         let contentBuffer = '';
                         await groqService.generateContentStreamEvents(
                             modelId,
-                            msgs as SafeAny[],
-                            (evt: SafeAny) => {
+                            msgs as GroqChatMessage[],
+                            (evt: GroqStreamEvent) => {
                                 if (evt.type === 'thinking') {
                                     if (onThinking) onThinking(evt.text);
                                 } else if (evt.type === 'content') {
@@ -3491,7 +3536,7 @@ ${mcpContext}`;
                     } else {
                         responseText = await groqService.generateContentStream(
                             modelId,
-                            msgs as SafeAny[],
+                            msgs as GroqChatMessage[],
                             {
                                 temperature: getModelTemperature(modelId, this.settings),
                                 topP: getModelTopP(modelId, this.settings),
@@ -3510,8 +3555,8 @@ ${mcpContext}`;
                         this.settings.geminiApiKey || this.settings.apiKey,
                         (headers) => this.rateLimitManager.updateFromHeaders('gemini', modelId, headers)
                     );
-                    const sysMsg  = msgs.find((m: SafeAny) => m.role === 'system');
-                    const userMsg = msgs.find((m: SafeAny) => m.role === 'user');
+                    const sysMsg  = msgs.find((m: OpenAIMessage) => m.role === 'system');
+                    const userMsg = msgs.find((m: OpenAIMessage) => m.role === 'user');
                     const prompt  = `${sysMsg ? sysMsg.content + '\n\n' : ''}${userMsg?.content || ''}`;
 
                     const geminiModel = geminiService.getGenerativeModel({
@@ -3552,7 +3597,7 @@ ${mcpContext}`;
                     );
                     responseText = await openRouterService.generateContentStream(
                         modelId,
-                        msgs as SafeAny[],
+                        msgs as OpenRouterChatMessage[],
                         {
                             temperature: getModelTemperature(modelId, this.settings),
                             maxTokens: 8192,
@@ -3578,8 +3623,8 @@ ${mcpContext}`;
                     let contentBuffer = '';
                     await ollamaService.generateContentStreamEvents(
                         modelId,
-                        msgs as SafeAny[],
-                        (evt: SafeAny) => {
+                        msgs as OllamaChatMessage[],
+                        (evt: OllamaStreamEvent) => {
                             if (evt.type === 'thinking') {
                                 if (onThinking) onThinking(evt.text);
                             } else if (evt.type === 'content') {
@@ -3605,7 +3650,7 @@ ${mcpContext}`;
                     );
                     responseText = await nvidiaService.generateContentStream(
                         modelId,
-                        msgs,
+                        msgs as NvidiaChatMessage[],
                         {
                             temperature: getModelTemperature(modelId, this.settings),
                             maxTokens: 8192,
@@ -3626,7 +3671,7 @@ ${mcpContext}`;
                     if (unifiedProvider.streamContent) {
                         const response = await unifiedProvider.streamContent(
                             modelId,
-                            msgs as SafeAny[],
+                            msgs as UnifiedMessage[],
                             (chunk: string) => {
                                 responseText += chunk;
                                 onToken(chunk);
@@ -3646,7 +3691,7 @@ ${mcpContext}`;
                     } else {
                         const response = await unifiedProvider.generateContent(
                             modelId,
-                            msgs as SafeAny[],
+                            msgs as UnifiedMessage[],
                             {
                                 temperature: getModelTemperature(modelId, this.settings),
                                 topP: getModelTopP(modelId, this.settings),
@@ -3677,12 +3722,12 @@ ${mcpContext}`;
                 chunkProvider: string,
                 chunkModelId: string,
                 chunkSystemPrompt: string,
-                synthMessages: SafeAny[]
+                synthMessages: OpenAIMessage[]
             ): Promise<string> => {
                 if (chunkProvider === 'groq') {
                     const gs = new GroqService(this.settings.groqApiKey,
                         (h) => this.rateLimitManager.updateFromHeaders('groq', chunkModelId, h));
-                    return await gs.generateContent(chunkModelId, synthMessages as SafeAny[],
+                    return await gs.generateContent(chunkModelId, synthMessages as GroqChatMessage[],
                         { temperature: getModelTemperature(chunkModelId, this.settings), topP: getModelTopP(chunkModelId, this.settings) });
                 } else if (chunkProvider === 'gemini') {
                     const { GeminiService: GS } = await import('./geminiService');
@@ -3694,23 +3739,23 @@ ${mcpContext}`;
                 } else if (chunkProvider === 'openrouter') {
                     const ors = new OpenRouterService(this.settings.openRouterApiKey,
                         (h) => this.rateLimitManager.updateFromHeaders('openrouter', chunkModelId, h));
-                    return await ors.generateContent(chunkModelId, synthMessages as SafeAny[],
+                    return await ors.generateContent(chunkModelId, synthMessages as OpenRouterChatMessage[],
                         { temperature: getModelTemperature(chunkModelId, this.settings), topP: getModelTopP(chunkModelId, this.settings), maxTokens: 8192 });
                 } else if (chunkProvider === 'ollama') {
                     const os = new OllamaService(this.settings.ollamaBaseUrl || 'http://localhost:11434', this.settings.ollamaApiKey,
                         (h) => this.rateLimitManager.updateFromHeaders('ollama', chunkModelId, h));
-                    return await os.generateContent(chunkModelId, synthMessages as SafeAny[],
+                    return await os.generateContent(chunkModelId, synthMessages as OllamaChatMessage[],
                         { temperature: getModelTemperature(chunkModelId, this.settings) });
                 } else if (chunkProvider === 'nvidia') {
                     const ns = new NvidiaService(this.settings.nvidiaApiKey,
                         (h) => this.rateLimitManager.updateFromHeaders('nvidia', chunkModelId, h));
-                    return await ns.generateContent(chunkModelId, synthMessages as SafeAny[],
+                    return await ns.generateContent(chunkModelId, synthMessages as NvidiaChatMessage[],
                         { temperature: getModelTemperature(chunkModelId, this.settings), maxTokens: 8192, topP: getModelTopP(chunkModelId, this.settings) });
                 } else if (UnifiedProviderManager.getInstance().hasProvider(chunkProvider)) {
                     const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(chunkProvider)!;
                     const response = await unifiedProvider.generateContent(
                         chunkModelId,
-                        synthMessages as SafeAny[],
+                        synthMessages as UnifiedMessage[],
                         {
                             temperature: getModelTemperature(chunkModelId, this.settings),
                             topP: getModelTopP(chunkModelId, this.settings),
@@ -3839,7 +3884,7 @@ ${mcpContext}`;
                     let content = step.result || '';
                     
                     try {
-                        const parsed = JSON.parse(content);
+                        const parsed = JSON.parse(content) as unknown[] | Record<string, unknown>;
                         if (Array.isArray(parsed)) {
                             
                             if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0] !== null) {
@@ -3848,7 +3893,7 @@ ${mcpContext}`;
                                 sections.push('| ' + keys.map(() => '---').join(' | ') + ' |');
                                 for (const item of parsed.slice(0, 25)) { 
                                     const vals = keys.map(k => {
-                                        const v = item[k];
+                                        const v = (item as Record<string, unknown>)[k];
                                         if (v === null || v === undefined) return '';
                                         const s = typeof v === 'object' ? JSON.stringify(v) : String(v);
                                         return s.length > 80 ? s.substring(0, 77) + '...' : s;
@@ -3976,7 +4021,7 @@ ${mcpContext}`;
                 
                 const synthMsgsForEstimate = buildSynthesisFromLedger(ledger, enhancedQuery, systemPrompt);
                 const synthPayloadTokens = Math.ceil(
-                    synthMsgsForEstimate.reduce((acc: number, m: SafeAny) =>
+                    synthMsgsForEstimate.reduce((acc: number, m: OpenAITool) =>
                         acc + (typeof m.content === 'string' ? m.content.length : 0), 0) / 4
                 );
                 
@@ -4042,12 +4087,12 @@ ${mcpContext}`;
                     
                     const synthMsgs = buildSynthesisFromLedger(ledger, enhancedQuery, systemPrompt);
 
-                    let timedPromise: SafeAny;
+                    let timedPromise: Promise<{ content: string; totalTokens?: number }> & { resetTimer: () => void; disableTimer: () => void };
                     timedPromise = withTimeout(
                         (signal) => streamProviderForSynthesis(
                             provider,
                             modelEntry.modelId,
-                            synthMsgs,
+                            synthMsgs as unknown as OpenAIMessage[],
                             (token: string) => {
                                 if (timedPromise) timedPromise.disableTimer();
                                 updateSnippetUI('Generating response...', token);
@@ -4141,7 +4186,7 @@ ${mcpContext}`;
                             if (waitMs > 0 && waitMs < 60_000) {
                                                                 updateSnippetUI(`Rate limited — waiting ${Math.ceil(waitMs / 1000)}s...`);
                                 updateProcessingUI(1, 2, `TPM error, waiting ${Math.ceil(waitMs / 1000)}s before retrying...`);
-                                await new Promise(resolve => setTimeout(resolve, waitMs));
+                                await new Promise(resolve => window.setTimeout(resolve, waitMs));
                             }
                             
                             nextIdx = attempt + 1;
@@ -4157,7 +4202,7 @@ ${mcpContext}`;
                         
                         
                         if (!isHardFail && !isRateLimit && !isTokenLimit) {
-                            await new Promise(resolve => setTimeout(resolve, 300));
+                            await new Promise(resolve => window.setTimeout(resolve, 300));
                         }
                         continue;
                     }

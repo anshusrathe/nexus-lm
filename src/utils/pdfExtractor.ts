@@ -1,7 +1,8 @@
 // This file will contain functionality for extracting text from PDF files using PDF.js.
 
-import { TFile, Vault, Notice, Platform, App, Modal, Setting, ButtonComponent } from 'obsidian';
+import { TFile, Vault, Notice, Platform, App, Modal, ButtonComponent } from 'obsidian';
 import { DirectorySuggester } from './directorySuggester';
+import type { PdfjsLib, PdfDocumentProxy, PdfTextItem, PdfOutlineItem } from '../types/pdf';
 
 // Assuming pdfjsLib is available globally or imported correctly via build process
 // You might need to import it like this if your build process supports it:
@@ -29,7 +30,7 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
     const arrayBuffer = await vault.readBinary(file);
 
     // Load the PDF document using pdfjsLib (assuming it's accessible, e.g., on window)
-    const pdfjsLib = (window as SafeAny).pdfjsLib; // Access from global scope if bundled this way
+    const pdfjsLib = (window as { pdfjsLib?: PdfjsLib }).pdfjsLib; // Access from global scope if bundled this way
 
     if (!pdfjsLib) {
         throw new Error("PDF.js library not loaded. Ensure pdfjs-dist is installed and bundled correctly.");
@@ -61,10 +62,10 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
     for (let i = start; i <= end; i++) {
       const page = await pdfDocument.getPage(i);
       const viewport = page.getViewport({ scale: 1.0 });
-      const textContent = await page.getTextContent();
+      const textContent = await page.getTextContent() as { items: PdfTextItem[] };
 
       // Filter out empty strings if they don't have a meaningful position/width
-      const items = textContent.items.filter((item: SafeAny) => item.str.trim().length > 0 || item.width > 0);
+      const items = textContent.items.filter((item: PdfTextItem) => item.str.trim().length > 0 || item.width > 0);
 
       if (items.length === 0) {
           if (i < end) fullText += '\n\n---\n\n'; // Add separator even for empty pages
@@ -73,15 +74,15 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
 
       // --- Step 1: Group items into approximate visual lines ---
       // Sort items by Y (descending, as Y increases upwards in PDF) to process from top to bottom
-      items.sort((a: SafeAny, b: SafeAny) => b.transform[5] - a.transform[5]);
+      items.sort((a: PdfTextItem, b: PdfTextItem) => b.transform[5] - a.transform[5]);
 
-      const lines: SafeAny[][] = [];
-      let currentLineItems: SafeAny[] = [];
+      const lines: PdfTextItem[][] = [];
+      let currentLineItems: PdfTextItem[] = [];
       let currentLineY = -Infinity;
 
       // Estimate average line height for paragraph threshold calculation
       // This is a very rough estimate; a better way would analyze actual item heights or line spans.
-      const avgItemHeight = items.reduce((sum: number, item: SafeAny) => sum + item.height, 0) / items.length;
+      const avgItemHeight = items.reduce((sum: number, item: PdfTextItem) => sum + item.height, 0) / items.length;
       const PARAGRAPH_THRESHOLD = avgItemHeight * PARAGRAPH_THRESHOLD_FACTOR;
 
 
@@ -98,11 +99,11 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
                   // Optionally update currentLineY to average/min/max of line items for better grouping
                   // For simplicity, we stick to the first item's Y or just check against a range.
                   // Let's update currentLineY to be the average of the line items processed so far for a slightly better centroid reference
-                   currentLineY = currentLineItems.reduce((sum: number, item: SafeAny) => sum + item.transform[5], 0) / currentLineItems.length;
+                   currentLineY = currentLineItems.reduce((sum: number, item: PdfTextItem) => sum + item.transform[5], 0) / currentLineItems.length;
 
               } else {
                   // New line detected. Sort the finished line by X and add to lines.
-                  currentLineItems.sort((a: SafeAny, b: SafeAny) => a.transform[4] - b.transform[4]);
+                   currentLineItems.sort((a: PdfTextItem, b: PdfTextItem) => a.transform[4] - b.transform[4]);
                   lines.push(currentLineItems);
 
                   // Start a new line
@@ -113,7 +114,7 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
       }
       // Add the last line
       if (currentLineItems.length > 0) {
-          currentLineItems.sort((a: SafeAny, b: SafeAny) => a.transform[4] - b.transform[4]);
+           currentLineItems.sort((a: PdfTextItem, b: PdfTextItem) => a.transform[4] - b.transform[4]);
           lines.push(currentLineItems);
       }
 
@@ -123,7 +124,7 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
 
       // --- Step 2: Identify potential column boundaries (Simple X-gap method) ---
       let splitX: number | null = null;
-      const xs = items.map((item: SafeAny) => item.transform[4]); // X coordinates
+      const xs = items.map((item: PdfTextItem) => item.transform[4]); // X coordinates
       xs.sort((a: number, b: number) => a - b);
 
       let maxGap = 0;
@@ -171,11 +172,11 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
           let lineContent = '';
           if (splitX !== null) {
               // Process as multiple columns
-              const leftItems = line.filter((item: SafeAny) => item.transform[4] < splitX);
-              const rightItems = line.filter((item: SafeAny) => item.transform[4] >= splitX); // Items >= splitX go to right column
+              const leftItems = line.filter((item: PdfTextItem) => item.transform[4] < splitX);
+              const rightItems = line.filter((item: PdfTextItem) => item.transform[4] >= splitX); // Items >= splitX go to right column
 
-              const leftText = leftItems.map((item: SafeAny) => item.str).join(' ').trim();
-              const rightText = rightItems.map((item: SafeAny) => item.str).join(' ').trim();
+              const leftText = leftItems.map((item: PdfTextItem) => item.str).join(' ').trim();
+              const rightText = rightItems.map((item: PdfTextItem) => item.str).join(' ').trim();
 
               lineContent += leftText;
               // Add space between columns if both have content on this line
@@ -186,7 +187,7 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
 
           } else {
               // Process as a single column line
-              lineContent = line.map((item: SafeAny) => item.str).join(' ').trim();
+              lineContent = line.map((item: PdfTextItem) => item.str).join(' ').trim();
           }
 
           pageText += lineContent;
@@ -224,7 +225,7 @@ export class PdfExtractOptionsModal extends Modal {
   private directory: string;
   private errorEl: HTMLElement | null = null;
   private dirSuggester: DirectorySuggester | null = null;
-  private pdfDocument: SafeAny;
+  private pdfDocument: PdfDocumentProxy;
   private previewCanvas: HTMLCanvasElement | null = null;
   private previewContainer: HTMLElement | null = null;
   private currentPreviewPage: number = 1;
@@ -235,7 +236,7 @@ export class PdfExtractOptionsModal extends Modal {
   private fromInput: HTMLInputElement | null = null;
   private toInput: HTMLInputElement | null = null;
 
-  constructor(app: App, numPages: number, defaultDir: string, pdfDocument: SafeAny, onSubmit: (opts: { from: number, to: number, full: boolean, directory: string }) => void) {
+  constructor(app: App, numPages: number, defaultDir: string, pdfDocument: PdfDocumentProxy, onSubmit: (opts: { from: number, to: number, full: boolean, directory: string }) => void) {
     super(app);
     this.numPages = numPages;
     this.onSubmit = onSubmit;
@@ -435,7 +436,7 @@ export class PdfExtractOptionsModal extends Modal {
     const loading = this.tocContainer.createDiv({ text: 'Loading outline...', cls: 'pdf-toc-loading' });
     
     try {
-      const outline = await this.pdfDocument.getOutline();
+      const outline = await this.pdfDocument.getOutline() as PdfOutlineItem[] | null;
       loading.remove();
       
       if (!outline || outline.length === 0) {
@@ -451,7 +452,7 @@ export class PdfExtractOptionsModal extends Modal {
     }
   }
 
-  private async renderOutlineItems(items: SafeAny[], parentEl: HTMLElement) {
+  private async renderOutlineItems(items: PdfOutlineItem[], parentEl: HTMLElement) {
     for (const item of items) {
       const li = parentEl.createEl('li', { cls: 'pdf-toc-item-wrapper' });
       
@@ -478,7 +479,7 @@ export class PdfExtractOptionsModal extends Modal {
             : item.dest;
           
           if (dest && dest.length > 0) {
-            const pageIndex = await this.pdfDocument.getPageIndex(dest[0]);
+            const pageIndex = await this.pdfDocument.getPageIndex(dest[0] as { num: number; gen: number });
             pageNum = pageIndex + 1;
           }
         }
@@ -487,7 +488,7 @@ export class PdfExtractOptionsModal extends Modal {
       }
 
       if (pageNum !== null) {
-        const pageSpan = itemEl.createSpan({ text: ` (p. ${pageNum})`, cls: 'pdf-toc-page' });
+        itemEl.createSpan({ text: ` (p. ${pageNum})`, cls: 'pdf-toc-page' });
         itemEl.addClass('is-clickable');
         itemEl.onclick = (e) => {
           // Update preview

@@ -4,6 +4,7 @@
  */
 import { requestUrl } from 'obsidian';
 import { UnifiedProviderManager } from '../services/unifiedProviderManager';
+import { AISettings } from '../settings';
 
 export interface TemporalQuery {
     cleanQuery: string;  // Query with temporal phrases removed
@@ -24,7 +25,7 @@ export interface TemporalQuery {
 export async function parseTemporalQuery(
     query: string, 
     referenceDate: Date = new Date(),
-    settings?: SafeAny
+    settings?: AISettings
 ): Promise<TemporalQuery> {
             
     // Try fast regex-based parsing first (covers common patterns like "this week", "yesterday", etc.)
@@ -369,7 +370,7 @@ function parseFlexibleDate(dateStr: string): Date | null {
  * - "documents I edited last summer"
  * - "notes from when I was on vacation in july"
  */
-async function parseTemporalQueryAI(query: string, referenceDate: Date, settings?: SafeAny): Promise<TemporalQuery> {
+async function parseTemporalQueryAI(query: string, referenceDate: Date, settings?: AISettings): Promise<TemporalQuery> {
     const lowerQuery = query.toLowerCase();
     
     // Quick heuristic check: Does the query contain temporal FILE FILTERING indicators?
@@ -409,31 +410,32 @@ async function parseTemporalQueryAI(query: string, referenceDate: Date, settings
     }
     
     // Check if we have the necessary API key for the provider
-    const provider = settings.provider || 'gemini';
+    const s: AISettings = settings;
+    const provider = s.provider || 'gemini';
     let apiKey = '';
     
     switch (provider) {
         case 'gemini':
-            apiKey = settings.geminiApiKey || settings.apiKey;
+            apiKey = s.geminiApiKey || s.apiKey;
             break;
         case 'openrouter':
-            apiKey = settings.openRouterApiKey;
+            apiKey = s.openRouterApiKey;
             break;
         case 'opencode':
-            apiKey = settings.openCodeApiKey;
+            apiKey = s.openCodeApiKey;
             break;
         case 'groq':
-            apiKey = settings.groqApiKey;
+            apiKey = s.groqApiKey;
             break;
         case 'nvidia':
-            apiKey = settings.nvidiaApiKey;
+            apiKey = s.nvidiaApiKey;
             break;
         case 'ollama':
             // Ollama doesn't need API key for local instances
             apiKey = 'local';
             break;
         default:
-            apiKey = settings.geminiApiKey || settings.apiKey;
+            apiKey = s.geminiApiKey || s.apiKey;
     }
     
     if (!apiKey) {
@@ -472,7 +474,7 @@ Rules:
 JSON:`;
 
     try {
-        let response: SafeAny;
+        let response: { status: number; json: Record<string, unknown> };
         let content: string = '';
 
         // Use provider-specific API calls
@@ -499,7 +501,7 @@ JSON:`;
                                 return { cleanQuery: query, startDate: null, endDate: null, hasTemporalFilter: false };
             }
             
-            content = response.json.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+            content = (response.json.candidates as unknown as Array<{ content?: { parts?: Array<{ text?: string }> } }>)?.[0]?.content?.parts?.[0]?.text?.trim() || '';
             
         } else if (provider === 'openrouter') {
             // Use OpenRouter API - try a sequence of reliable free/cheap models
@@ -531,7 +533,7 @@ JSON:`;
                     });
                     
                     if (response.status === 200) {
-                        content = response.json.choices?.[0]?.message?.content?.trim() || '';
+                        content = (response.json.choices as unknown as Array<{ message?: { content?: string } }>)?.[0]?.message?.content?.trim() || '';
                         openRouterSuccess = true;
                         break;
                     }
@@ -565,7 +567,7 @@ JSON:`;
                     });
                     
                     if (response.status === 200) {
-                        content = response.json.choices?.[0]?.message?.content?.trim() || '';
+                        content = (response.json.choices as unknown as Array<{ message?: { content?: string } }>)?.[0]?.message?.content?.trim() || '';
                         groqSuccess = true;
                         break;
                     }
@@ -614,7 +616,7 @@ JSON:`;
             };
         }
 
-        const parsed = JSON.parse(jsonMatch[0]);
+        const parsed: TemporalFilterInput = JSON.parse(jsonMatch[0]);
         
         if (!parsed.hasTime) {
             return {

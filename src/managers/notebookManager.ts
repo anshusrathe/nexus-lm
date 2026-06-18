@@ -1,4 +1,4 @@
-import { App, Notice, TFile, normalizePath } from 'obsidian';
+import { App, Notice, normalizePath } from 'obsidian';
 
 export type NotebookMode = 'cag' | 'rag';
 
@@ -32,7 +32,7 @@ export class NotebookManager {
       const fileExists = await this.app.vault.adapter.exists(this.filePath);
       if (fileExists) {
         const jsonString = await this.app.vault.adapter.read(this.filePath);
-        this.notebooks = JSON.parse(jsonString);
+        this.notebooks = JSON.parse(jsonString) as Notebook[];
       } else {
         
         await this.saveNotebooks();
@@ -163,7 +163,7 @@ export class NotebookChatHistoryManager {
             let updatedAt = Date.now();
             try {
               const json = await this.app.vault.adapter.read(f);
-              const session = JSON.parse(json);
+              const session = JSON.parse(json) as NotebookChatSession;
               name = session.name || id;
               createdAt = session.createdAt || createdAt;
               updatedAt = session.updatedAt || updatedAt;
@@ -188,7 +188,7 @@ export class NotebookChatHistoryManager {
       const exists = await this.app.vault.adapter.exists(file);
       if (!exists) return null;
       const json = await this.app.vault.adapter.read(file);
-      return JSON.parse(json);
+      return JSON.parse(json) as NotebookChatSession;
     } catch (e) {
       return null;
     }

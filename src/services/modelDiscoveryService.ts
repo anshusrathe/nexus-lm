@@ -6,7 +6,7 @@
  */
 
 import { requestUrl } from 'obsidian';
-import { CustomModel, CustomEmbeddingModel, Provider, AISettings } from '../settings';
+import { CustomModel, CustomEmbeddingModel, AISettings } from '../settings';
 import { validateOpenRouterApiKey } from './openRouterService';
 import { validateNvidiaApiKey } from './nvidiaService';
 
@@ -26,7 +26,7 @@ export async function verifyModel(model: CustomModel, settings: AISettings): Pro
   const provider = model.provider;
   let url = '';
   let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  let body: SafeAny = {};
+  let body: Record<string, unknown> = {};
 
   if (provider === 'gemini') {
     const key = settings.geminiApiKey || settings.apiKey;
@@ -111,7 +111,7 @@ export async function verifyModel(model: CustomModel, settings: AISettings): Pro
 
     // Add a 10s timeout to verification requests
     const timeoutPromise = new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error('Request timed out')), 10000)
+      window.setTimeout(() => reject(new Error('Request timed out')), 10000)
     );
 
     const response = await Promise.race([requestPromise, timeoutPromise]);
@@ -123,8 +123,9 @@ export async function verifyModel(model: CustomModel, settings: AISettings): Pro
     } else {
       let errorMsg = `API Error ${response.status}`;
       try {
-        const data = response.json;
-        errorMsg = data.error?.message || data.message || errorMsg;
+        const data = response.json as Record<string, unknown>;
+        const errObj = data.error as Record<string, unknown> | undefined;
+        errorMsg = ((errObj?.message ?? data.message) as string) || errorMsg;
       } catch {}
       return { success: false, error: errorMsg };
     }
@@ -132,6 +133,7 @@ export async function verifyModel(model: CustomModel, settings: AISettings): Pro
     return { success: false, error: error instanceof Error ? error.message : 'Unknown network error' };
   }
 }
+
 
 /**
  * Verifies if an embedding model is actually accessible with the current API key.
@@ -141,7 +143,7 @@ export async function verifyEmbeddingModel(model: CustomEmbeddingModel, settings
   const provider = model.provider;
   let url = '';
   let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  let body: SafeAny = {};
+  let body: Record<string, unknown> = {};
 
   if (provider === 'gemini') {
     const key = settings.geminiApiKey || settings.apiKey;
@@ -197,7 +199,7 @@ export async function verifyEmbeddingModel(model: CustomEmbeddingModel, settings
 
     // Add a 10s timeout to verification requests
     const timeoutPromise = new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error('Request timed out')), 10000)
+      window.setTimeout(() => reject(new Error('Request timed out')), 10000)
     );
 
     const response = await Promise.race([requestPromise, timeoutPromise]);
@@ -207,8 +209,9 @@ export async function verifyEmbeddingModel(model: CustomEmbeddingModel, settings
     } else {
       let errorMsg = `API Error ${response.status}`;
       try {
-        const data = response.json;
-        errorMsg = data.error?.message || data.message || errorMsg;
+        const data = response.json as Record<string, unknown>;
+        const errObj = data.error as Record<string, unknown> | undefined;
+        errorMsg = ((errObj?.message ?? data.message) as string) || errorMsg;
       } catch {}
       return { success: false, error: errorMsg };
     }
@@ -330,7 +333,8 @@ async function fetchGeminiModels(apiKey: string): Promise<ModelDiscoveryResult> 
     }
 
     const data = response.json as GeminiModelResponse;
-    const models: DiscoveredModel[] = (data.models || [])
+    const geminiModels = (data.models || []);
+    const models: DiscoveredModel[] = geminiModels
       .filter(m => m.supportedGenerationMethods.includes('generateContent'))
       .map(m => {
         const capabilities: string[] = [];
@@ -345,7 +349,7 @@ async function fetchGeminiModels(apiKey: string): Promise<ModelDiscoveryResult> 
         };
       });
 
-    const embeddingModels: DiscoveredModel[] = (data.models || [])
+    const embeddingModels: DiscoveredModel[] = geminiModels
       .filter(m => m.supportedGenerationMethods.includes('embedContent'))
       .map(m => ({
         id: m.name.startsWith('models/') ? m.name.substring(7) : m.name,
@@ -487,7 +491,7 @@ async function fetchOllamaModels(baseUrl: string, apiKey?: string): Promise<Mode
 
         if (showResponse.status === 200) {
           const showData = showResponse.json as { 
-            model_info?: Record<string, SafeAny>; 
+            model_info?: Record<string, number>; 
             details?: { family?: string; families?: string[] };
             capabilities?: string[];
           };
@@ -786,10 +790,10 @@ async function fetchOpenCodeModels(apiKey: string): Promise<ModelDiscoveryResult
       return { provider: 'opencode', models: [], error: `API error: ${response.status}` };
     }
 
-    const data = response.json as SafeAny;
+    const data = response.json as { data?: Array<{ id: string; context_length?: number; max_model_len?: number; context_window?: number; max_model_length?: number; metadata?: Record<string, unknown> }> };
     const models: DiscoveredModel[] = (data.data || [])
-      .filter((m: SafeAny) => m.id)
-      .map((m: SafeAny) => ({
+      .filter((m) => m.id)
+      .map((m) => ({
         id: m.id,
         name: formatModelName(m.id),
         tokenLimit: extractGenericTokenLimit(m) ?? inferContextWindow(m.id, false)
@@ -822,10 +826,11 @@ export interface ModelDiscoveryConfig {
  * Extracts the token limit from a generic OpenAI-compatible API model entry
  * using a cascading check over known field locations across different providers.
  */
-function extractGenericTokenLimit(m: Record<string, SafeAny>): number | null {
-  return m.context_window ?? m.max_model_len ?? m.context_length ?? m.max_model_length ??
-         m.metadata?.context_window ?? m.metadata?.max_model_len ??
-         m.metadata?.context_length ?? m.metadata?.max_model_length ?? null;
+function extractGenericTokenLimit(m: Record<string, unknown>): number | null {
+  const v = (m.context_window ?? m.max_model_len ?? m.context_length ?? m.max_model_length) as number | undefined;
+  const meta = m.metadata as Record<string, unknown> | undefined;
+  const mv = meta ? (meta.context_window ?? meta.max_model_len ?? meta.context_length ?? meta.max_model_length) as number | undefined : undefined;
+  return (v ?? mv ?? null) as number | null;
 }
 
 /**
@@ -858,7 +863,7 @@ async function fetchCustomProviderModels(provider: { id: string; name: string; b
       return { provider: provider.id, models: [], error: `API error: ${response.status}` };
     }
 
-    const data = response.json as { data: SafeAny[] };
+    const data = response.json as { data?: Array<{ id: string; type?: string; context_window?: number; max_model_len?: number; context_length?: number; max_model_length?: number; metadata?: Record<string, unknown> }> };
     if (!data.data || !Array.isArray(data.data)) {
       return { provider: provider.id, models: [] };
     }
@@ -964,7 +969,7 @@ export async function discoverModels(config: ModelDiscoveryConfig): Promise<Mode
 /**
  * Converts discovery results to CustomModel format.
  */
-export function toCustomModels(result: ModelDiscoveryResult): CustomModel[] | SafeAny[] {
+export function toCustomModels(result: ModelDiscoveryResult): CustomModel[] {
   return result.models.map(m => ({
     provider: result.provider,
     id: m.id,

@@ -219,7 +219,7 @@ class MCPEnvVarWizard extends Modal {
       contentEl.createEl('h3', { text: 'Paths', cls: 'mcp-wizard-section-title' });
 
       const adapter = this.app.vault.adapter;
-      const vaultPath = ('basePath' in adapter) ? (adapter as SafeAny).basePath as string : undefined;
+      const vaultPath = ('basePath' in adapter) ? (adapter as { basePath?: string }).basePath : undefined;
 
       pathSpecs.forEach((spec: MCPPathSpec) => {
         const fieldGroup = contentEl.createDiv({ cls: 'mcp-wizard-field' });
@@ -363,7 +363,7 @@ class MCPEnvVarWizard extends Modal {
     input.classList.add('mcp-wizard-input-error');
     const existing = input.parentElement?.querySelector('.mcp-wizard-error');
     if (!existing) {
-      const err = document.createElement('span');
+      const err = this.containerEl.ownerDocument.createElement('span');
       err.className = 'mcp-wizard-error';
       err.textContent = message;
       input.insertAdjacentElement('afterend', err);

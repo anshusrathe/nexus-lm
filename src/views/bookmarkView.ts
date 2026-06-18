@@ -1,6 +1,5 @@
-import { ItemView, WorkspaceLeaf, App, ButtonComponent, Notice, ExtraButtonComponent } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, ExtraButtonComponent } from 'obsidian';
 import AIPlugin from '../main';
-import { ParsedFeedEntry } from '../parsing/feedParsing';
 import { getFaviconUrl } from '../utils/utils';
 
 export const VIEW_TYPE_BOOKMARKS = 'AI_BOOKMARKS_VIEW';

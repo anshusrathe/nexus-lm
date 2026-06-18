@@ -1,10 +1,19 @@
-import { MCPService, MCPTool } from './mcpService';
+import { MCPService } from './mcpService';
 
 export interface MCPToolCall {
     serverId: string;
     serverName: string;
     toolName: string;
     arguments: Record<string, unknown>;
+}
+
+interface AIToolCall {
+    function?: {
+        name?: string;
+        arguments?: string | Record<string, unknown>;
+    };
+    name?: string;
+    arguments?: Record<string, unknown>;
 }
 
 export interface MCPToolResult {
@@ -108,7 +117,7 @@ export class MCPToolCallingService {
      * re-invoking the MCP server. This prevents duplicate executions when a
      * fallback model re-requests a tool that already ran.
      */
-    async executeToolCall(toolCall: Record<string, SafeAny>): Promise<MCPToolResult> {
+    async executeToolCall(toolCall: AIToolCall): Promise<MCPToolResult> {
         try {
             // Parse the tool name to extract server and tool.
             // Format: <sanitizedServerName>__<toolName>
@@ -124,7 +133,7 @@ export class MCPToolCallingService {
 
             // Parse arguments early so we can build the dedup key
             const args = typeof toolCall.function?.arguments === 'string'
-                ? JSON.parse(toolCall.function.arguments)
+                ? JSON.parse(toolCall.function.arguments) as Record<string, unknown>
                 : toolCall.function?.arguments || toolCall.arguments || {};
 
             // ── Deduplication check ──────────────────────────────────────────

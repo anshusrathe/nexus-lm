@@ -99,8 +99,9 @@ async function executeJavaScript(code: string): Promise<CodeExecutionResult> {
         if (result !== undefined)
             logs.push(`→ ${typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)}`);
         return { success: true, output: logs.join('\n') || '(no output)', language: 'javascript' };
-    } catch (err: SafeAny) {
-        return { success: false, output: logs.join('\n'), error: err?.message || String(err), language: 'javascript' };
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { success: false, output: logs.join('\n'), error: message, language: 'javascript' };
     }
 }
 
@@ -148,27 +149,45 @@ ${code}
 
 type JsonVizType = 'vega-lite' | 'chartjs' | 'chartjs-simple' | 'card-list' | 'plain';
 
+type ChartJsSimpleObj = {
+    type: string;
+    title?: string;
+    data: Array<{ label: string; value: number }> | number[];
+    horizontal?: boolean;
+};
+
+type CardListObj = {
+    type: 'auto' | 'cards';
+    title?: string;
+    data: Array<Record<string, unknown>>;
+};
+
+type JsonObj = Record<string, unknown>;
+
 // Chart.js native types — any of these in obj.type triggers chartjs-simple
 const CHARTJS_SIMPLE_TYPES = new Set([
     'bar','line','pie','doughnut','radar','polarArea','bubble','scatter','sparkline',
     'treemap','horizontalBar'
 ]);
 
-function detectJsonVizType(obj: SafeAny): JsonVizType {
+function detectJsonVizType(obj: JsonObj): JsonVizType {
     if (!obj || typeof obj !== 'object') return 'plain';
     // Vega-Lite spec
-    if (typeof obj.$schema === 'string' && obj.$schema.includes('vega-lite')) return 'vega-lite';
+    const schema = obj.$schema;
+    if (typeof schema === 'string' && schema.includes('vega-lite')) return 'vega-lite';
     // Full Chart.js spec: has type + data.datasets or data.labels
-    if (obj.type && obj.data && (obj.data.datasets || obj.data.labels)) return 'chartjs';
+    const objType = obj.type;
+    const data = obj.data as Record<string, unknown> | undefined;
+    if (objType && data && (data.datasets || data.labels)) return 'chartjs';
     // Sparkline shorthand: { type:'sparkline', data:[numbers] }
-    if (obj.type === 'sparkline' && Array.isArray(obj.data)
-        && obj.data.every((v: SafeAny) => typeof v === 'number')) return 'chartjs-simple';
+    if (objType === 'sparkline' && Array.isArray(obj.data)
+        && obj.data.every((v: unknown) => typeof v === 'number')) return 'chartjs-simple';
     // Simple chart: { type, title, data:[{label,value},...] } — any chart type
-    if (obj.type && CHARTJS_SIMPLE_TYPES.has(obj.type) && Array.isArray(obj.data)
+    if (objType && CHARTJS_SIMPLE_TYPES.has(objType as string) && Array.isArray(obj.data)
         && obj.data.length > 0 && typeof obj.data[0] === 'object'
-        && 'label' in obj.data[0] && 'value' in obj.data[0]) return 'chartjs-simple';
+        && 'label' in (obj.data[0] as object) && 'value' in (obj.data[0] as object)) return 'chartjs-simple';
     // Card list: { type:'auto'|'cards', title, data:[{...}] }
-    if ((obj.type === 'auto' || obj.type === 'cards') && obj.title && Array.isArray(obj.data)
+    if ((objType === 'auto' || objType === 'cards') && obj.title && Array.isArray(obj.data)
         && obj.data.length > 0 && typeof obj.data[0] === 'object') return 'card-list';
     return 'plain';
 }
@@ -196,7 +215,7 @@ function buildChartJsHtml(spec: string): string {
 <script>
 try{
   const chart=new Chart(document.getElementById('c'),${spec});
-  setTimeout(()=>parent.postMessage({iframeHeight:document.body.scrollHeight},'*'),200);
+  window.setTimeout(()=>parent.postMessage({iframeHeight:document.body.scrollHeight},'*'),200);
 }catch(e){const p=document.createElement('pre');p.className='error-text';p.textContent=e.message;document.body.empty();document.body.appendChild(p);
   parent.postMessage({iframeHeight:document.body.scrollHeight},'*');}
 </script>
@@ -204,44 +223,49 @@ try{
 }
 
 /** Convert simple {type, title, data:[{label,value}]} to a Chart.js spec and render */
-function buildSimpleChartHtml(obj: SafeAny): string {
+function buildSimpleChartHtml(obj: ChartJsSimpleObj): string {
     // Map unsupported types to nearest Chart.js equivalent
     const typeMap: Record<string, string> = { treemap: 'pie', sparkline: 'line', horizontalBar: 'bar' };
-    const rawType = (obj.type || 'bar').toLowerCase();
+    const objType = obj.type as string | undefined;
+    const rawType = (objType || 'bar').toLowerCase();
     const chartType = typeMap[rawType] ?? rawType;
 
     const PALETTE = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6','#f97316','#84cc16'];
 
-    let spec: SafeAny;
+    let spec: Record<string, unknown>;
+    const chartTitle = obj.title as string | undefined;
+    const chartData = obj.data;
+    const isHorizontal = obj.horizontal as boolean | undefined;
     if (rawType === 'sparkline') {
         // Sparkline: minimal line chart, no axes, no legend
         spec = {
             type: 'line',
-            data: { labels: obj.data.map((_: SafeAny, i: number) => i + 1),
-                    datasets: [{ label: obj.title || '', data: obj.data,
+            data: { labels: chartData.map((_: unknown, i: number) => i + 1),
+                    datasets: [{ label: chartTitle || '', data: chartData,
                         borderColor: PALETTE[0], backgroundColor: PALETTE[0] + '33',
                         fill: true, tension: 0.4, pointRadius: 2 }] },
             options: { responsive: true, plugins: { legend: { display: false },
-                title: { display: !!obj.title, text: obj.title || '' } },
+                title: { display: !!chartTitle, text: chartTitle || '' } },
                 scales: { x: { display: false }, y: { display: false } } }
         };
     } else {
-        const labels = obj.data.map((d: SafeAny) => d.label);
-        const values = obj.data.map((d: SafeAny) => d.value);
+        const dataAsLabelValue = chartData as Array<{ label: string; value: number }>;
+        const labels = dataAsLabelValue.map(d => d.label);
+        const values = dataAsLabelValue.map(d => d.value);
         const isCircular = ['pie','doughnut','polarArea'].includes(chartType);
         spec = {
             type: chartType,
             data: {
                 labels,
-                datasets: [{ label: obj.title || 'Value', data: values,
+                datasets: [{ label: chartTitle || 'Value', data: values,
                     backgroundColor: isCircular ? PALETTE : PALETTE[0],
                     borderColor: isCircular ? PALETTE.map(c => c) : PALETTE[1],
                     borderWidth: 1 }]
             },
             options: { responsive: true,
                 plugins: { legend: { position: 'bottom' },
-                    title: { display: !!obj.title, text: obj.title || '' } },
-                ...(chartType === 'bar' && obj.horizontal ? { indexAxis: 'y' } : {})
+                    title: { display: !!chartTitle, text: chartTitle || '' } },
+                ...(chartType === 'bar' && isHorizontal ? { indexAxis: 'y' } : {})
             }
         };
     }
@@ -249,11 +273,11 @@ function buildSimpleChartHtml(obj: SafeAny): string {
 }
 
 /** Render a card list for {type:'auto'|'cards', title, data:[{key:val,...}]} */
-function buildCardListHtml(obj: SafeAny): string {
+function buildCardListHtml(obj: CardListObj): string {
     const keys = Object.keys(obj.data[0] || {});
     const [titleKey, ...descKeys] = keys;
-    const cards = obj.data.map((item: SafeAny) => {
-        const title = item[titleKey] || '';
+    const cards = obj.data.map((item: Record<string, unknown>) => {
+        const title = (titleKey ? item[titleKey] : '') || '';
         const desc = descKeys.map((k: string) => `<p style="margin:4px 0 0;font-size:0.85em;opacity:0.8">${item[k]}</p>`).join('');
         return `<div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:8px;padding:12px 16px;margin-bottom:8px">
             <strong style="font-size:0.95em">${title}</strong>${desc}</div>`;
@@ -267,17 +291,18 @@ h3{margin:0 0 12px;font-size:0.8em;opacity:0.6;text-transform:uppercase;letter-s
 }
 
 function executeJson(code: string): CodeExecutionResult {
-    let parsed: SafeAny;
-    try { parsed = JSON.parse(code); }
-    catch (err: SafeAny) {
-        return { success: false, output: '', error: `Invalid JSON: ${err?.message}`, language: 'json' };
+    let parsed: JsonObj;
+    try { parsed = JSON.parse(code) as JsonObj; }
+    catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { success: false, output: '', error: `Invalid JSON: ${message}`, language: 'json' };
     }
     const pretty = JSON.stringify(parsed, null, 2);
     const viz = detectJsonVizType(parsed);
     if (viz === 'vega-lite')      return { success: true, output: '', language: 'json', isHtml: true, htmlContent: buildVegaLiteHtml(pretty) };
     if (viz === 'chartjs')        return { success: true, output: '', language: 'json', isHtml: true, htmlContent: buildChartJsHtml(pretty) };
-    if (viz === 'chartjs-simple') return { success: true, output: '', language: 'json', isHtml: true, htmlContent: buildSimpleChartHtml(parsed) };
-    if (viz === 'card-list')      return { success: true, output: '', language: 'json', isHtml: true, htmlContent: buildCardListHtml(parsed) };
+    if (viz === 'chartjs-simple') return { success: true, output: '', language: 'json', isHtml: true, htmlContent: buildSimpleChartHtml(parsed as ChartJsSimpleObj) };
+    if (viz === 'card-list')      return { success: true, output: '', language: 'json', isHtml: true, htmlContent: buildCardListHtml(parsed as CardListObj) };
     // Plain JSON — pretty-print via MarkdownRenderer fenced block
     return { success: true, output: '', language: 'json', isMarkdown: true, markdownContent: '```json\n' + pretty + '\n```' };
 }

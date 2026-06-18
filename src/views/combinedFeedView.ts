@@ -1,6 +1,6 @@
-import { ItemView, WorkspaceLeaf, App, Setting, ButtonComponent, Notice, ExtraButtonComponent } from 'obsidian';
+import { ItemView, WorkspaceLeaf, ExtraButtonComponent } from 'obsidian';
 import AIPlugin from '../main';
-import { parseFeed, ParsedFeed, ParsedFeedEntry } from '../parsing/feedParsing';
+import { parseFeed, ParsedFeedEntry } from '../parsing/feedParsing';
 import { getFaviconUrl } from '../utils/utils';
 
 export const VIEW_TYPE_COMBINED_FEED = 'AI_COMBINED_FEED_VIEW';
@@ -29,13 +29,13 @@ export class CombinedFeedView extends ItemView {
     }
 
     
-    async setState(state: SafeAny, result: SafeAny): Promise<void> {
+    async setState(state: Record<string, unknown>, result: import('obsidian').ViewStateResult): Promise<void> {
         
         await super.setState(state, result);
         
     }
 
-    getState(): SafeAny {
+    getState(): Record<string, unknown> {
         
         return super.getState();
     }

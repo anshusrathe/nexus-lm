@@ -21,6 +21,22 @@ export interface ChatMessage {
     };
   }>;
 }
+
+export interface ToolDefinition {
+  type: string;
+  function: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  };
+}
+
+export interface ToolCallResult {
+  toolCallId: string;
+  success?: boolean;
+  content?: string;
+  error?: string;
+}
 export interface GenerationOptions {
   temperature?: number;
   maxTokens?: number;
@@ -124,12 +140,12 @@ export class NvidiaService {
       }
 
       if (response.status >= 400) {
-        const errorData: NvidiaErrorResponse = typeof response.json === 'object' ? response.json : { error: { message: `HTTP ${response.status}: Request failed` } };
+        const errorData = (typeof response.json === 'object' ? response.json : { error: { message: `HTTP ${response.status}: Request failed`, type: 'api_error' } }) as NvidiaErrorResponse;
         throw new NvidiaApiError(errorData.error?.message || `HTTP ${response.status}: API request failed`, response.status);
       }
 
-      const data = response.json;
-      return data.choices[0]?.message?.content || '';
+      const data = response.json as NvidiaChatCompletionResponse;
+      return data.choices?.[0]?.message?.content || '';
     } catch (error) {
       if (error instanceof NvidiaApiError) throw error;
       // Convert fetch errors to NvidiaApiError
@@ -231,9 +247,9 @@ export class NvidiaService {
   async generateContentWithTools(
     model: string,
     messages: ChatMessage[],
-    tools: SafeAny[],
+    tools: ToolDefinition[],
     options: GenerationOptions | undefined,
-    executeToolCallback: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
+    executeToolCallback: (toolCalls: ChatMessage['tool_calls']) => Promise<ToolCallResult[]>,
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
     let allMessages = [...messages];
@@ -274,7 +290,7 @@ export class NvidiaService {
       });
 
       if (response.status >= 400) {
-        const errorData: NvidiaErrorResponse = typeof response.json === 'object' ? response.json : { error: { message: `HTTP ${response.status}: Request failed` } };
+        const errorData = (typeof response.json === 'object' ? response.json : { error: { message: `HTTP ${response.status}: Request failed`, type: 'api_error' } }) as NvidiaErrorResponse;
         throw new NvidiaApiError(errorData.error?.message || `HTTP ${response.status}: API request failed`, response.status);
       }
 
@@ -287,7 +303,7 @@ export class NvidiaService {
         this.onHeadersReceived(headersObj);
       }
 
-      const data = response.json;
+      const data = response.json as NvidiaChatCompletionResponse;
       const message = data.choices?.[0]?.message;
       
       // Track token usage
@@ -296,22 +312,25 @@ export class NvidiaService {
       }
 
       // Add assistant message to conversation
-      allMessages.push(message);
+      if (message) {
+        allMessages.push(message as ChatMessage);
+      }
 
       // Check for tool calls
-      const toolCalls = message?.tool_calls || [];
+      const messageWithToolCalls = message as unknown as Record<string, unknown>;
+      const toolCalls = (messageWithToolCalls.tool_calls as Array<Record<string, unknown>>) || [];
       if (toolCalls.length > 0) {
         // Execute tools
-        const toolResults = await executeToolCallback(toolCalls);
+        const toolResults = await executeToolCallback(toolCalls as ChatMessage['tool_calls']);
         
         // Add tool results to conversation
         for (const toolCall of toolCalls) {
-          const result = toolResults.find((r: SafeAny) => r.toolCallId === toolCall.id);
+          const result = toolResults.find((r: ToolCallResult) => r.toolCallId === toolCall.id as string);
           const resultContent = result?.success !== false ? result?.content || '' : `Error: ${result?.error || 'Tool execution failed'}`;
           
           allMessages.push({
             role: 'tool',
-            tool_call_id: toolCall.id,
+            tool_call_id: toolCall.id as string,
             content: resultContent
           });
         }
@@ -333,7 +352,7 @@ export class NvidiaService {
    */
   private async handleErrorResponse(response: Response): Promise<void> {
     try {
-      const data = await response.json();
+      const data = await response.json() as { error?: { message?: string; type?: string } };
       const errorMsg = data.error?.message || `HTTP ${response.status}: API request failed`;
       throw new NvidiaApiError(errorMsg, response.status, data.error?.type);
     } catch (e) {

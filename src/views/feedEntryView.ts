@@ -1,8 +1,12 @@
-import { ItemView, WorkspaceLeaf, App, Setting, ButtonComponent, Notice, ExtraButtonComponent } from 'obsidian';
+import { ItemView, WorkspaceLeaf, ExtraButtonComponent } from 'obsidian';
 import AIPlugin from '../main';
-import { ParsedFeed, ParsedFeedEntry } from '../parsing/feedParsing'; 
+import { ParsedFeed } from '../parsing/feedParsing';
 
 export const VIEW_TYPE_NEXUS_FEED_ENTRIES = 'NEXUS_FEED_ENTRIES_VIEW';
+
+interface FeedEntryViewState {
+    feedData?: ParsedFeed;
+}
 
 export class FeedEntryView extends ItemView {
     plugin: AIPlugin;
@@ -27,10 +31,10 @@ export class FeedEntryView extends ItemView {
     }
 
     
-    async setState(state: SafeAny, result: SafeAny): Promise<void> {
-        
-        if (state && state.feedData) {
-            this.feedData = state.feedData as ParsedFeed;
+    async setState(state: Record<string, unknown>, result: import('obsidian').ViewStateResult): Promise<void> {
+        const feedState = state as FeedEntryViewState;
+        if (feedState && feedState.feedData) {
+            this.feedData = feedState.feedData;
             
              if (this.entriesContainer) { 
                  this.renderEntries();
@@ -51,7 +55,7 @@ export class FeedEntryView extends ItemView {
         await super.setState(state, result);
     }
 
-    getState(): SafeAny {
+    getState(): Record<string, unknown> {
         
         
         

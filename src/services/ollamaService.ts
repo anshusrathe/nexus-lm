@@ -12,12 +12,10 @@ import { requestUrl } from 'obsidian';
 import { simulatedStream, fetchStream, createOllamaParser } from '../utils/streamingUtils';
 
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
-  images?: string[]; 
-                     
-                     
-                     
+  images?: string[];
+  tool_name?: string;
 }
 
 export interface GenerationOptions {
@@ -60,6 +58,82 @@ export interface OllamaWebFetchResponse {
   title: string;
   content: string;
   links: string[];
+}
+
+interface OllamaChatRequestBody {
+  model: string;
+  messages: ChatMessage[];
+  stream: boolean;
+  options?: {
+    temperature?: number;
+    num_predict?: number;
+    top_p?: number;
+  };
+  tools?: ToolDefinition[];
+  temperature?: number;
+  think?: boolean | 'low' | 'medium' | 'high';
+}
+
+interface OllamaChatResponse {
+  model?: string;
+  message?: {
+    role: 'system' | 'user' | 'assistant' | 'tool';
+    content?: string;
+    thinking?: string;
+    tool_calls?: ToolCall[];
+  };
+  done?: boolean;
+  prompt_eval_count?: number;
+  eval_count?: number;
+}
+
+interface OllamaModelInfo {
+  name: string;
+}
+
+interface OllamaWebSearchRequestBody {
+  query: string;
+  max_results: number;
+}
+
+interface OllamaWebFetchRequestBody {
+  url: string;
+}
+
+interface ToolDefinition {
+  type: string;
+  function: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  };
+}
+
+interface ToolCall {
+  function?: {
+    name?: string;
+    arguments?: string;
+  };
+}
+
+interface ToolCallResult {
+  success: boolean;
+  content?: string;
+  error?: string;
+}
+
+interface RequestUrlOptions {
+  url: string;
+  method: string;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+interface RequestUrlResponse {
+  status: number;
+  text: string;
+  json: unknown;
+  headers?: Record<string, string>;
 }
 
 /**
@@ -118,15 +192,15 @@ export class OllamaService {
     messages: ChatMessage[],
     options?: GenerationOptions
   ): Promise<string> {
-    const requestBody: SafeAny = {
+    const requestBody: OllamaChatRequestBody = {
       model,
       messages,
       stream: false,
       options: {},
     };
-    if (options?.temperature !== undefined) requestBody.options.temperature = options.temperature;
-    if (options?.maxTokens !== undefined) requestBody.options.num_predict = options.maxTokens;
-    if (options?.topP !== undefined) requestBody.options.top_p = options.topP;
+    if (options?.temperature !== undefined) requestBody.options!.temperature = options.temperature;
+    if (options?.maxTokens !== undefined) requestBody.options!.num_predict = options.maxTokens;
+    if (options?.topP !== undefined) requestBody.options!.top_p = options.topP;
     if (options?.think !== undefined) requestBody.think = options.think;
 
     const headers: Record<string, string> = {
@@ -165,7 +239,7 @@ export class OllamaService {
         throw new OllamaApiError(errorData.error || `Ollama API error: ${response.status}`, response.status);
       }
 
-      const data = response.json;
+      const data = response.json as OllamaChatResponse;
       return data.message?.content || '';
     } else {
       
@@ -186,7 +260,7 @@ export class OllamaService {
         throw new OllamaApiError(errorData.error || `Ollama API error: ${response.status}`, response.status);
       }
 
-      const data = await response.json();
+      const data = await response.json() as OllamaChatResponse;
       return data.message?.content || '';
     }
   }
@@ -208,15 +282,15 @@ export class OllamaService {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
 
-    const requestBody: SafeAny = {
+    const requestBody: OllamaChatRequestBody = {
       model,
       messages,
       stream: true,
       options: {},
     };
-    if (options?.temperature !== undefined) requestBody.options.temperature = options.temperature;
-    if (options?.maxTokens !== undefined) requestBody.options.num_predict = options.maxTokens;
-    if (options?.topP !== undefined) requestBody.options.top_p = options.topP;
+    if (options?.temperature !== undefined) requestBody.options!.temperature = options.temperature;
+    if (options?.maxTokens !== undefined) requestBody.options!.num_predict = options.maxTokens;
+    if (options?.topP !== undefined) requestBody.options!.top_p = options.topP;
     if (options?.think !== undefined) requestBody.think = options.think;
 
     const parser = createOllamaParser();
@@ -294,10 +368,10 @@ export class OllamaService {
         throw new OllamaApiError(errorData.error || `Ollama API error: ${response.status}`, response.status);
       }
 
-      const data = response.json;
-      return data.models?.map((m: SafeAny) => m.name) || [];
+      const data = response.json as { models?: Array<{ name: string; size?: number; modified_at?: string }> };
+      return data.models?.map((m: OllamaModelInfo) => m.name) || [];
     } else {
-      
+
       const response = await fetch(`${this.baseUrl}/api/tags`, {
         method: 'GET',
         headers
@@ -308,8 +382,8 @@ export class OllamaService {
         throw new OllamaApiError(errorData.error || `Ollama API error: ${response.status}`, response.status);
       }
 
-      const data = await response.json();
-      return data.models?.map((m: SafeAny) => m.name) || [];
+      const data = await response.json() as { models?: Array<{ name: string; size?: number; modified_at?: string }> };
+      return data.models?.map((m: OllamaModelInfo) => m.name) || [];
     }
   }
 
@@ -340,7 +414,7 @@ export class OllamaService {
     
     const webSearchUrl = 'https://ollama.com/api/web_search';
 
-    const requestBody: SafeAny = {
+    const requestBody: OllamaWebSearchRequestBody = {
       query,
       max_results: maxResults
     };
@@ -382,10 +456,10 @@ export class OllamaService {
       throw new OllamaApiError(errorData.error || `Ollama web search error: ${response.status}`, response.status);
     }
 
-    const data = response.json;
+    const data = response.json as { results?: unknown[] };
     
     return {
-      results: data.results || []
+      results: (data.results || []) as OllamaWebSearchResult[]
     };
   }
 
@@ -418,7 +492,7 @@ export class OllamaService {
     
     const webFetchUrl = 'https://ollama.com/api/web_fetch';
 
-    const requestBody: SafeAny = {
+    const requestBody: OllamaWebFetchRequestBody = {
       url: cleanUrl
     };
 
@@ -459,12 +533,12 @@ export class OllamaService {
       throw new OllamaApiError(errorData.error || `Ollama web fetch error: ${response.status}`, response.status);
     }
 
-    const data = response.json;
+    const data = response.json as { title?: string; content?: string; links?: unknown[] };
     
     return {
       title: data.title || 'Untitled',
       content: data.content || '',
-      links: data.links || []
+      links: (data.links || []) as string[]
     };
   }
 
@@ -481,10 +555,10 @@ export class OllamaService {
   async generateContentWithTools(
     model: string,
     messages: ChatMessage[],
-    tools: SafeAny[],
+    tools: ToolDefinition[],
     options: GenerationOptions,
-    executeToolsCallback: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
-    useRequestUrl?: (options: SafeAny) => Promise<SafeAny>,
+    executeToolsCallback: (toolCalls: ToolCall[]) => Promise<ToolCallResult[]>,
+    useRequestUrl?: (options: RequestUrlOptions) => Promise<RequestUrlResponse>,
     onThinkingChunk?: (text: string) => void,
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
@@ -498,7 +572,7 @@ export class OllamaService {
     
     while (true) {
       if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
-      const requestBody: SafeAny = {
+      const requestBody: OllamaChatRequestBody = {
         model,
         messages: conversationMessages,
         tools,
@@ -509,7 +583,7 @@ export class OllamaService {
         requestBody.think = options.think;
       }
 
-      let data: SafeAny;
+      let data: OllamaChatResponse;
       
       
       if (useRequestUrl) {
@@ -537,7 +611,7 @@ export class OllamaService {
           this.onHeadersReceived(headers);
         }
 
-        data = response.json;
+        data = response.json as OllamaChatResponse;
       } else {
         const response = await fetch(`${this.baseUrl}/api/chat`, {
           method: 'POST',
@@ -559,7 +633,7 @@ export class OllamaService {
           this.onHeadersReceived(response.headers);
         }
 
-        data = await response.json();
+        data = await response.json() as OllamaChatResponse;
       }
       
       if (data.prompt_eval_count || data.eval_count) {
@@ -574,7 +648,7 @@ export class OllamaService {
       }
 
       
-      conversationMessages.push(message);
+      conversationMessages.push(message as ChatMessage);
 
       
       if (message.tool_calls && message.tool_calls.length > 0) {
@@ -597,7 +671,7 @@ export class OllamaService {
             content: toolResult.success
               ? toolResult.content
               : `Error: ${toolResult.error}`
-          } as SafeAny);
+          } as ChatMessage);
         }
         
         
@@ -608,7 +682,7 @@ export class OllamaService {
       
       if (message.content || message.thinking) {
         
-        fullContent = message.content || message.thinking;
+        fullContent = message.content || message.thinking || '';
         if (streamCallback) {
           streamCallback(fullContent);
         }
@@ -621,7 +695,7 @@ export class OllamaService {
                 conversationMessages.push({
           role: 'user',
           content: 'You have already called some tools and received results. Please now synthesise a complete, direct answer to the original question using all the tool results above. Do not call any more tools — just write the final answer.'
-        } as SafeAny);
+        } as ChatMessage);
         continue;
       }
 

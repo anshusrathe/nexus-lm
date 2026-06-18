@@ -1,8 +1,8 @@
 import { App, Modal, TFile, Notice, ButtonComponent, MarkdownRenderer, Component, TFolder, normalizePath, Setting } from 'obsidian';
-import { AISettings, DEFAULT_SETTINGS, getModelTemperature, getModelTopP, getGeminiThinkingConfig } from '../settings';
+import { AISettings, getModelTemperature, getModelTopP, getGeminiThinkingConfig } from '../settings';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { WebSearchService } from '../services/webSearch';
-import { GroqService, ChatMessage, GroqApiError } from '../services/groqService';
+import { GroqService, ChatMessage, GroqApiError, GeminiHistoryMessage } from '../services/groqService';
 import { UnifiedProviderManager, UnifiedMessage } from '../services/unifiedProviderManager';
 
 interface FileCreationPlan {
@@ -35,6 +35,13 @@ interface DiagramEdge {
     to: string;
 }
 
+interface DiagramLayoutConfig {
+    nodeWidth: number;
+    nodeHeight: number;
+    hGap: number;
+    vGap: number;
+}
+
 interface EnhancedFileCreationContext {
   userPrompt: string;
   targetFolder?: string;
@@ -42,7 +49,7 @@ interface EnhancedFileCreationContext {
   webSearchEnabled: boolean;
   webSearchService?: WebSearchService;
   settings: AISettings;
-  chatHistory: SafeAny[];
+  chatHistory: GeminiHistoryMessage[];
   progressCallback?: (message: string, snippet?: string) => void;
 }
 
@@ -74,7 +81,7 @@ export class FileCreationReviewModal extends Modal {
 
   private renderSpecializedPlan(type: 'Canvas' | 'Excalidraw') {
     const { contentEl } = this;
-    const plan = this.plan as SafeAny;
+    const plan = this.plan as FileCreationPlan & { targetPath?: string; nodes?: unknown[]; edges?: unknown[]; type?: string; elements?: unknown[] };
     const folderName = plan.folderName || 'New Files';
     const targetPath = plan.targetPath;
 
@@ -106,7 +113,7 @@ export class FileCreationReviewModal extends Modal {
         pathInfo.addClass('nl-font-weight-bold');
         pathInfo.createSpan({ text: 'Target Path: ' });
         const linkSpan = pathInfo.createSpan();
-        MarkdownRenderer.render(this.app, `[[${targetPath}]]`, linkSpan, '', this as SafeAny);
+        MarkdownRenderer.render(this.app, `[[${targetPath}]]`, linkSpan, '', this as unknown as Component);
     }
 
     const footer = contentEl.createDiv({ cls: 'file-preview-footer' });
@@ -130,7 +137,7 @@ export class FileCreationReviewModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     
-    const plan = this.plan as SafeAny;
+    const plan = this.plan as FileCreationPlan & { nodes?: unknown[]; edges?: unknown[]; type?: string; elements?: unknown[] };
     const isCanvas = plan && plan.nodes && plan.edges;
     const isExcalidraw = plan && (plan.type === 'excalidraw' || (plan.elements && !Array.isArray(plan.files)));
 
@@ -295,20 +302,22 @@ export async function handleFileCreationPrompt(
   contextFiles: Array<{ path: string; content: string; basename: string }> = [],
   webSearchEnabled: boolean = false,
   webSearchService?: WebSearchService,
-  chatHistory: SafeAny[] = [],
+  chatHistory: GeminiHistoryMessage[] = [],
   progressCallback?: (message: string, snippet?: string) => void
 ) {
   // Add spinner to top right of the workspace
   let spinner: HTMLElement | null = null;
   try {
     // Try to find the file view header or fallback to workspace container
-    const workspace = document.querySelector('.workspace') || document.body;
-    spinner = document.createElement('div');
-    spinner.className = 'loading-spinner visible';
-    spinner.addClass('nl-position-fixed');
-    spinner.addClass('nl-top-18px');
-    spinner.addClass('nl-right-32px');
-    spinner.addClass('nl-z-index-9999');
+    const view = app.workspace.activeLeaf?.view;
+    const doc = (view && 'containerEl' in view) ? (view as { containerEl: HTMLElement }).containerEl.ownerDocument : document;
+    const workspace = doc.querySelector('.workspace') || doc.body;
+    spinner = doc.createElement('div');
+    spinner!.className = 'loading-spinner visible';
+    spinner!.addClass('nl-position-fixed');
+    spinner!.addClass('nl-top-18px');
+    spinner!.addClass('nl-right-32px');
+    spinner!.addClass('nl-z-index-9999');
     workspace.appendChild(spinner);
 
     // Create enhanced context for file creation
@@ -337,9 +346,11 @@ export async function handleFileCreationPrompt(
 
     if (spinner) spinner.remove();
 
-    new FileCreationReviewModal(app, enhancedPlan, settings, async (acceptedPlan) => {
-      await createFilesFromPlan(app, acceptedPlan);
-      new Notice(`Created ${acceptedPlan.files.length} file(s) in folder: ${acceptedPlan.folderName}`);
+    new FileCreationReviewModal(app, enhancedPlan, settings, (acceptedPlan) => {
+      void (async () => {
+        await createFilesFromPlan(app, acceptedPlan);
+        new Notice(`Created ${acceptedPlan.files.length} file(s) in folder: ${acceptedPlan.folderName}`);
+      })();
     }).open();
   } catch (err) {
     if (spinner) spinner.remove();
@@ -474,9 +485,9 @@ CRITICAL:
       );
     } else if (UnifiedProviderManager.getInstance().hasProvider(context.settings.provider)) {
       const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(context.settings.provider)!;
-      const convertedHistory: UnifiedMessage[] = (context.chatHistory || []).map((h: SafeAny) => ({
+      const convertedHistory: UnifiedMessage[] = (context.chatHistory || []).map((h: GeminiHistoryMessage) => ({
         role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant' | 'system',
-        content: h.parts[0].text
+        content: h.parts?.[0]?.text || ''
       }));
       const response = await unifiedProvider.generateContent(
         context.settings.model,
@@ -722,9 +733,9 @@ ORIGINAL REQUEST: ${context.userPrompt}`;
     const genAI = new GoogleGenerativeAI(context.settings.geminiApiKey || context.settings.apiKey);
     
     // Configure model with web search if enabled
-    const modelConfig: SafeAny = { model: context.settings.model };
+    const modelConfig = { model: context.settings.model } as Parameters<typeof genAI.getGenerativeModel>[0];
     if (context.webSearchEnabled && context.webSearchService) {
-      modelConfig.tools = [context.webSearchService.getGoogleSearchToolConfig()];
+      modelConfig.tools = [context.webSearchService.getGoogleSearchToolConfig()] as unknown as typeof modelConfig.tools;
     }
     
     const model = genAI.getGenerativeModel(modelConfig);
@@ -785,7 +796,7 @@ function extractAndValidateJSON(aiText: string): FileCreationPlan | null {
   
   // Strategy 2: Try direct parse first (cleanest response)
   try {
-    const plan = JSON.parse(cleanedText);
+    const plan = JSON.parse(cleanedText) as Record<string, unknown>;
     if (isValidPlan(plan)) {
       return sanitizePlan(plan);
     }
@@ -797,7 +808,7 @@ function extractAndValidateJSON(aiText: string): FileCreationPlan | null {
   const jsonStr = extractJSONObject(cleanedText);
   if (jsonStr) {
     try {
-      const plan = JSON.parse(jsonStr);
+      const plan = JSON.parse(jsonStr) as Record<string, unknown>;
       if (isValidPlan(plan)) {
         return sanitizePlan(plan);
       }
@@ -810,7 +821,7 @@ function extractAndValidateJSON(aiText: string): FileCreationPlan | null {
   const simpleMatch = aiText.match(/\{[\s\S]*\}/);
   if (simpleMatch) {
     try {
-      const plan = JSON.parse(simpleMatch[0]);
+      const plan = JSON.parse(simpleMatch[0]) as Record<string, unknown>;
       if (isValidPlan(plan)) {
         return sanitizePlan(plan);
       }
@@ -823,7 +834,7 @@ function extractAndValidateJSON(aiText: string): FileCreationPlan | null {
   const allMatches = findAllJSONObjects(aiText);
   for (const match of allMatches) {
     try {
-      const plan = JSON.parse(match);
+      const plan = JSON.parse(match) as Record<string, unknown>;
       if (isValidPlan(plan)) {
         return sanitizePlan(plan);
       }
@@ -905,7 +916,7 @@ function findAllJSONObjects(text: string): string[] {
 /**
  * Validates that the plan has the required structure.
  */
-function isValidPlan(plan: SafeAny): boolean {
+function isValidPlan(plan: Record<string, unknown>): boolean {
   if (!plan || typeof plan !== 'object') return false;
   if (!plan.folderName || typeof plan.folderName !== 'string') return false;
   if (!Array.isArray(plan.files)) return false;
@@ -924,12 +935,12 @@ function isValidPlan(plan: SafeAny): boolean {
 /**
  * Sanitizes and normalizes the plan.
  */
-function sanitizePlan(plan: SafeAny): FileCreationPlan {
+function sanitizePlan(plan: Record<string, unknown>): FileCreationPlan {
   // Clean the folder name to remove any unwanted characters
-  plan.folderName = plan.folderName.replace(/[:;"'`]/g, '').trim();
+  plan.folderName = (plan.folderName as string).replace(/[:;"'`]/g, '').trim();
   
   // Ensure all files have .md extension for Obsidian if no extension specified
-  plan.files = plan.files.map((file: SafeAny) => {
+  plan.files = (plan.files as Array<{ name: string; content: string; extension?: string; description?: string }>).map((file) => {
     // Default to .md extension
     if (!file.extension || file.extension === '') {
       file.extension = 'md';
@@ -959,7 +970,7 @@ function sanitizePlan(plan: SafeAny): FileCreationPlan {
     return file;
   });
   
-  return plan as FileCreationPlan;
+  return plan as unknown as FileCreationPlan;
 }
 
 /**
@@ -1026,8 +1037,8 @@ function parseMarkdownToDiagramNodes(markdown: string): DiagramNode[] {
  * Calculates a hierarchical tree layout for the nodes.
  */
 function applyTreeLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', layoutType: 'tree' | 'timeline' | 'sideways' = 'tree') {
-    const nodes: SafeAny[] = [];
-    const edges: SafeAny[] = [];
+    const nodes: DiagramNode[] = [];
+    const edges: Array<DiagramEdge & { hGap: number; vGap: number }> = [];
     
     // Layout Constants
     const config = {
@@ -1092,9 +1103,9 @@ function applyTreeLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', la
     return { nodes, edges };
 }
 
-function applyTimelineLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', config: SafeAny) {
-    const nodes: SafeAny[] = [];
-    const edges: SafeAny[] = [];
+function applyTimelineLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', config: DiagramLayoutConfig) {
+    const nodes: DiagramNode[] = [];
+    const edges: Array<DiagramEdge & { hGap: number; vGap: number }> = [];
     const verticalOffset = 150;
 
     let currentX = 0;
@@ -1131,9 +1142,9 @@ function applyTimelineLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw'
     return { nodes, edges };
 }
 
-function applySidewaysLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', config: SafeAny) {
-    const nodes: SafeAny[] = [];
-    const edges: SafeAny[] = [];
+function applySidewaysLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw', config: DiagramLayoutConfig) {
+    const nodes: DiagramNode[] = [];
+    const edges: Array<DiagramEdge & { hGap: number; vGap: number }> = [];
     const sHGap = 150; // Special gap for sideways
     const sVGap = 40;
 
@@ -1188,16 +1199,16 @@ function applySidewaysLayout(roots: DiagramNode[], type: 'canvas' | 'excalidraw'
 /**
  * Converts the layout into Obsidian Canvas JSON format.
  */
-function convertToCanvasJSON(layout: { nodes: SafeAny[], edges: SafeAny[] }): string {
+function convertToCanvasJSON(layout: { nodes: DiagramNode[]; edges: Array<DiagramEdge & { hGap: number; vGap: number }> }): string {
     const canvasData = {
         nodes: layout.nodes.map(n => ({
             id: n.id,
             type: 'text',
             text: n.text,
-            x: Math.round(n.x),
-            y: Math.round(n.y),
-            width: n.width,
-            height: n.height
+            x: Math.round(n.x!),
+            y: Math.round(n.y!),
+            width: n.width!,
+            height: n.height!
         })),
         edges: layout.edges.map(e => ({
             id: e.id,
@@ -1213,8 +1224,8 @@ function convertToCanvasJSON(layout: { nodes: SafeAny[], edges: SafeAny[] }): st
 /**
  * Converts the layout into Excalidraw JSON format.
  */
-function convertToExcalidrawJSON(layout: { nodes: SafeAny[], edges: SafeAny[] }): string {
-    const elements: SafeAny[] = [];
+function convertToExcalidrawJSON(layout: { nodes: DiagramNode[]; edges: Array<DiagramEdge & { hGap: number; vGap: number }> }): string {
+    const elements: Record<string, unknown>[] = [];
     const seed = Math.floor(Math.random() * 100000);
 
     layout.nodes.forEach((n, idx) => {
@@ -1225,10 +1236,10 @@ function convertToExcalidrawJSON(layout: { nodes: SafeAny[], edges: SafeAny[] })
         elements.push({
             type: 'rectangle',
             id: shapeId,
-            x: n.x,
-            y: n.y,
-            width: n.width,
-            height: n.height,
+            x: n.x!,
+            y: n.y!,
+            width: n.width!,
+            height: n.height!,
             strokeColor: '#374151',
             backgroundColor: '#f3f4f6',
             fillStyle: 'solid',
@@ -1249,10 +1260,10 @@ function convertToExcalidrawJSON(layout: { nodes: SafeAny[], edges: SafeAny[] })
         elements.push({
             type: 'text',
             id: textId,
-            x: n.x + 10,
-            y: n.y + 10,
-            width: n.width - 20,
-            height: n.height - 20,
+            x: n.x! + 10,
+            y: n.y! + 10,
+            width: n.width! - 20,
+            height: n.height! - 20,
             text: n.text,
             fontSize: 16,
             fontFamily: 1,
@@ -1279,30 +1290,30 @@ function convertToExcalidrawJSON(layout: { nodes: SafeAny[], edges: SafeAny[] })
 
             if (fromNode.layoutType === 'sideways') {
                 // Sideways: Right of Parent to Left of Child
-                startX = fromNode.x + fromNode.width;
-                startY = fromNode.y + fromNode.height / 2;
-                endX = toNode.x;
-                endY = toNode.y + toNode.height / 2;
+                startX = fromNode.x! + fromNode.width!;
+                startY = fromNode.y! + fromNode.height! / 2;
+                endX = toNode.x!;
+                endY = toNode.y! + toNode.height! / 2;
                 const midX = e.hGap / 2;
                 // Path: Right -> MidX -> Vertical to ChildY -> Right to ChildX
-                points = [[0, 0], [midX, 0], [midX, endY - startY], [endX - startX, endY - startY]];
+                points = [[0, 0], [midX, 0], [midX, endY! - startY], [endX! - startX, endY! - startY]];
             } else if (fromNode.layoutType === 'timeline') {
                 // Timeline: Right of Parent to Left of Child
-                startX = fromNode.x + fromNode.width;
-                startY = fromNode.y + fromNode.height / 2;
-                endX = toNode.x;
-                endY = toNode.y + toNode.height / 2;
+                startX = fromNode.x! + fromNode.width!;
+                startY = fromNode.y! + fromNode.height! / 2;
+                endX = toNode.x!;
+                endY = toNode.y! + toNode.height! / 2;
                 const midX = e.hGap / 2;
-                points = [[0, 0], [midX, 0], [midX, endY - startY], [endX - startX, endY - startY]];
+                points = [[0, 0], [midX, 0], [midX, endY! - startY], [endX! - startX, endY! - startY]];
             } else {
                 // Tree: Bottom of Parent to Top of Child
-                startX = fromNode.x + fromNode.width / 2;
-                startY = fromNode.y + fromNode.height;
-                endX = toNode.x + toNode.width / 2;
-                endY = toNode.y;
-                const midY = (e.vGap - fromNode.height) / 2;
+                startX = fromNode.x! + fromNode.width! / 2;
+                startY = fromNode.y! + fromNode.height!;
+                endX = toNode.x! + toNode.width! / 2;
+                endY = toNode.y!;
+                const midY = (e.vGap - fromNode.height!) / 2;
                 // Path: Down -> MidY -> Horizontal to ChildX -> Down to ChildY
-                points = [[0, 0], [0, midY], [endX - startX, midY], [endX - startX, endY - startY]];
+                points = [[0, 0], [0, midY], [endX! - startX, midY], [endX! - startX, endY! - startY]];
             }
 
             elements.push({

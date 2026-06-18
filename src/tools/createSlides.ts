@@ -1,4 +1,4 @@
-import { App, Modal, Notice, TFile, ButtonComponent, MarkdownRenderer, Component, ToggleComponent, setIcon, normalizePath, Setting } from 'obsidian';
+import { App, Modal, Notice, TFile, ButtonComponent, setIcon, normalizePath, Setting } from 'obsidian';
 import { AISettings } from '../settings';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GroqService, ChatMessage } from '../services/groqService';
@@ -110,7 +110,7 @@ export class SlideManager {
     notePaths: string[],
     slideSettings: SlideSettings,
     onProgress?: (message: string) => void
-  ): Promise<SafeAny> {
+  ): Promise<ZenSlideshowData> {
     // Legacy redirect to Zen mode
     return this.generateZenSlideshow(notePaths, slideSettings, onProgress);
   }
@@ -146,8 +146,8 @@ export class SlideManager {
         { temperature: 0.7, maxTokens: 8192 }
       );
       return response.text;
-    } catch (error: SafeAny) {
-            throw new Error(`${provider} API error: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+            throw new Error(`${provider} API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -158,8 +158,8 @@ export class SlideManager {
       
       const result = await model.generateContent(prompt);
       return result.response.text();
-    } catch (error: SafeAny) {
-            throw new Error(`Gemini API error: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+            throw new Error(`Gemini API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -176,8 +176,8 @@ export class SlideManager {
         { temperature: 0.7, maxTokens: 8192 }
       );
       return responseText;
-    } catch (error: SafeAny) {
-            throw new Error(`Groq API error: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+            throw new Error(`Groq API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -194,8 +194,8 @@ export class SlideManager {
         { temperature: 0.7, maxTokens: 8192 }
       );
       return responseText;
-    } catch (error: SafeAny) {
-            throw new Error(`OpenRouter API error: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+            throw new Error(`OpenRouter API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -212,8 +212,8 @@ export class SlideManager {
         { temperature: 0.7, maxTokens: 8192 }
       );
       return responseText;
-    } catch (error: SafeAny) {
-            throw new Error(`Ollama API error: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+            throw new Error(`Ollama API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -230,8 +230,8 @@ export class SlideManager {
         { temperature: 0.7, maxTokens: 8192 }
       );
       return responseText;
-    } catch (error: SafeAny) {
-            throw new Error(`NVIDIA API error: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+            throw new Error(`NVIDIA API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -681,19 +681,19 @@ export class SlideshowSettingsModal extends Modal {
       loadVoicesNow();
     };
     
-    setTimeout(() => {
+    window.setTimeout(() => {
       loadVoicesNow();
     }, 100);
     
-    setTimeout(() => {
+    window.setTimeout(() => {
       loadVoicesNow();
     }, 500);
     
-    setTimeout(() => {
+    window.setTimeout(() => {
       loadVoicesNow();
     }, 1500);
     
-    setTimeout(() => {
+    window.setTimeout(() => {
       loadVoicesNow();
     }, 3000);
   }
@@ -717,7 +717,7 @@ export class SlideshowSettingsModal extends Modal {
     let defaultVoice = this.availableVoices.find(v => v.default) || this.availableVoices[0];
     
     for (const voice of this.availableVoices) {
-      const option = document.createElement('option');
+      const option = this.containerEl.ownerDocument.createElement('option');
       option.value = voice.name;
       option.textContent = this.formatVoiceName(voice);
       if (voice.default) {
@@ -912,8 +912,8 @@ export class SlideshowVoiceSettingsModal extends Modal {
     
     synth.addEventListener('voiceschanged', loadVoicesNow);
     loadVoicesNow();
-    setTimeout(loadVoicesNow, 100);
-    setTimeout(loadVoicesNow, 500);
+    window.setTimeout(loadVoicesNow, 100);
+    window.setTimeout(loadVoicesNow, 500);
   }
 
   private isNeuralVoice(voice: SpeechSynthesisVoice): boolean {
@@ -932,7 +932,7 @@ export class SlideshowVoiceSettingsModal extends Modal {
     }
     
     for (const voice of this.availableVoices) {
-      const option = document.createElement('option');
+      const option = this.containerEl.ownerDocument.createElement('option');
       option.value = voice.name;
       option.textContent = this.formatVoiceName(voice);
       this.voiceSelectDropdown.appendChild(option);
@@ -1034,7 +1034,7 @@ export class ZenSlideshowModal extends Modal {
     const prevBtn = controls.createEl('button', { cls: 'slideshow-nav-btn zen-nav-btn' });
     setIcon(prevBtn, 'chevron-left');
     prevBtn.title = 'Previous';
-    prevBtn.addEventListener('click', () => this.previousSlide());
+    prevBtn.addEventListener('click', () => void this.previousSlide());
 
     const pauseBtn = controls.createEl('button', { cls: 'slideshow-nav-btn zen-pause-btn' });
     setIcon(pauseBtn, 'pause');
@@ -1044,17 +1044,17 @@ export class ZenSlideshowModal extends Modal {
     const rewindBtn = controls.createEl('button', { cls: 'slideshow-nav-btn zen-rewind-btn' });
     setIcon(rewindBtn, 'skip-back');
     rewindBtn.title = 'Rewind to previous node';
-    rewindBtn.addEventListener('click', () => this.rewindNode());
+    rewindBtn.addEventListener('click', () => void this.rewindNode());
 
     const skipBtn = controls.createEl('button', { cls: 'slideshow-nav-btn zen-skip-btn' });
     setIcon(skipBtn, 'skip-forward');
     skipBtn.title = 'Skip to next node';
-    skipBtn.addEventListener('click', () => this.skipToNext());
+    skipBtn.addEventListener('click', () => void this.skipToNext());
 
     const nextBtn = controls.createEl('button', { cls: 'slideshow-nav-btn zen-nav-btn' });
     setIcon(nextBtn, 'chevron-right');
     nextBtn.title = 'Next';
-    nextBtn.addEventListener('click', () => this.nextSlide());
+    nextBtn.addEventListener('click', () => void this.nextSlide());
 
     // Narration status
     const ttsStatus = body.createDiv({ cls: 'zen-tts-status' });
@@ -1072,7 +1072,7 @@ export class ZenSlideshowModal extends Modal {
      // Force flush
 
     // Do async work in setTimeout to avoid blocking UI
-    setTimeout(() => {
+    window.setTimeout(() => {
        // Force flush
       try {
         this.setupWheelNavigation(modalEl);
@@ -1098,7 +1098,7 @@ export class ZenSlideshowModal extends Modal {
     };
     
         modalEl.addEventListener('wheel', wheelHandler, { passive: false });
-        (this as SafeAny).wheelHandler = wheelHandler;
+        (this as unknown as Record<string, unknown>).wheelHandler = wheelHandler;
       }
 
   private async initializeVoices(): Promise<void> {
@@ -1126,10 +1126,10 @@ export class ZenSlideshowModal extends Modal {
         return;
       }
 
-      const voiceLoadTimeout = setTimeout(loadVoices, 1000);
+      const voiceLoadTimeout = window.setTimeout(loadVoices, 1000);
 
       this.synth.onvoiceschanged = () => {
-        clearTimeout(voiceLoadTimeout);
+        window.clearTimeout(voiceLoadTimeout);
         loadVoices();
       };
     });
@@ -1262,7 +1262,7 @@ export class ZenSlideshowModal extends Modal {
   }
 
   private updateProgress() {
-    const progressFill = document.getElementById('zen-progress-fill');
+    const progressFill = this.containerEl.ownerDocument.getElementById('zen-progress-fill');
     if (progressFill) {
       const totalNodes = this.navigationSequence.length;
       const progressPercent = (this.currentNavIndex / totalNodes) * 100;
@@ -1306,7 +1306,7 @@ export class ZenSlideshowModal extends Modal {
       return;
     }
 
-    const ttsStatus = document.getElementById('zen-tts-status');
+    const ttsStatus = this.containerEl.ownerDocument.getElementById('zen-tts-status');
     
     const sentences = fullNarration.match(/[^.!?]+[.!?]+/g) || [fullNarration];
     
@@ -1425,7 +1425,7 @@ export class ZenSlideshowModal extends Modal {
       
       this.updateProgress();
       
-      setTimeout(() => {
+      window.setTimeout(() => {
         if (!this.isPaused) {
           this.narrateCurrentNode();
         }
@@ -1475,7 +1475,7 @@ export class ZenSlideshowModal extends Modal {
   }
 
   private handlePresentationEnd() {
-    const ttsStatus = document.getElementById('zen-tts-status');
+    const ttsStatus = this.containerEl.ownerDocument.getElementById('zen-tts-status');
     if (ttsStatus) {
       ttsStatus.textContent = 'Presentation complete!';
     }

@@ -3,6 +3,23 @@ import { BaseProvider, UnifiedMessage, UnifiedGenerationOptions, UnifiedResponse
 import { RateLimitManager } from '../utils/rateLimitManager';
 import { simulatedStream, fetchStream, createSSEParser } from '../utils/streamingUtils';
 
+interface OpenCodeRequestBody {
+    model: string;
+    messages: UnifiedMessage[];
+    stream: boolean;
+    temperature?: number;
+    top_p?: number;
+    max_tokens?: number;
+    tools?: Record<string, unknown>[];
+    tool_choice?: string;
+}
+
+interface OpenCodeToolCallResult {
+    success: boolean;
+    content: string;
+    error?: string;
+}
+
 /**
  * OpenCode Provider - Handles API calls to OpenCode Zen API
  */
@@ -27,7 +44,7 @@ export class OpenCodeProvider extends BaseProvider {
     ): Promise<UnifiedResponse> {
         await RateLimitManager.getInstance().waitForClearance(this.id, modelId, 1000);
 
-        const body: SafeAny = {
+        const body: OpenCodeRequestBody = {
             model: modelId,
             messages: messages,
             stream: false
@@ -51,7 +68,7 @@ export class OpenCodeProvider extends BaseProvider {
             });
 
             if (response.status >= 400) {
-                const errorData = typeof response.json === 'object' ? response.json : {};
+                const errorData = (typeof response.json === 'object' ? response.json : {}) as { error?: { message?: string } };
                 throw new Error(`OpenCode API error: ${response.status} ${errorData.error?.message || 'Request failed'}`);
             }
 
@@ -62,17 +79,17 @@ export class OpenCodeProvider extends BaseProvider {
             });
             RateLimitManager.getInstance().updateFromHeaders(this.id, modelId, headersObj);
 
-            const data = response.json;
+            const data = response.json as OpenAIChatCompletionResponse;
             if (data.usage) {
-                RateLimitManager.getInstance().recordApiCall(this.id, modelId, data.usage.total_tokens);
+                RateLimitManager.getInstance().recordApiCall(this.id, modelId, data.usage.total_tokens ?? 0);
             }
 
             return {
-                text: data.choices[0]?.message?.content || '',
+                text: (data.choices ?? [])[0]?.message?.content || '',
                 usage: data.usage ? {
-                    promptTokens: data.usage.prompt_tokens,
-                    completionTokens: data.usage.completion_tokens,
-                    totalTokens: data.usage.total_tokens
+                    promptTokens: data.usage.prompt_tokens!,
+                    completionTokens: data.usage.completion_tokens!,
+                    totalTokens: data.usage.total_tokens!
                 } : undefined
             };
         } catch (error) {
@@ -102,7 +119,7 @@ export class OpenCodeProvider extends BaseProvider {
         };
 
         const buildBody = (stream: boolean) => {
-            const body: SafeAny = { model: modelId, messages, stream };
+            const body: OpenCodeRequestBody = { model: modelId, messages, stream };
             if (options?.temperature !== undefined) body.temperature = options.temperature;
             if (options?.topP !== undefined) body.top_p = options.topP;
             if (options?.maxTokens !== undefined) body.max_tokens = options.maxTokens;
@@ -149,13 +166,13 @@ export class OpenCodeProvider extends BaseProvider {
     async generateContentWithTools(
         modelId: string,
         messages: UnifiedMessage[],
-        tools: SafeAny[],
+        tools: Record<string, unknown>[],
         options: UnifiedGenerationOptions & { toolChoice?: string },
-        executeToolsCallback?: (toolCalls: SafeAny[]) => Promise<SafeAny[]>,
+        executeToolsCallback?: (toolCalls: Record<string, unknown>[]) => Promise<Array<Record<string, unknown>>>,
         streamCallback?: (chunk: string) => void
     ): Promise<{ content: string; totalTokens?: number }> {
         let fullContent = '';
-        let conversationMessages = [...messages] as SafeAny[];
+        let conversationMessages = [...messages];
         let totalTokens = 0;
         let toolRoundsExecuted = 0;
         const MAX_CONTINUATION_NUDGES = 3;
@@ -166,7 +183,7 @@ export class OpenCodeProvider extends BaseProvider {
             if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
             await RateLimitManager.getInstance().waitForClearance(this.id, modelId, 1000);
 
-            const requestBody: SafeAny = {
+            const requestBody: OpenCodeRequestBody = {
                 model: modelId,
                 messages: conversationMessages,
                 stream: false
@@ -195,9 +212,9 @@ export class OpenCodeProvider extends BaseProvider {
                 });
 
                 if (response.status >= 400) {
-                    const errorData = typeof response.json === 'object' ? response.json : {};
-                    throw new Error(`OpenCode API error: ${response.status} ${errorData.error?.message || 'Request failed'}`);
-                }
+                const errorData = (typeof response.json === 'object' ? response.json : {}) as { error?: { message?: string } };
+                throw new Error(`OpenCode API error: ${response.status} ${errorData.error?.message || 'Request failed'}`);
+            }
 
                 const headersObj = new Headers();
                 Object.entries(response.headers).forEach(([key, value]) => {
@@ -205,31 +222,31 @@ export class OpenCodeProvider extends BaseProvider {
                 });
                 RateLimitManager.getInstance().updateFromHeaders(this.id, modelId, headersObj);
 
-                const data = response.json;
+                const data = response.json as OpenAIChatCompletionResponse;
                 if (data.usage) {
                     totalTokens += (data.usage.total_tokens || 0);
-                    RateLimitManager.getInstance().recordApiCall(this.id, modelId, data.usage.total_tokens);
+                    RateLimitManager.getInstance().recordApiCall(this.id, modelId, data.usage.total_tokens ?? 0);
                 }
 
-                const message = data.choices[0]?.message;
+                const message = data.choices?.[0]?.message;
                 if (!message) break;
-                conversationMessages.push(message);
+                conversationMessages.push(message as unknown as UnifiedMessage);
 
                 if (message.tool_calls && message.tool_calls.length > 0) {
                     toolRoundsExecuted++;
                     if (currentToolChoice === 'required') currentToolChoice = 'auto';
                     
                     if (executeToolsCallback) {
-                        const toolResults = await executeToolsCallback(message.tool_calls);
+                        const toolResults = await executeToolsCallback(message.tool_calls as Record<string, unknown>[]);
                         for (let i = 0; i < message.tool_calls.length; i++) {
-                            const toolCall = message.tool_calls[i];
+                            const toolCall = message.tool_calls[i] as Record<string, unknown>;
                             const toolResult = toolResults[i];
                             conversationMessages.push({
                                 role: 'tool',
-                                tool_call_id: toolCall.id,
-                                name: toolCall.function.name,
+                                tool_call_id: toolCall.id as string,
+                                name: (toolCall.function as Record<string, unknown>).name as string,
                                 content: toolResult.success ? toolResult.content : `Error: ${toolResult.error}`
-                            });
+                            } as unknown as UnifiedMessage);
                         }
                         continue;
                     } else throw new Error('Tool calls requested but no executeToolsCallback provided');

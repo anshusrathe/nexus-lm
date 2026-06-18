@@ -1,8 +1,29 @@
-import { App, TFile, Notice, Vault, requestUrl } from 'obsidian';
-import { AISettings, CustomEmbeddingModel, getProviderForEmbeddingModel } from '../settings';
-import { extractTextFromPdf } from '../utils/pdfExtractor';
+import { App, TFile, Notice, requestUrl } from 'obsidian';
+import { AISettings, getProviderForEmbeddingModel } from '../settings';
 import { parseTemporalQuery } from '../utils/temporalFilter';
 import { OramaWorkerManager } from '../utils/oramaWorkerManager';
+
+type IndexConfiguration = {
+    id: string;
+    type: 'embedding' | 'bm25';
+    name: string;
+    model?: string;
+    enabled: boolean;
+    fileCount: number;
+    lastUpdated: number;
+    isBuilding?: boolean;
+    buildProgress?: number;
+    buildError?: string;
+    excludedFolders?: string[];
+    excludedFiles?: string[];
+};
+
+interface OramaHitDocument {
+    path: string;
+    chunkIndex: number;
+    content?: string;
+    lastModified: number;
+}
 
 interface DocumentChunk {
     path: string;
@@ -175,16 +196,16 @@ export class EmbeddingsManager {
                         };
 
                         await OramaWorkerManager.getInstance().load(tempId, data, schema, true);
-                        const response = await OramaWorkerManager.getInstance().getMetadata(tempId);
+                        const response = await OramaWorkerManager.getInstance().getMetadata(tempId) as { metadata?: Record<string, unknown> };
                         const metadata = response.metadata;
                         await OramaWorkerManager.getInstance().clear(tempId); // Clear temp instance
 
                         if (!metadata) continue;
 
                         // Extract model from index
-                        model = metadata.model;
-                        fileCount = metadata.fileCount || 0;
-                        lastUpdated = metadata.lastUpdated || Date.now();
+                        model = String(metadata.model || '');
+                        fileCount = Number(metadata.fileCount || 0);
+                        lastUpdated = Number(metadata.lastUpdated || Date.now());
                     } catch (e) {
                                                 continue;
                     }
@@ -254,7 +275,7 @@ export class EmbeddingsManager {
             if (this.buildNotice) {
                 this.buildNotice.setMessage(message);
                 // Allow the notice to disappear after a few seconds
-                setTimeout(() => {
+                window.setTimeout(() => {
                     this.buildNotice = null;
                 }, 5000);
             } else {
@@ -344,7 +365,7 @@ export class EmbeddingsManager {
         const indexConfig = this.settings.indexConfigurations?.find(c => c.id === instanceId);
         const isBM25 = indexConfig?.type === 'bm25';
         
-        const schema: Record<string, unknown> = {
+        const schema: Record<string, string> = {
             id: 'string',
             path: 'string',
             chunkIndex: 'number',
@@ -474,7 +495,7 @@ export class EmbeddingsManager {
       }
 
       if (delayNeeded > 0) {
-        await new Promise(resolve => setTimeout(resolve, delayNeeded));
+        await new Promise(resolve => window.setTimeout(resolve, delayNeeded));
         // After waiting, re-check and potentially reset if enough time has passed
         const afterDelay = Date.now();
         if (afterDelay - this._lastResetTime >= oneMinute) {
@@ -667,9 +688,9 @@ export class EmbeddingsManager {
                                 return await this.getGeminiEmbedding(contentForEmbedding, embeddingModel, geminiApiKey);
             }
         } catch (error: unknown) {
-            const err = error as unknown as SafeAny;
-            if (err.status && err.json) {
-                throw new Error(`Failed to generate embedding: ${err.json?.error?.message || err.message}`);
+            if (error && typeof error === 'object' && 'status' in error && 'json' in error) {
+                const json = (error as { json?: { error?: { message?: string } } }).json;
+                throw new Error(`Failed to generate embedding: ${json?.error?.message || 'Unknown error'}`);
             }
             throw new Error('Failed to generate embedding');
         }
@@ -741,11 +762,11 @@ export class EmbeddingsManager {
             });
             
             if (response.status >= 400) {
-                const resJson = response.json as unknown as SafeAny;
+                const resJson = response.json as { error?: { message?: string } };
                 throw new Error(`${provider.name} API error: ${resJson?.error?.message || response.status}`);
             }
             
-            const resJson = response.json as unknown as SafeAny;
+            const resJson = response.json as { data?: Array<{ embedding: number[] }> };
             if (!resJson || !resJson.data || !resJson.data[0] || !resJson.data[0].embedding) {
                 throw new Error(`Invalid response from ${provider.name} API`);
             }
@@ -784,11 +805,11 @@ export class EmbeddingsManager {
             });
             
             if (response.status >= 400) {
-                const errJson = response.json as unknown as SafeAny;
+                const errJson = response.json as { error?: { message?: string } };
                 throw new Error(`${provider.name} batch API error: ${errJson?.error?.message || response.status}`);
             }
             
-            const resJson = response.json as unknown as SafeAny;
+            const resJson = response.json as { data?: Array<{ embedding: number[] }> };
             if (!resJson || !resJson.data || !Array.isArray(resJson.data)) {
                 throw new Error(`Invalid batch response from ${provider.name} API`);
             }
@@ -1076,7 +1097,7 @@ export class EmbeddingsManager {
         try {
                         
             const baseUrl = 'https://integrate.api.nvidia.com';
-            const requestBody: SafeAny = {
+            const requestBody: Record<string, unknown> = {
                 input: texts,
                 model: modelId,
                 input_type: isQuery ? 'query' : 'passage'
@@ -1177,7 +1198,7 @@ export class EmbeddingsManager {
         try {
             await this.loadIndex(indexId);
             const targetId = indexId || this.loadedIndexId || 'default-bm25';
-            const metadata = await OramaWorkerManager.getInstance().getMetadata(targetId);
+            const metadata = await OramaWorkerManager.getInstance().getMetadata(targetId) as { documents?: Array<{ path: string }> } | undefined;
             const docs = metadata?.documents || [];
             const uniquePaths = new Set(docs.map((d: { path: string }) => d.path));
 
@@ -1224,9 +1245,9 @@ export class EmbeddingsManager {
                 
                 // Return a promise that resolves when the build is finished
                 return new Promise((resolve, reject) => {
-                    const checkInterval = setInterval(() => {
+                    const checkInterval = window.setInterval(() => {
                         if (!this.activeBuilds.has(indexId)) {
-                            clearInterval(checkInterval);
+                            window.clearInterval(checkInterval);
                             resolve();
                         }
                     }, 500);
@@ -1741,9 +1762,9 @@ export class EmbeddingsManager {
                 
                 // Return a promise that resolves when the build is finished
                 return new Promise((resolve, reject) => {
-                    const checkInterval = setInterval(() => {
+                    const checkInterval = window.setInterval(() => {
                         if (!this.activeBuilds.has(bm25IndexId)) {
-                            clearInterval(checkInterval);
+                            window.clearInterval(checkInterval);
                             resolve();
                         }
                     }, 500);
@@ -1947,7 +1968,7 @@ export class EmbeddingsManager {
     async detectChanges(indexId: string): Promise<{ hasChanges: boolean; newFiles: number; modifiedFiles: number; deletedFiles: number }> {
         try {
             // Resolve config to know type and exclusions
-            const indexConfig = this.settings.indexConfigurations?.find((c: SafeAny) => c.id === indexId);
+            const indexConfig = this.settings.indexConfigurations?.find((c: IndexConfiguration) => c.id === indexId);
             const isBM25 = indexConfig?.type === 'bm25';
 
             // Use the already loaded index if possible, otherwise we have to return "no changes" to avoid freezing
@@ -2075,9 +2096,9 @@ export class EmbeddingsManager {
                 },
                 tolerance: 1,
                 limit: limit * 5
-            });
+            }) as { results?: { hits?: Array<{ document: OramaHitDocument; score: number }> } } | undefined;
 
-            const bm25Results = (bm25SearchResponse.results?.hits || []).map((hit: { document: SafeAny, score: number }) => ({
+            const bm25Results = (bm25SearchResponse!.results?.hits || []).map((hit: { document: OramaHitDocument; score: number }) => ({
                 path: hit.document.path,
                 chunkIndex: hit.document.chunkIndex,
                 content: hit.document.content || '',
@@ -2128,7 +2149,7 @@ export class EmbeddingsManager {
                     cleanQuery: temporalQuery.cleanQuery
                 } : undefined
             };
-        } catch (error: SafeAny) {
+        } catch (error: unknown) {
                         return { results: [], temporalContext: undefined };
         }
     }
@@ -2141,7 +2162,7 @@ export class EmbeddingsManager {
         if (indexId) {
             // Per-index exclusions (embedding indexes)
             const indexConfig = this.settings.indexConfigurations?.find(
-                (c: SafeAny) => c.id === indexId
+                (c: IndexConfiguration) => c.id === indexId
             );
             excludedFolders = indexConfig?.excludedFolders || [];
             excludedFiles = indexConfig?.excludedFiles || [];
@@ -2199,7 +2220,7 @@ export class EmbeddingsManager {
         if (this.isLoadingIndex) {
                         // Wait for the current load to finish
             while (this.isLoadingIndex) {
-                await new Promise(resolve => setTimeout(resolve, 50));
+                await new Promise(resolve => window.setTimeout(resolve, 50));
             }
             // After waiting, check cache again as the other load might have populated it
             if (this.indexCache.has(targetId)) {
@@ -2230,14 +2251,14 @@ export class EmbeddingsManager {
                 const data = await adapter.readBinary(indexPath);
                 
                 // Yield to event loop to allow UI to paint
-                await new Promise(resolve => setTimeout(resolve, 0));
+                await new Promise(resolve => window.setTimeout(resolve, 0));
                 
                 // Steps 2 & 3: Offload Restoration to Orama Worker (50% - 75%)
                 if (restoreNotice) restoreNotice.setMessage(`[Nexus] Restoring ${label}: 60% (Processing in background...)`);
 
                 // Build schema dynamically based on index type
                 const isBM25 = indexConfig?.type === 'bm25';
-                const schema: Record<string, unknown> = {
+                const schema: Record<string, string> = {
                     id: 'string',
                     path: 'string',
                     chunkIndex: 'number',
@@ -2254,22 +2275,22 @@ export class EmbeddingsManager {
                     schema.embedding = 'vector[1]'; // Dummy dimension, refined by worker on LOAD
                 }
 
-                const loadResponse = await OramaWorkerManager.getInstance().load(targetId, data, schema, true);
+                const loadResponse = await OramaWorkerManager.getInstance().load(targetId, data, schema, true) as { metadata?: Record<string, unknown>; documents?: Array<Record<string, unknown>> };
                 const metadata = loadResponse.metadata;
                 const shadowDocs = loadResponse.documents || [];
 
                 // Yield to event loop
-                await new Promise(resolve => setTimeout(resolve, 0));
+                await new Promise(resolve => window.setTimeout(resolve, 0));
 
                 // Step 4: Finalizing (90% - 100%)
                 if (restoreNotice) restoreNotice.setMessage(`[Nexus] Restoring ${label}: 90% (Finalizing...)`);
 
                 if (metadata) {
                     this.index = {
-                        documents: shadowDocs, // Lightweight docs (no embeddings)
-                        lastUpdated: metadata.lastUpdated || Date.now(),
-                        version: metadata.version || INDEX_VERSION,
-                        model: metadata.model || indexConfig?.model || targetId
+                        documents: shadowDocs as unknown as DocumentChunk[],
+                        lastUpdated: Number(metadata.lastUpdated || Date.now()),
+                        version: Number(metadata.version || INDEX_VERSION),
+                        model: String(metadata.model || indexConfig?.model || targetId)
                     };
                                     }
             } else {
@@ -2291,13 +2312,13 @@ export class EmbeddingsManager {
             
             if (restoreNotice) {
                 restoreNotice.setMessage(`[Nexus] ${label.charAt(0).toUpperCase() + label.slice(1)} restored successfully!`);
-                setTimeout(() => restoreNotice?.hide(), 2000);
+                window.setTimeout(() => restoreNotice?.hide(), 2000);
             }
 
         } catch (error) {
                         if (restoreNotice) {
                 restoreNotice.setMessage(`[Nexus] ${label.charAt(0).toUpperCase() + label.slice(1)} restoration failed.`);
-                setTimeout(() => restoreNotice?.hide(), 3000);
+                window.setTimeout(() => restoreNotice?.hide(), 3000);
             }
             this.index = { documents: [], lastUpdated: 0, version: INDEX_VERSION, model: targetId };
             if (this.loadedIndexId) {
@@ -2525,9 +2546,9 @@ export class EmbeddingsManager {
                     where: Object.keys(where).length > 0 ? where : undefined,
                     limit: limit * 5,
                     similarity: 0.4
-                });
+                }) as { results?: { hits?: Array<{ document: OramaHitDocument; score: number }> } } | undefined;
 
-                const fusedResults = (hybridSearchResponse.results?.hits || []).map((hit: { document: SafeAny, score: number }) => ({
+                const fusedResults = (hybridSearchResponse!.results?.hits || []).map((hit: { document: OramaHitDocument; score: number }) => ({
                     path: hit.document.path,
                     chunkIndex: hit.document.chunkIndex,
                     content: hit.document.content || '',
@@ -2593,8 +2614,7 @@ export class EmbeddingsManager {
                 this.settings.embeddingModel = originalEmbeddingModel;
             }
         } catch (error: unknown) {
-            const err = error as unknown as SafeAny;
-            if (err?.message?.includes('DIMENSION_MISMATCH')) {
+            if (error instanceof Error && error.message.includes('DIMENSION_MISMATCH')) {
                 new Notice(`[Nexus] Embedding dimension mismatch. Please click "Rebuild Index" in settings to update "${this.loadedIndexId || 'the index'}" for the current model.`);
                                 throw new Error('Dimension mismatch. Please rebuild the index.');
             }
@@ -2672,10 +2692,10 @@ export class EmbeddingsManager {
                     where: Object.keys(where).length > 0 ? where : undefined,
                     limit: 100, // Get enough candidates for filtering/grouping
                     similarity: 0.4
-                });
+                }) as { results?: { hits?: Array<{ document: OramaHitDocument; score: number }> } } | undefined;
 
                 const vectorResults: Array<{path: string, chunkIndex: number, content: string, similarity: number, lastModified: number}> = 
-                    (vectorSearchResponse.results?.hits || []).map((hit: { document: SafeAny, score: number }) => ({
+                    (vectorSearchResponse!.results?.hits || []).map((hit: { document: OramaHitDocument; score: number }) => ({
                         path: hit.document.path,
                         chunkIndex: hit.document.chunkIndex,
                         content: hit.document.content || '',
@@ -2734,8 +2754,7 @@ export class EmbeddingsManager {
                 this.settings.embeddingModel = originalEmbeddingModel;
             }
         } catch (error: unknown) {
-            const err = error as unknown as SafeAny;
-            if (err?.message?.includes('DIMENSION_MISMATCH')) {
+            if (error instanceof Error && error.message.includes('DIMENSION_MISMATCH')) {
                 new Notice(`[Nexus] Embedding dimension mismatch. Please click "Rebuild Index" in settings to update "${this.loadedIndexId || 'the index'}" for the current model.`);
                             }
                         return [];

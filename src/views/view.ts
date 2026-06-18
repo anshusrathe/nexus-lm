@@ -1,6 +1,5 @@
 import { App, TAbstractFile, ItemView, WorkspaceLeaf, TFile, ButtonComponent, Notice, MarkdownRenderer, Component, Modal, Setting, setIcon, normalizePath, Platform } from 'obsidian';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { AISettings, Provider, getModelsGroupedByProvider, getModelDisplayName, getProviderForModel } from '../settings';
+import { AISettings, getModelsGroupedByProvider, getModelDisplayName, getProviderForModel } from '../settings';
 import { DirectorySuggester } from '../utils/directorySuggester';
 import { NotebookManager, Notebook } from '../managers/notebookManager'; 
 import { NotebookFormModal } from '../modals/notebookModals'; 
@@ -9,11 +8,11 @@ import { TokenEstimator } from '../utils/tokenEstimator';
 import AIPlugin from '../main'; 
 
 
-import { QnAManager, QASettingsModal as QnASettingsModal, Question as QnAQuestion, QASettings as QnASettings } from '../tools/createQnA';
-import { MCQManager, MCQSettingsModal as MCQModal, MCQ as MCQItem, MCQSettings as MCQSett } from '../tools/createMCQs';
-import { ConceptMapManager, ConceptMapModal, SavedConceptMap } from '../tools/createConceptMaps';
+import { QnAManager } from '../tools/createQnA';
+import { MCQManager } from '../tools/createMCQs';
+import { ConceptMapManager, ConceptMapModal, SavedConceptMap, ConceptMapData } from '../tools/createConceptMaps';
 import { SlideManager, SlideshowSettingsModal, SavedSlideshow, SlideshowVoiceSettingsModal } from '../tools/createSlides';
-import { MultimodalInput, processFileForMultimodal, isMultimodalSupported, getFileIcon, isTextFile } from '../utils/multimodalUtils';
+import { isMultimodalSupported } from '../utils/multimodalUtils';
 
 interface OpenAIErrorResponse {
   error: {
@@ -44,6 +43,11 @@ interface MCQResult {
   incorrectAttempts: number;
   marks: number;
   accuracy: number;
+}
+
+interface NotebookChatViewLike {
+  notebook?: { id: string };
+  externalInvalidateContextCache?: () => void;
 }
 
 interface MindmapNode {
@@ -121,7 +125,7 @@ export class NoteSuggester {
     this.input.addEventListener('keydown', (e) => this.onKeyDown(e));
     this.input.addEventListener('blur', () => {
       
-      setTimeout(() => this.suggestions.hide(), 100);
+      window.setTimeout(() => this.suggestions.hide(), 100);
     });
     this.input.addEventListener('focus', () => {
       
@@ -289,7 +293,7 @@ export class FolderSuggester {
 
   private getAvailableFolders(): string[] {
     const allFolders = this.app.vault.getAllLoadedFiles()
-      .filter((f: TAbstractFile) => (f as SafeAny).children !== undefined) 
+      .filter((f: TAbstractFile) => (f as unknown as Record<string, unknown>).children !== undefined) 
       .map((f: TAbstractFile) => f.path)
       .filter((path: string) => path !== '' && !path.startsWith('.'));
     return allFolders;
@@ -310,7 +314,7 @@ export class FolderSuggester {
     this.input.addEventListener('input', () => this.onInputChange());
     this.input.addEventListener('keydown', (e) => this.onKeyDown(e));
     this.input.addEventListener('blur', () => {
-      setTimeout(() => this.suggestions.hide(), 100);
+      window.setTimeout(() => this.suggestions.hide(), 100);
     });
     this.input.addEventListener('focus', () => {
       if (this.input.value.trim()) {
@@ -428,6 +432,7 @@ export class AITutorView extends ItemView {
   private container: HTMLElement;
   private settings: AISettings;
   private plugin: AIPlugin;
+  get document() { return this.containerEl.ownerDocument; }
   private noteSuggester!: NoteSuggester;
   private state: {
     questions: Question[];
@@ -474,6 +479,7 @@ export class AITutorView extends ItemView {
   private _mcqSubmitBtn?: ButtonComponent;
   private _mcqProgressDialog?: HTMLElement;
   private _mcqEvaluationInProgress: boolean = false;
+  private _progressIntervalMap = new WeakMap<HTMLElement, ReturnType<typeof setInterval>>();
 
   constructor(leaf: WorkspaceLeaf, settings: AISettings, plugin: AIPlugin) {
     super(leaf);
@@ -516,8 +522,8 @@ export class AITutorView extends ItemView {
       apiKey = this.settings.nvidiaApiKey;
     } else if (provider === 'opencode') {
       apiKey = this.settings.openCodeApiKey;
-    } else if (this.settings.customProviders?.some((p: SafeAny) => p.id === provider)) {
-      const cp = this.settings.customProviders.find((p: SafeAny) => p.id === provider);
+    } else if (this.settings.customProviders?.some((p) => p.id === provider)) {
+      const cp = this.settings.customProviders.find((p) => p.id === provider);
       apiKey = cp?.apiKey || '';
     } else {
       apiKey = this.settings.geminiApiKey || this.settings.apiKey;
@@ -610,8 +616,8 @@ export class AITutorView extends ItemView {
             return;
           }
           
-          new QASettingsModal(this.app, this.settings, new Set(selectedPaths), async (settings) => {
-            await this.generateQuestions(selectedPaths, settings);
+          new QASettingsModal(this.app, this.settings, new Set(selectedPaths), (settings) => {
+            void this.generateQuestions(selectedPaths, settings);
           }).open();
         }
       });
@@ -631,8 +637,8 @@ export class AITutorView extends ItemView {
             return;
           }
           
-          new MCQSettingsModal(this.app, this.settings, new Set(selectedPaths), async (settings) => {
-            await this.generateMCQs(selectedPaths, settings);
+          new MCQSettingsModal(this.app, this.settings, new Set(selectedPaths), (settings) => {
+            void this.generateMCQs(selectedPaths, settings);
           }).open();
         }
       });
@@ -653,8 +659,8 @@ export class AITutorView extends ItemView {
               return;
             }
             
-            new ConceptMapModal(this.app, async (name) => {
-              await this.generateConceptMap(selectedPaths, name);
+            new ConceptMapModal(this.app, (name) => {
+              void this.generateConceptMap(selectedPaths, name);
             }).open();
           }
         });
@@ -677,8 +683,8 @@ export class AITutorView extends ItemView {
               return;
             }
             
-            new SlideshowSettingsModal(this.app, this.settings, new Set(selectedPaths), async (settings) => {
-              await this.generateSlideshow(selectedPaths, settings);
+            new SlideshowSettingsModal(this.app, this.settings, new Set(selectedPaths), (settings) => {
+              void this.generateSlideshow(selectedPaths, settings);
             }).open();
           }
         });
@@ -773,7 +779,7 @@ export class AITutorView extends ItemView {
   private async invalidateNotebookCache(notebookId: string) {
     this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
       if (leaf.view && leaf.view.getViewType && leaf.view.getViewType() === VIEW_TYPE_NOTEBOOK_CHAT) {
-        const view: SafeAny = leaf.view;
+        const view = leaf.view as unknown as NotebookChatViewLike;
         if (view.notebook && view.notebook.id === notebookId && typeof view.externalInvalidateContextCache === 'function') {
           view.externalInvalidateContextCache();
         }
@@ -799,19 +805,21 @@ export class AITutorView extends ItemView {
       return;
     }
     
-    new NotebookFormModal(this.app, this.plugin, latestNotebook, async (settings) => {
-      await this.notebookManager.updateNotebook(latestNotebook.id, settings.name, Array.from(settings.sourcePaths), settings.customInstruction, settings.webSources, settings.inlineCitation, settings.mode, settings.sourceFolders, settings.feedSources);
-      
-      await this.notebookManager.loadNotebooks();
-      this.invalidateNotebookCache(latestNotebook.id);
-      this.renderInitial();
+    new NotebookFormModal(this.app, this.plugin, latestNotebook, (settings) => {
+      void (async () => {
+        await this.notebookManager.updateNotebook(latestNotebook.id, settings.name, Array.from(settings.sourcePaths), settings.customInstruction, settings.webSources, settings.inlineCitation, settings.mode, settings.sourceFolders, settings.feedSources);
+        
+        await this.notebookManager.loadNotebooks();
+        this.invalidateNotebookCache(latestNotebook.id);
+        this.renderInitial();
+      })();
     }).open();
   }
 
   private handleDeleteNotebook(notebookId: string) {
     if (confirm('Are you sure you want to delete this notebook?')) {
       
-      (document.activeElement as HTMLElement)?.blur();
+      (this.document.activeElement as HTMLElement)?.blur();
       this.notebookManager.deleteNotebook(notebookId);
       this.invalidateNotebookCache(notebookId);
       this.renderInitial();
@@ -853,8 +861,8 @@ export class AITutorView extends ItemView {
     const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_NOTEBOOK_CHAT);
     for (const leaf of leaves) {
       const viewState = leaf.getViewState();
-      const notebook = (viewState.state as unknown as SafeAny)?.notebook;
-      if (notebook?.id === notebookId) {
+      const state = viewState.state as { notebook?: { id: string } } | undefined;
+      if (state?.notebook?.id === notebookId) {
         return leaf;
       }
     }
@@ -885,7 +893,7 @@ export class AITutorView extends ItemView {
       attr: { style: 'width: 100%; box-sizing: border-box;' }
     });
     searchInput.addEventListener('keydown', (e) => e.stopPropagation());
-    setTimeout(() => searchInput.focus(), 100);
+    window.setTimeout(() => searchInput.focus(), 100);
 
     const itemsToFilter: { itemEl: HTMLElement, name: string }[] = [];
     const headersToFilter: { headerEl: HTMLElement, items: HTMLElement[], separatorEl?: HTMLElement }[] = [];
@@ -913,19 +921,20 @@ export class AITutorView extends ItemView {
           option.classList.add('selected');
         }
         option.textContent = model.name;
-        option.addEventListener('click', async () => {
-          
-          this.settings.aiTutorModel = model.id;
-          this.settings.aiTutorProvider = model.provider;
-          
-          this.settings.model = model.id;
-          this.settings.provider = model.provider;
-          if (modelBtn) modelBtn.textContent = model.name;
-          menuEl.remove();
-          await this.plugin.saveSettings();
-          
-          
-          this.updateContextBar();
+        option.addEventListener('click', () => {
+          void (async () => {
+            this.settings.aiTutorModel = model.id;
+            this.settings.aiTutorProvider = model.provider;
+            
+            this.settings.model = model.id;
+            this.settings.provider = model.provider;
+            if (modelBtn) modelBtn.textContent = model.name;
+            menuEl.remove();
+            await this.plugin.saveSettings();
+            
+            
+            this.updateContextBar();
+          })();
         });
       });
 
@@ -962,10 +971,10 @@ export class AITutorView extends ItemView {
       if (!menuEl.contains(e.target as Node) && 
           !(e.target as Element).closest('.model-select-btn')) {
         menuEl.remove();
-        document.removeEventListener('click', closeHandler);
+        this.document.removeEventListener('click', closeHandler);
       }
     };
-    setTimeout(() => document.addEventListener('click', closeHandler), 0);
+    window.setTimeout(() => this.document.addEventListener('click', closeHandler), 0);
   }
 
   private async updateContextBar() {
@@ -1053,7 +1062,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = document.createElement('div');
+      const progressContainer = this.document.createElement('div');
       progressContainer.className = 'qna-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1177,7 +1186,7 @@ export class AITutorView extends ItemView {
       .setButtonText('Start New Session')
       .onClick(() => {
         
-        (document.activeElement as HTMLElement)?.blur();
+        (this.document.activeElement as HTMLElement)?.blur();
         this.renderInitial();
       });
   }
@@ -1249,7 +1258,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
 
-      const progressContainer = document.createElement('div');
+      const progressContainer = this.document.createElement('div');
       progressContainer.className = 'mcq-inline-progress';
 
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1387,7 +1396,7 @@ export class AITutorView extends ItemView {
       .setButtonText('Start New Session')
       .onClick(() => {
         
-        (document.activeElement as HTMLElement)?.blur();
+        (this.document.activeElement as HTMLElement)?.blur();
         this.renderInitial();
       });
   }
@@ -1489,7 +1498,7 @@ export class AITutorView extends ItemView {
     }
     
     
-    const dialog = document.createElement('div');
+    const dialog = this.document.createElement('div');
     dialog.className = 'mcq-progress-dialog mcq-progress-inline';
     
     
@@ -1523,23 +1532,23 @@ export class AITutorView extends ItemView {
     }, 200);
     
     
-    (dialog as unknown as SafeAny)._progressInterval = progressInterval;
+    this._progressIntervalMap.set(dialog, progressInterval);
   }
   
   private hideMCQProgressDialog() {
     if (this._mcqProgressDialog) {
-      
-      const interval = (this._mcqProgressDialog as unknown as SafeAny)._progressInterval;
+      const interval = this._progressIntervalMap.get(this._mcqProgressDialog);
       if (interval) {
         clearInterval(interval);
       }
+      this._progressIntervalMap.delete(this._mcqProgressDialog);
       
       this._mcqProgressDialog.remove();
       this._mcqProgressDialog = undefined;
     }
   }
   
-  private showMCQEvaluationError(error: SafeAny) {
+  private showMCQEvaluationError(error: unknown) {
     this.hideMCQProgressDialog();
     this._mcqEvaluationInProgress = false;
     
@@ -1557,11 +1566,11 @@ export class AITutorView extends ItemView {
     }
     
     
-    const overlay = document.createElement('div');
+    const overlay = this.document.createElement('div');
     overlay.className = 'mcq-error-overlay';
     
     
-    const dialog = document.createElement('div');
+    const dialog = this.document.createElement('div');
     dialog.className = 'mcq-error-dialog';
     
     
@@ -1578,7 +1587,7 @@ export class AITutorView extends ItemView {
     message.textContent = 'There was an error evaluating your test. Please try again.';
     
     
-    if (error && error.message) {
+    if (error instanceof Error) {
       const details = content.createDiv({ cls: 'mcq-error-details' });
       details.textContent = `Error: ${error.message}`;
     }
@@ -1601,7 +1610,7 @@ export class AITutorView extends ItemView {
       });
     
     overlay.appendChild(dialog);
-    document.body.appendChild(overlay);
+    this.document.body.appendChild(overlay);
     
     
     new Notice('Test evaluation failed. Please try again.');
@@ -1694,7 +1703,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = document.createElement('div');
+      const progressContainer = this.document.createElement('div');
       progressContainer.className = 'concept-map-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1774,7 +1783,7 @@ export class AITutorView extends ItemView {
   }
 
   
-  async generateSlideshow(notePaths: string[], settings: SafeAny) {
+  async generateSlideshow(notePaths: string[], settings: { name: string; type: 'zen'; preferredVoice?: string; voiceRate?: number; voicePitch?: number }) {
     try {
       
       const selectedNotesContainer = this.noteSuggester?.['selectedNotesContainer'] as HTMLElement;
@@ -1784,7 +1793,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = document.createElement('div');
+      const progressContainer = this.document.createElement('div');
       progressContainer.className = 'slideshow-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1866,7 +1875,7 @@ export class AITutorView extends ItemView {
       new Notice('Zen slideshow created successfully!');
       
       
-      setTimeout(() => {
+      window.setTimeout(() => {
         progressContainer.remove();
         startButtons.forEach(btn => btn.addClass('nl-pointer-events-'));
         this.renderInitial();
@@ -2047,9 +2056,9 @@ export class AITutorView extends ItemView {
     const match = text.substring(index, index + query.length);
     const after = text.substring(index + query.length);
     
-    if (before) element.appendChild(document.createTextNode(before));
+    if (before) element.appendChild(this.document.createTextNode(before));
     const highlight = element.createEl('mark', { text: match, cls: 'search-highlight' });
-    if (after) element.appendChild(document.createTextNode(after));
+    if (after) element.appendChild(this.document.createTextNode(after));
   }
 
   private async openSavedConceptMap(conceptMap: SavedConceptMap) {
@@ -2068,7 +2077,7 @@ export class AITutorView extends ItemView {
       
       
       if (!file) {
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => window.setTimeout(resolve, 200));
         file = this.app.vault.getAbstractFileByPath(conceptMap.filePath) as TFile | null;
       }
       
@@ -2102,10 +2111,10 @@ export class AITutorView extends ItemView {
           }
   }
 
-  private parseConceptMapFromMarkdown(content: string, defaultName: string): SafeAny {
+  private parseConceptMapFromMarkdown(content: string, defaultName: string): ConceptMapData {
     const lines = content.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     
-    const conceptMapData: SafeAny = {
+    const conceptMapData: ConceptMapData = {
       noteName: defaultName,
       innerCircle: [],
       outerCircle: [],
@@ -2210,7 +2219,7 @@ export class AITutorView extends ItemView {
   private deleteSavedConceptMap(id: string) {
     if (confirm('Are you sure you want to delete this concept map from the saved list?')) {
       
-      (document.activeElement as HTMLElement)?.blur();
+      (this.document.activeElement as HTMLElement)?.blur();
       this.state.savedConceptMaps = this.state.savedConceptMaps.filter(cm => cm.id !== id);
       this.saveSavedConceptMaps();
       this.renderInitial();
@@ -2277,13 +2286,14 @@ export class AITutorView extends ItemView {
       
       const zenData = await this.slideManager.loadZenSlideshow(slideshow.filePath);
       
-      new SlideshowVoiceSettingsModal(this.app, zenData, async (updatedSettings) => {
+      new SlideshowVoiceSettingsModal(this.app, zenData, (updatedSettings) => {
         zenData.preferredVoice = updatedSettings.preferredVoice;
         zenData.voiceRate = updatedSettings.voiceRate;
         zenData.voicePitch = updatedSettings.voicePitch;
         
-        await this.slideManager.saveZenSlideshow(zenData, slideshow.filePath);
-        new Notice('Slideshow voice updated successfully');
+        void this.slideManager.saveZenSlideshow(zenData, slideshow.filePath).then(() => {
+          new Notice('Slideshow voice updated successfully');
+        });
       }).open();
       
     } catch (error) {
@@ -2293,7 +2303,7 @@ export class AITutorView extends ItemView {
 
   private deleteSavedSlideshow(id: string) {
     if (confirm('Are you sure you want to delete this slideshow from the saved list?')) {
-      (document.activeElement as HTMLElement)?.blur();
+      (this.document.activeElement as HTMLElement)?.blur();
       this.state.savedSlideshows = this.state.savedSlideshows.filter(s => s.id !== id);
       this.saveSavedSlideshows();
       this.renderInitial();
@@ -2420,7 +2430,7 @@ export class AITutorView extends ItemView {
     this.hideMCQProgressDialog();
     
     
-    const errorOverlays = document.body.querySelectorAll('.mcq-error-overlay');
+    const errorOverlays = this.document.body.querySelectorAll('.mcq-error-overlay');
     errorOverlays.forEach(overlay => overlay.remove());
     
     
@@ -2613,7 +2623,7 @@ class QASettingsModal extends Modal {
     private saveDirectory: string;
     private customPrompt: string = '';
 
-    constructor(app: SafeAny, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: QASettings) => void) {
+    constructor(app: App, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: QASettings) => void) {
         super(app);
         this.initialSelectedPaths = initialSelectedPaths;
         this.onSubmit = onSubmit;
@@ -2719,7 +2729,7 @@ class MCQSettingsModal extends Modal {
   private correctMarks: number = 1;
   private incorrectMarks: number = 0;
 
-  constructor(app: SafeAny, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: MCQSettings) => void) {
+  constructor(app: App, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: MCQSettings) => void) {
     super(app);
     this.initialSelectedPaths = initialSelectedPaths;
     this.onSubmit = onSubmit;
@@ -2855,7 +2865,7 @@ class MindmapSettingsModal extends Modal {
   private customPrompt: string = '';
   private saveDirectory: string;
 
-  constructor(app: SafeAny, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: { customPrompt: string; saveDirectory: string }) => void) {
+  constructor(app: App, pluginSettings: AISettings, initialSelectedPaths: Set<string>, onSubmit: (settings: { customPrompt: string; saveDirectory: string }) => void) {
     super(app);
     this.initialSelectedPaths = initialSelectedPaths;
     this.onSubmit = onSubmit;
@@ -2916,7 +2926,7 @@ class MindmapSettingsModal extends Modal {
 
 class TimerModal extends Modal {
   private onSubmit: (ms: number) => void;
-  constructor(app: SafeAny, onSubmit: (ms: number) => void) {
+  constructor(app: App, onSubmit: (ms: number) => void) {
     super(app);
     this.onSubmit = onSubmit;
   }
