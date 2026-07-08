@@ -1,0 +1,103 @@
+[AgentView] handleSend task="Using web viewer using CLI and open the link in obsidian https://www.reddit.com/..."
+plugin:nexus-lm:53607 [AgentView] setRunning(true), prev=false
+plugin:nexus-lm:53629 [AgentView] startTimer
+plugin:nexus-lm:53662 [AgentView] updateUI isRunning=true events=0 stepCount=0
+plugin:nexus-lm:53666 [AgentView] updateUI sendBtn.display=none
+plugin:nexus-lm:53674 [AgentView] updateUI stopBtn.display=
+plugin:nexus-lm:53682 [AgentView] updateUI statusBarEl.display=flex
+plugin:nexus-lm:53689 [AgentView] updateUI inputEl.disabled=true
+plugin:nexus-lm:53133 [AgentTrace] steps $derived -> 0 steps
+plugin:nexus-lm:53210 [AgentTrace] $effect events=0 isRunning=false traceContainerEl=exists steps=0
+plugin:nexus-lm:53231 [AgentTrace] stepsListEl is null, cannot auto-scroll
+plugin:nexus-lm:53210 [AgentTrace] $effect events=0 isRunning=true traceContainerEl=exists steps=0
+plugin:nexus-lm:53940 [AgentView] runAgentTask START task="Using web viewer using CLI and open the link in obsidian https://www.reddit.com/..."
+plugin:nexus-lm:53950 [AgentView] runAgentTask provider=ollama model=minimax-m3
+plugin:nexus-lm:53968 [AgentView] runAgentTask calling orchestrator.runAgent()
+plugin:nexus-lm:54776 [Orchestrator] runAgent task="Using web viewer using CLI and open the link in obsidian htt..."
+plugin:nexus-lm:54791 [Orchestrator] toolDefs count=9
+plugin:nexus-lm:54797 [Orchestrator] complexity=0 isComplex=false defaultMode=react
+plugin:nexus-lm:54806 [Orchestrator] starting ReAct loop
+plugin:nexus-lm:54985 [Orchestrator] runReActLoop maxSteps=50 initial messages=2
+plugin:nexus-lm:54987 [Orchestrator] ReAct iteration step=0/50 abort=false messages.len=2
+plugin:nexus-lm:54996 [Orchestrator] calling providerCall (iteration 0)
+plugin:nexus-lm:53962 [AgentView] providerCall #1 messages=2
+plugin:nexus-lm:53870 [AgentView] callProvider provider=ollama model=minimax-m3 messages.len=2
+plugin:nexus-lm:53903 [AgentView] callProvider -> Ollama
+2plugin:nexus-lm:53216 [AgentTrace] applyIcons done
+plugin:nexus-lm:53226 [AgentTrace] auto-scroll to bottom, scrollHeight=44
+plugin:nexus-lm:53926 [AgentView] callProvider DONE, response length=275 preview="THOUGHT: The user wants to open a Reddit link in Obsidian's web viewer using the CLI. I'll use the `web` command with th..."
+plugin:nexus-lm:53936 [AgentView] parseToolCalls found 1 tool calls
+plugin:nexus-lm:54998 [Orchestrator] providerCall returned content=275 chars toolCalls=1
+plugin:nexus-lm:55018 [Orchestrator] processing 1 tool calls from content
+plugin:nexus-lm:55072 [Orchestrator] processToolCall tool=cli args={"command":"web url=https://www.reddit.com/r/ollama/comments/1sy485i/sick_of_being_patient_for_ollama_cloud_capacity/ newtab"}
+plugin:nexus-lm:55091 [Orchestrator] executing tool: cli
+plugin:nexus-lm:55093 [Orchestrator] tool result success=false content.len=0
+plugin:nexus-lm:54944 [Orchestrator] addStep #1 status=failed tool=cli thought="The user wants to open a Reddit link in Obsidian's..."
+plugin:nexus-lm:53580 [AgentView] addEvent type=step data= {step: 1, status: 'failed', thought: "The user wants to open a Reddit link in Obsidian's…l use the `web` command with the `url` parameter.", toolName: 'cli'} ts= 1783090855854
+plugin:nexus-lm:53602 [AgentView] addEvent -> state events.length=1, isRunning=true
+plugin:nexus-lm:53662 [AgentView] updateUI isRunning=true events=1 stepCount=1
+plugin:nexus-lm:53666 [AgentView] updateUI sendBtn.display=none
+plugin:nexus-lm:53674 [AgentView] updateUI stopBtn.display=
+plugin:nexus-lm:53682 [AgentView] updateUI statusBarEl.display=flex
+plugin:nexus-lm:53689 [AgentView] updateUI inputEl.disabled=true
+plugin:nexus-lm:53133 [AgentTrace] steps $derived -> 1 steps
+plugin:nexus-lm:53210 [AgentTrace] $effect events=1 isRunning=true traceContainerEl=exists steps=1
+plugin:nexus-lm:54960 [Orchestrator] addStep -> onEvent fired, total steps=1
+plugin:nexus-lm:53580 [AgentView] addEvent type=tool_result data= {toolName: 'cli', success: false} ts= 1783090855870
+plugin:nexus-lm:53602 [AgentView] addEvent -> state events.length=2, isRunning=true
+plugin:nexus-lm:53662 [AgentView] updateUI isRunning=true events=2 stepCount=1
+plugin:nexus-lm:53666 [AgentView] updateUI sendBtn.display=none
+plugin:nexus-lm:53674 [AgentView] updateUI stopBtn.display=
+plugin:nexus-lm:53682 [AgentView] updateUI statusBarEl.display=flex
+plugin:nexus-lm:53689 [AgentView] updateUI inputEl.disabled=true
+plugin:nexus-lm:53133 [AgentTrace] steps $derived -> 1 steps
+plugin:nexus-lm:53210 [AgentTrace] $effect events=2 isRunning=true traceContainerEl=exists steps=1
+plugin:nexus-lm:54987 [Orchestrator] ReAct iteration step=1/50 abort=false messages.len=4
+plugin:nexus-lm:54996 [Orchestrator] calling providerCall (iteration 1)
+plugin:nexus-lm:53962 [AgentView] providerCall #2 messages=4
+plugin:nexus-lm:53870 [AgentView] callProvider provider=ollama model=minimax-m3 messages.len=4
+plugin:nexus-lm:53903 [AgentView] callProvider -> Ollama
+2plugin:nexus-lm:53216 [AgentTrace] applyIcons done
+app.js:1 Received CLI command ['version']
+2plugin:nexus-lm:53226 [AgentTrace] auto-scroll to bottom, scrollHeight=171
+plugin:nexus-lm:53926 [AgentView] callProvider DONE, response length=1512 preview="I'm unable to execute the command because the Obsidian CLI binary is not detected in this environment. The error message..."
+plugin:nexus-lm:53936 [AgentView] parseToolCalls found 0 tool calls
+plugin:nexus-lm:54998 [Orchestrator] providerCall returned content=1512 chars toolCalls=undefined
+plugin:nexus-lm:55009 [Orchestrator] found final_answer tag, returning
+plugin:nexus-lm:54944 [Orchestrator] addStep #2 status=completed tool=none thought="Task complete. Providing final answer...."
+plugin:nexus-lm:53580 [AgentView] addEvent type=step data= {step: 2, status: 'completed', thought: 'Task complete. Providing final answer.', toolName: null} ts= 1783090863993
+plugin:nexus-lm:53602 [AgentView] addEvent -> state events.length=3, isRunning=true
+plugin:nexus-lm:53662 [AgentView] updateUI isRunning=true events=3 stepCount=2
+plugin:nexus-lm:53666 [AgentView] updateUI sendBtn.display=none
+plugin:nexus-lm:53674 [AgentView] updateUI stopBtn.display=
+plugin:nexus-lm:53682 [AgentView] updateUI statusBarEl.display=flex
+plugin:nexus-lm:53689 [AgentView] updateUI inputEl.disabled=true
+plugin:nexus-lm:53133 [AgentTrace] steps $derived -> 2 steps
+plugin:nexus-lm:53210 [AgentTrace] $effect events=3 isRunning=true traceContainerEl=exists steps=2
+plugin:nexus-lm:54960 [Orchestrator] addStep -> onEvent fired, total steps=2
+plugin:nexus-lm:53970 [AgentView] runAgentTask orchestrator returned, result length=400
+plugin:nexus-lm:53580 [AgentView] addEvent type=final_answer data= {answer: 'The Obsidian CLI binary is not detected, so I cann…ternative solution like creating a bookmark note.'} ts= 1783090863999
+plugin:nexus-lm:53602 [AgentView] addEvent -> state events.length=4, isRunning=true
+plugin:nexus-lm:53662 [AgentView] updateUI isRunning=true events=4 stepCount=2
+plugin:nexus-lm:53666 [AgentView] updateUI sendBtn.display=none
+plugin:nexus-lm:53674 [AgentView] updateUI stopBtn.display=
+plugin:nexus-lm:53682 [AgentView] updateUI statusBarEl.display=flex
+plugin:nexus-lm:53689 [AgentView] updateUI inputEl.disabled=true
+plugin:nexus-lm:53133 [AgentTrace] steps $derived -> 2 steps
+plugin:nexus-lm:53156 [AgentTrace] found final_answer
+plugin:nexus-lm:53210 [AgentTrace] $effect events=4 isRunning=true traceContainerEl=exists steps=2
+plugin:nexus-lm:53983 [AgentView] runAgentTask END (total provider calls: 2)
+plugin:nexus-lm:53863 [AgentView] runAgentTask finally block, isRunning=true
+plugin:nexus-lm:53607 [AgentView] setRunning(false), prev=true
+plugin:nexus-lm:53636 [AgentView] stopTimer
+plugin:nexus-lm:53662 [AgentView] updateUI isRunning=false events=4 stepCount=2
+plugin:nexus-lm:53666 [AgentView] updateUI sendBtn.display=
+plugin:nexus-lm:53674 [AgentView] updateUI stopBtn.display=none
+plugin:nexus-lm:53682 [AgentView] updateUI statusBarEl.display=none
+plugin:nexus-lm:53689 [AgentView] updateUI inputEl.disabled=false
+plugin:nexus-lm:53133 [AgentTrace] steps $derived -> 2 steps
+plugin:nexus-lm:53156 [AgentTrace] found final_answer
+plugin:nexus-lm:53210 [AgentTrace] $effect events=4 isRunning=true traceContainerEl=exists steps=2
+plugin:nexus-lm:53210 [AgentTrace] $effect events=4 isRunning=false traceContainerEl=exists steps=2
+4plugin:nexus-lm:53216 [AgentTrace] applyIcons done
+4plugin:nexus-lm:53226 [AgentTrace] auto-scroll to bottom, scrollHeight=194

@@ -8,6 +8,7 @@ import { showConfirm } from './modals/confirmModal';
 import { ParsedFeedEntry } from './parsing/feedParsing';
 import { SavedConceptMap } from './tools/createConceptMaps';
 import { SavedSlideshow } from './tools/createSlides';
+import { detectBinaryPath, clearBinaryCache } from './agent/cliExecutor';
 import type AIPlugin from './main';
 
 // Move Provider type directly into settings.ts
@@ -182,6 +183,15 @@ export interface AISettings {
   customProviders: CustomProviderConfig[]; // New setting for custom providers
   savedConceptMaps: SavedConceptMap[];
   savedSlideshows: SavedSlideshow[];
+  // Agent settings
+  agentMaxSteps: number;
+  agentDefaultMode: 'react' | 'plan-react';
+  agentApprovalMode: 'all' | 'writes-only' | 'never';
+  agentDenyList: string[];
+  agentEnableCLI: boolean;
+  agentEnablePluginDiscovery: boolean;
+  agentEnableMCP: boolean;
+  agentCliBinaryPath: string;
 }
 
 export const DEFAULT_SETTINGS: AISettings = {
@@ -324,6 +334,15 @@ customModels: [
   chatWallpaperHeaderOpacity: 0.2,
   chatWallpaperEnabled: false,
   customProviders: [],
+  // Agent defaults
+  agentMaxSteps: 25,
+  agentDefaultMode: 'react',
+  agentApprovalMode: 'writes-only',
+  agentDenyList: ['.obsidian', '.trash', 'backups'],
+  agentEnableCLI: true,
+  agentEnablePluginDiscovery: false,
+  agentEnableMCP: false,
+  agentCliBinaryPath: '',
 };
 
 export interface CustomEmbeddingModel {
@@ -2316,7 +2335,139 @@ await this.plugin.saveSettings();
       }
     }
 
-    // Code Execution and Canvas (Below MCP)
+    // Agent configuration
+    new Setting(containerEl).setName('Agent').setHeading();
+    containerEl.createEl('p', {
+      text: 'Configure the autonomous AI agent that can read, write, search, and manage your vault.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Max steps')
+      .setDesc('Maximum number of steps the agent can take before stopping (5-100).')
+      .addSlider(slider => slider
+        .setLimits(5, 100, 1)
+        .setValue(this.plugin.settings.agentMaxSteps ?? 25)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.agentMaxSteps = value;
+          await this.plugin.saveSettings();
+          if (this.plugin.agentOrchestrator) {
+            this.plugin.agentOrchestrator.updateConfig({
+              ...this.plugin.settings,
+              maxSteps: value,
+              defaultMode: this.plugin.settings.agentDefaultMode,
+              approvalMode: this.plugin.settings.agentApprovalMode,
+              denyList: this.plugin.settings.agentDenyList,
+              enableCLI: this.plugin.settings.agentEnableCLI,
+              enablePluginDiscovery: this.plugin.settings.agentEnablePluginDiscovery,
+              enableMCP: this.plugin.settings.agentEnableMCP ?? false,
+            });
+          }
+        }));
+
+    new Setting(containerEl)
+      .setName('Default mode')
+      .setDesc('ReAct: simple thought-action loop. Plan+ReAct: create a plan first for complex tasks.')
+      .addDropdown(drop => drop
+        .addOption('react', 'ReAct')
+        .addOption('plan-react', 'Plan + ReAct')
+        .setValue(this.plugin.settings.agentDefaultMode ?? 'react')
+        .onChange(async (value) => {
+          this.plugin.settings.agentDefaultMode = value as 'react' | 'plan-react';
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Approval mode')
+      .setDesc('When the agent should ask for approval before executing tools.')
+      .addDropdown(drop => drop
+        .addOption('all', 'All tools')
+        .addOption('writes-only', 'Write operations only')
+        .addOption('never', 'Never (auto-approve all)')
+        .setValue(this.plugin.settings.agentApprovalMode ?? 'writes-only')
+        .onChange(async (value) => {
+          this.plugin.settings.agentApprovalMode = value as 'all' | 'writes-only' | 'never';
+          await this.plugin.saveSettings();
+          if (this.plugin.agentSafety) {
+            this.plugin.agentSafety.updateConfig(
+              this.plugin.settings.agentDenyList,
+              value as 'all' | 'writes-only' | 'never'
+            );
+          }
+        }));
+
+    new Setting(containerEl)
+      .setName('Enable CLI tools')
+      .setDesc('Allow the agent to use Obsidian CLI commands (desktop only).')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.agentEnableCLI ?? true)
+        .onChange(async (value) => {
+          this.plugin.settings.agentEnableCLI = value;
+          await this.plugin.saveSettings();
+          new Notice(`Agent CLI tools ${value ? 'enabled' : 'disabled'}. Restart to apply.`);
+        }));
+
+    const cliPathSetting = new Setting(containerEl)
+      .setName('CLI binary path')
+      .setDesc('Custom path to the obsidian CLI binary (e.g. C:\\Program Files\\Obsidian\\Obsidian.com). Leave empty for auto-detection.')
+      .addText(text => text
+        .setPlaceholder('Auto-detect (recommended)')
+        .setValue(this.plugin.settings.agentCliBinaryPath ?? '')
+        .onChange(async (value) => {
+          this.plugin.settings.agentCliBinaryPath = value;
+          await this.plugin.saveSettings();
+        }));
+
+    cliPathSetting.addButton(btn => {
+      btn.setButtonText('Detect')
+        .setTooltip('Automatically locate the Obsidian CLI binary on your system')
+        .onClick(async () => {
+          clearBinaryCache();
+          const path = await detectBinaryPath();
+          if (path) {
+            this.plugin.settings.agentCliBinaryPath = path;
+            await this.plugin.saveSettings();
+            this.display();
+            new Notice(`CLI binary found at: ${path}`);
+          } else {
+            new Notice('CLI binary not found. Try setting the path manually.');
+          }
+        });
+    });
+
+    new Setting(containerEl)
+      .setName('Enable plugin discovery')
+      .setDesc('Allow the agent to discover and interact with other Obsidian plugins.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.agentEnablePluginDiscovery ?? false)
+        .onChange(async (value) => {
+          this.plugin.settings.agentEnablePluginDiscovery = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Enable MCP tools')
+      .setDesc('Allow the agent to use MCP (Model Context Protocol) tools from connected servers.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.agentEnableMCP ?? false)
+        .onChange(async (value) => {
+          this.plugin.settings.agentEnableMCP = value;
+          await this.plugin.saveSettings();
+          new Notice(`Agent MCP tools ${value ? 'enabled' : 'disabled'}. Restart to apply.`);
+        }));
+
+    new Setting(containerEl)
+      .setName('Deny list')
+      .setDesc('Comma-separated paths the agent is not allowed to modify.')
+      .addText(text => text
+        .setValue((this.plugin.settings.agentDenyList ?? ['.obsidian', '.trash', 'backups']).join(', '))
+        .onChange(async (value) => {
+          this.plugin.settings.agentDenyList = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
+          await this.plugin.saveSettings();
+        }));
+
+    // Code Execution and Canvas (Below MCP and Agent)
     new Setting(containerEl).setName('Code execution and canvas').setHeading();
     containerEl.createEl('p', {
       text: 'Control how code blocks in AI responses are executed. Supported languages: JavaScript, TypeScript, HTML, CSS, Python.',

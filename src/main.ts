@@ -24,6 +24,15 @@ import { UnifiedProviderManager } from './services/unifiedProviderManager';
 import { OpenCodeProvider } from './services/openCodeService';
 import { CustomOpenAIProvider } from './services/customOpenAIProvider';
 import { openEditSelectionModal } from './editSelection';
+import { AgentView, VIEW_TYPE_AGENT } from './views/agentView';
+import { ToolRegistry } from './agent/toolRegistry';
+import { SafetyLayer } from './agent/safetyLayer';
+import { AgentOrchestrator } from './agent/agentOrchestrator';
+import { AgentMemory } from './agent/agentMemory';
+import { createVaultNativeTools } from './agent/agentTools';
+import { createCLITools } from './agent/cliTools';
+import type { AgentConfig, AgentEvent } from './agent/types';
+import { registerMCPTools } from './agent/mcpToolBridge';
 
 
 
@@ -38,6 +47,10 @@ export default class AIPlugin extends Plugin {
     public verifyingProviders: Set<Provider> = new Set();
     public verifyingEmbeddingProviders: Set<Provider> = new Set();
     private currentViewMode: string = 'landing';
+    public agentRegistry!: ToolRegistry;
+    public agentSafety!: SafetyLayer;
+    public agentOrchestrator!: AgentOrchestrator;
+    public agentMemory!: AgentMemory;
 
     async onload() {
         await this.loadSettings();
@@ -84,6 +97,62 @@ export default class AIPlugin extends Plugin {
         this.notebookManager = new NotebookManager(this.app);
 
         
+        this.agentMemory = new AgentMemory(this.app);
+        void this.agentMemory.initialize();
+
+        this.agentRegistry = new ToolRegistry();
+        this.agentRegistry.registerBatch(createVaultNativeTools());
+
+        
+        this.agentRegistry.registerBatch(
+          createCLITools(this.settings.agentEnableCLI ?? false)
+        );
+
+        this.agentSafety = new SafetyLayer(
+          this.app,
+          this.settings.agentDenyList ?? ['.obsidian', '.trash', 'backups'],
+          this.settings.agentApprovalMode ?? 'writes-only'
+        );
+
+        const agentConfig: AgentConfig = {
+          maxSteps: this.settings.agentMaxSteps ?? 25,
+          defaultMode: this.settings.agentDefaultMode ?? 'react',
+          approvalMode: this.settings.agentApprovalMode ?? 'writes-only',
+          denyList: this.settings.agentDenyList ?? ['.obsidian', '.trash', 'backups'],
+          enableCLI: this.settings.agentEnableCLI ?? true,
+          enablePluginDiscovery: this.settings.agentEnablePluginDiscovery ?? false,
+          enableMCP: this.settings.agentEnableMCP ?? false,
+        };
+
+        if (this.mcpService && (this.settings.agentEnableMCP ?? false)) {
+          registerMCPTools(this.agentRegistry, this.mcpService);
+        }
+
+        this.agentOrchestrator = new AgentOrchestrator(
+          this.agentRegistry,
+          this.agentSafety,
+          {
+            app: this.app,
+            settings: { ...this.settings, ...agentConfig },
+            searchVaultBM25: (query: string, limit: number) =>
+              this.searchVaultBM25Only(query, limit).then(r => r.results),
+            onEvent: (event: AgentEvent) => {
+              const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_AGENT);
+              for (const leaf of leaves) {
+                const view = leaf.view;
+                if (view instanceof AgentView) {
+                  view.addEvent(event);
+                }
+              }
+              return;
+            },
+            getActiveFile: () => this.app.workspace.getActiveFile(),
+            getSetting: (key: string) => (this.settings as unknown as Record<string, unknown>)[key],
+          },
+          agentConfig
+        );
+
+        
         
         this.app.workspace.onLayoutReady(() => {
             
@@ -96,13 +165,20 @@ export default class AIPlugin extends Plugin {
 
             
             if (this.settings.mcpEnabled && this.settings.mcpServers && (this.settings.mcpAutoConnect ?? true)) {
-                this.settings.mcpServers
+                const connectPromises = this.settings.mcpServers
                     .filter(server => !server.disabled)
-                    .forEach(server => {
+                    .map(server =>
                         this.mcpService.connectServer(server).catch(err => {
                                                         new Notice(`Failed to connect to MCP server ${server.name}`);
-                        });
+                        })
+                    );
+                if (connectPromises.length > 0) {
+                    Promise.all(connectPromises).finally(() => {
+                        if (this.settings.agentEnableMCP) {
+                            this.refreshAgentMCPTools();
+                        }
                     });
+                }
             }
 
             
@@ -190,6 +266,12 @@ export default class AIPlugin extends Plugin {
         );
 
         
+        this.registerView(
+            VIEW_TYPE_AGENT,
+            (leaf) => new AgentView(leaf, this)
+        );
+
+        
         this.addRibbonIcon('loader-pinwheel', 'Open Nexus-LM', async () => {
             await this.activateView('landing');
         });
@@ -203,7 +285,16 @@ export default class AIPlugin extends Plugin {
                 await this.activateView('landing');
             }
         });
+        
+        this.addCommand({
+            id: 'open-agent',
+            name: 'Open Agent',
+            callback: async () => {
+                await this.activateView('agent');
+            }
+        });
 
+        
         this.addCommand({
             id: 'open-ai-chat',
             name: 'Open Nexus Chat',
@@ -455,7 +546,7 @@ export default class AIPlugin extends Plugin {
         return this.embeddingsManager.findSimilarContentBM25Only(query, limit);
     }
 
-    async activateView(mode: 'landing' | 'tutor' | 'chat' | 'feed' | 'feed-entries' | 'combined-feed' | 'bookmarks', subMode?: 'qa' | 'mcq', data?: unknown): Promise<void> {
+    async activateView(mode: 'landing' | 'tutor' | 'chat' | 'feed' | 'feed-entries' | 'combined-feed' | 'bookmarks' | 'agent', subMode?: 'qa' | 'mcq', data?: unknown): Promise<void> {
         this.currentViewMode = mode;
         let viewType: string;
         let state: Record<string, unknown> = {};
@@ -501,6 +592,9 @@ export default class AIPlugin extends Plugin {
                 break;
             case 'bookmarks':
                 viewType = VIEW_TYPE_BOOKMARKS;
+                break;
+            case 'agent':
+                viewType = VIEW_TYPE_AGENT;
                 break;
             default:
                                 return;
@@ -1111,6 +1205,16 @@ export default class AIPlugin extends Plugin {
             }
             this.verifyingEmbeddingProviders.delete(provider);
             if (onComplete) onComplete();
+        }
+    }
+
+    refreshAgentMCPTools(): void {
+        if (this.agentRegistry && this.mcpService) {
+            const mcpTools = this.agentRegistry.getAll('mcp');
+            for (const tool of mcpTools) {
+                this.agentRegistry.removeTool(tool.definition.name);
+            }
+            registerMCPTools(this.agentRegistry, this.mcpService);
         }
     }
 }
