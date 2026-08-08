@@ -5,6 +5,7 @@ export interface AIChatSessionMeta {
   name: string;
   createdAt: number;
   updatedAt: number;
+  sessionType?: 'chat' | 'agent';
   matchCount?: number; // Number of messages matching search query
 }
 
@@ -13,6 +14,7 @@ export interface AIChatSession {
   name: string;
   createdAt: number;
   updatedAt: number;
+  sessionType?: 'chat' | 'agent';
   systemInstructions?: string; // Custom system instructions for this session
   messages: { 
     question: string; 
@@ -27,6 +29,8 @@ export interface AIChatSession {
     webResults?: Record<string, unknown>[];
     quickSearchResults?: Record<string, unknown>[];
     modelName?: string;
+    modelProvider?: string;
+    completedAt?: number;
     totalTokens?: number;
     responseTimeMs?: number;
     mcpTools?: Record<string, unknown>[];
@@ -41,7 +45,16 @@ export interface AIChatSession {
     fileOperations?: unknown[];
     // File action data for persistence
     fileActionData?: Record<string, unknown>;
+    // Unified Episodic memory & summary fields
+    summary?: string;
+    keywords?: string[];
+    lessons?: string[];
+    importance?: number;
+    stepsCount?: number;
+    success?: boolean;
+    artifacts?: string[];
   }[];
+  scratchpad?: string;
 }
 
 export class AIChatSessionManager {
@@ -54,6 +67,18 @@ export class AIChatSessionManager {
 
   private getSessionFile(sessionId: string): string {
     return normalizePath(`${this.baseDir}/${sessionId}.json`);
+  }
+
+  pruneOlderTurnTraces(session: AIChatSession): void {
+    if (!session.messages || session.messages.length <= 1) return;
+    // Keep Turn N-1 (the immediate last turn) 100% intact, and preserve execution traces while ensuring metadata, summary & lessons.
+    for (let i = 0; i < session.messages.length - 1; i++) {
+      const msg = session.messages[i];
+      if (!msg.summary && msg.question) {
+        const cleanQ = msg.question.replace(/\n+/g, ' ').replace(/^(New task:\s*)+/i, '').trim();
+        msg.summary = cleanQ.length > 150 ? cleanQ.substring(0, 147) + '...' : cleanQ;
+      }
+    }
   }
 
   async listSessions(): Promise<AIChatSessionMeta[]> {
@@ -84,10 +109,22 @@ export class AIChatSessionManager {
     }
   }
 
-  async listSessionsLazy(limit: number = 20, offset: number = 0, searchQuery: string = ''): Promise<{ sessions: AIChatSessionMeta[], total: number }> {
+  async listSessionsLazy(limit: number = 20, offset: number = 0, searchQuery: string = '', sessionType?: 'chat' | 'agent'): Promise<{ sessions: AIChatSessionMeta[], total: number }> {
     try {
       const files = await this.app.vault.adapter.list(this.baseDir);
-      const sessionFiles = (files.files || []).filter(f => f.endsWith('.json'));
+      let sessionFiles = (files.files || []).filter(f => f.endsWith('.json'));
+      if (sessionType) {
+        const matches = await Promise.all(sessionFiles.map(async path => {
+          try {
+            const session = JSON.parse(await this.app.vault.adapter.read(path)) as AIChatSession;
+            const inferredType = session.sessionType ?? (session.messages?.some(message => message.isAgentResponse) ? 'agent' : 'chat');
+            return inferredType === sessionType;
+          } catch {
+            return false;
+          }
+        }));
+        sessionFiles = sessionFiles.filter((_, index) => matches[index]);
+      }
       
       // Sort by file modification time (most recent first) without reading all files
       const fileStats = await Promise.all(
@@ -110,12 +147,14 @@ export class AIChatSessionManager {
             let matchFound = false;
             let matchCount = 0;
             
+            let sType: 'chat' | 'agent' = 'chat';
             try {
               const json = await this.app.vault.adapter.read(f);
               const session = JSON.parse(json) as AIChatSession;
               name = session.name || id;
               createdAt = session.createdAt || createdAt;
               updatedAt = session.updatedAt || updatedAt;
+              sType = session.sessionType ?? (session.messages?.some(msg => (msg as any).isAgentResponse) ? 'agent' : 'chat');
               
               // Search in session name, ID, and all message content
               const query = searchQuery.toLowerCase();
@@ -150,7 +189,7 @@ export class AIChatSessionManager {
             }
             
             // Only return sessions that match the search
-            return matchFound ? { id, name, createdAt, updatedAt, matchCount } : null;
+            return matchFound ? { id, name, createdAt, updatedAt, sessionType: sType, matchCount } : null;
           })
         );
         
@@ -170,15 +209,17 @@ export class AIChatSessionManager {
             let name = id;
             let createdAt = Date.now();
             let updatedAt = Date.now();
+            let sType: 'chat' | 'agent' = 'chat';
             try {
               const json = await this.app.vault.adapter.read(f);
               const session = JSON.parse(json) as AIChatSession;
               name = session.name || id;
               createdAt = session.createdAt || createdAt;
               updatedAt = session.updatedAt || updatedAt;
+              sType = session.sessionType ?? (session.messages?.some(msg => (msg as any).isAgentResponse) ? 'agent' : 'chat');
             } catch { // Intentionally ignored
             }
-            return { id, name, createdAt, updatedAt };
+            return { id, name, createdAt, updatedAt, sessionType: sType };
           })
         );
         
@@ -209,6 +250,7 @@ export class AIChatSessionManager {
       if (!dirExists) {
         await this.app.vault.adapter.mkdir(dir);
       }
+      this.pruneOlderTurnTraces(session);
       session.updatedAt = Date.now();
       await this.app.vault.adapter.write(file, JSON.stringify(session, null, 2));
     } catch (e) {
@@ -242,4 +284,4 @@ export class AIChatSessionManager {
       new Notice(`Failed to delete AI chat session: ${errorMessage}`);
     }
   }
-} 
+}

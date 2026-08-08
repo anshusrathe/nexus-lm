@@ -14,7 +14,7 @@ export default {
     sourcemap: true,
     inlineDynamicImports: true
   },
-  external: ['obsidian', 'child_process', 'fs'],
+  external: ['obsidian', 'child_process', 'fs', 'http', 'https'],
   plugins: [
     webWorkerLoader({
       targetPlatform: 'browser',
@@ -37,7 +37,13 @@ export default {
     }),
     svelte({
       emitCss: false,
-      preprocess: sveltePreprocess(),
+      preprocess: sveltePreprocess({
+        typescript: {
+          compilerOptions: {
+            verbatimModuleSyntax: true,
+          },
+        },
+      }),
       compilerOptions: {
         compatibility: {
           componentApi: 4

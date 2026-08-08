@@ -469,6 +469,8 @@ export class ModelSelector {
         return this.validateOllamaBaseUrl(this.settings.ollamaBaseUrl);
       case 'nvidia':
         return validateNvidiaApiKey(this.settings.nvidiaApiKey);
+      case 'lmstudio':
+        return this.validateLmStudioBaseUrl(this.settings.lmStudioBaseUrl);
       default:
         // Check if it's a custom provider
         if (this.settings.customProviders && this.settings.customProviders.some(p => p.id === provider)) {
@@ -524,6 +526,18 @@ export class ModelSelector {
     try {
       const parsedUrl = new URL(url);
       return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+    } catch {      return false;
+    }
+  }
+
+  /**
+   * Validates LM Studio base URL
+   */
+  private validateLmStudioBaseUrl(url: string): boolean {
+    if (!url) return false;
+    try {
+      const parsedUrl = new URL(url);
+      return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
     } catch {
       return false;
     }
@@ -544,6 +558,8 @@ export class ModelSelector {
         return '• OpenCode Zen: Add your API key in Settings → AI Assistant → Basic Settings';
       case 'ollama':
         return '• Ollama: Configure base URL in Settings → AI Assistant → Basic Settings (default: http://localhost:11434)';
+      case 'lmstudio':
+        return '• LM Studio: Start the local server (LM Studio → Developer → Start Server) and configure the server URL in Settings → AI Assistant → Basic Settings (default: http://localhost:1234)';
       default:
         return `• ${provider}: Configure in Settings → AI Assistant → Basic Settings`;
     }

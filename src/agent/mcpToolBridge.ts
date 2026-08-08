@@ -50,7 +50,8 @@ function buildMCPToolHandler(
 
 export function registerMCPTools(
   registry: { registerBatch: (handlers: ToolHandler[]) => void; getAll: (category?: ToolCategory) => ToolHandler[] },
-  mcpService: MCPService
+  mcpService: MCPService,
+  enabledMCPIds?: string[]
 ): void {
   const connectedServers = mcpService.getConnectedServers() as Array<{ id: string; name: string }>;
   const existingMCP = new Set(
@@ -59,6 +60,9 @@ export function registerMCPTools(
 
   const newHandlers: ToolHandler[] = [];
   for (const server of connectedServers) {
+    if (enabledMCPIds !== undefined && !enabledMCPIds.includes(server.id)) {
+      continue;
+    }
     const serverTools = mcpService.getServerTools(server.id) as Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }>;
     for (const tool of serverTools) {
       const prefixed = `${sanitizeServerName(server.name)}__${tool.name}`;

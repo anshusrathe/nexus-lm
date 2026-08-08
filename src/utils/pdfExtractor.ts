@@ -2,16 +2,19 @@
 
 import { TFile, Vault, Notice, Platform, App, Modal, ButtonComponent } from 'obsidian';
 import { DirectorySuggester } from './directorySuggester';
-import type { PdfjsLib, PdfDocumentProxy, PdfTextItem, PdfOutlineItem } from '../types/pdf';
+import type { PdfDocumentProxy, PdfTextItem, PdfOutlineItem } from '../types/pdf';
+import * as pdfjsLib from 'pdfjs-dist';
 
-// Assuming pdfjsLib is available globally or imported correctly via build process
-// You might need to import it like this if your build process supports it:
-// import * as pdfjsLib from 'pdfjs-dist';
-// And set the worker source:
-// pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/<version>/pdf.worker.min.js`;
-// Or bundle the worker with your plugin's assets and set the path accordingly.
-// For this code snippet, we'll assume pdfjsLib is accessible,
-// likely attached to the global window object by your build setup if bundled correctly.
+export function getPdfjsLib(): typeof pdfjsLib {
+  const lib = (window as { pdfjsLib?: typeof pdfjsLib }).pdfjsLib || pdfjsLib;
+  if (!lib.GlobalWorkerOptions.workerSrc) {
+    lib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${lib.version || '5.1.91'}/build/pdf.worker.min.mjs`;
+  }
+  if (!(window as { pdfjsLib?: typeof pdfjsLib }).pdfjsLib) {
+    (window as { pdfjsLib?: typeof pdfjsLib }).pdfjsLib = lib;
+  }
+  return lib;
+}
 
 /**
  * Extracts text content from a PDF file using PDF.js.
@@ -29,21 +32,10 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
     // Read the PDF file as an ArrayBuffer using Obsidian's API
     const arrayBuffer = await vault.readBinary(file);
 
-    // Load the PDF document using pdfjsLib (assuming it's accessible, e.g., on window)
-    const pdfjsLib = (window as { pdfjsLib?: PdfjsLib }).pdfjsLib; // Access from global scope if bundled this way
+    // Load the PDF document using PDF.js
+    const pdfjs = getPdfjsLib();
 
-    if (!pdfjsLib) {
-        throw new Error("PDF.js library not loaded. Ensure pdfjs-dist is installed and bundled correctly.");
-    }
-
-    // Set the worker source if not already set globally (Highly recommended for performance)
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-                  // As a temporary measure for development, you could use a CDN, but bundling is recommended for distribution:
-         // pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-         // Note: Using a CDN in a released plugin requires careful consideration.
-    }
-
-    const pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pdfDocument = await pdfjs.getDocument({ data: arrayBuffer }).promise;
 
     let fullText = '';
     const numPages = pdfDocument.numPages;
@@ -65,7 +57,9 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
       const textContent = await page.getTextContent();
 
       // Filter out empty strings if they don't have a meaningful position/width
-      const items = textContent.items.filter((item: PdfTextItem) => item.str.trim().length > 0 || item.width > 0);
+      const items = (textContent.items as any[]).filter((item: any): item is PdfTextItem => 
+        typeof item === 'object' && item !== null && 'str' in item && typeof item.str === 'string' && (item.str.trim().length > 0 || item.width > 0)
+      );
 
       if (items.length === 0) {
           if (i < end) fullText += '\n\n---\n\n'; // Add separator even for empty pages
@@ -225,7 +219,7 @@ export class PdfExtractOptionsModal extends Modal {
   private directory: string;
   private errorEl: HTMLElement | null = null;
   private dirSuggester: DirectorySuggester | null = null;
-  private pdfDocument: PdfDocumentProxy;
+  private pdfDocument: any;
   private previewCanvas: HTMLCanvasElement | null = null;
   private previewContainer: HTMLElement | null = null;
   private currentPreviewPage: number = 1;
@@ -236,7 +230,7 @@ export class PdfExtractOptionsModal extends Modal {
   private fromInput: HTMLInputElement | null = null;
   private toInput: HTMLInputElement | null = null;
 
-  constructor(app: App, numPages: number, defaultDir: string, pdfDocument: PdfDocumentProxy, onSubmit: (opts: { from: number, to: number, full: boolean, directory: string }) => void) {
+  constructor(app: App, numPages: number, defaultDir: string, pdfDocument: any, onSubmit: (opts: { from: number, to: number, full: boolean, directory: string }) => void) {
     super(app);
     this.numPages = numPages;
     this.onSubmit = onSubmit;

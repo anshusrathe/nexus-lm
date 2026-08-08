@@ -292,3 +292,65 @@ export function applyMultiEdit(content: string, edits: MultiEditOp[]): MultiEdit
 
   return { success: true, result: workingContent, steps };
 }
+
+/**
+ * Compute a line-level diff between original and modified content using LCS.
+ * Preserves line ordering and produces an interleaved diff with added/removed lines.
+ */
+export function computeLineDiff(
+  origLines: string[],
+  modLines: string[]
+): { additions: number; removals: number; diffLines: Array<{ type: 'added' | 'removed'; content: string }> } {
+  // Build LCS table
+  const m = origLines.length;
+  const n = modLines.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (origLines[i - 1] === modLines[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  // Backtrack to find diff
+  const diffLines: Array<{ type: 'added' | 'removed'; content: string }> = [];
+  let i = m, j = n;
+  const temp: Array<{ type: 'added' | 'removed'; content: string }> = [];
+
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && origLines[i - 1] === modLines[j - 1]) {
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      temp.push({ type: 'added' as const, content: modLines[j - 1] });
+      j--;
+    } else {
+      temp.push({ type: 'removed' as const, content: origLines[i - 1] });
+      i--;
+    }
+  }
+
+  // Reverse to get chronological order
+  for (let k = temp.length - 1; k >= 0; k--) {
+    diffLines.push(temp[k]);
+  }
+
+  // Collapse adjacent same-type lines
+  const collapsed: Array<{ type: 'added' | 'removed'; content: string }> = [];
+  for (const line of diffLines) {
+    if (collapsed.length > 0 && collapsed[collapsed.length - 1].type === line.type) {
+      collapsed[collapsed.length - 1].content += '\n' + line.content;
+    } else {
+      collapsed.push({ ...line });
+    }
+  }
+
+  const removals = collapsed.filter(l => l.type === 'removed').length;
+  const additions = collapsed.filter(l => l.type === 'added').length;
+
+  return { additions, removals, diffLines: collapsed };
+}

@@ -21,6 +21,7 @@ import { MCPServerSelectionModal } from '../modals/mcpServerSelectionModal';
 import { MCPToolCallingService } from '../mcp/mcpToolCalling';
 import { executeCode, detectLanguage, isExecutable, isRenderable, wrapInMarkdownFence } from '../tools/codeExecutor';
 import { SaveNoteModal } from '../modals/saveNoteModal';
+import { openSessionHistoryModal } from '../modals/sessionHistoryModal';
 
 interface MCPResourceReadResult {
     contents: Array<{
@@ -78,6 +79,13 @@ interface Response {
     vaultAnswer?: string;
     vaultResults?: Array<{ path: string; score: number }>;
     fileOperations?: unknown[];
+    summary?: string;
+    keywords?: string[];
+    lessons?: string[];
+    importance?: number;
+    stepsCount?: number;
+    success?: boolean;
+    artifacts?: string[];
     
     metadata?: {
         vaultSearchFallback?: {
@@ -949,6 +957,10 @@ export class ResponseView extends ItemView {
     private selectedFiles: Set<string> = new Set();
     private activeSearchModes: Set<string> = new Set();
     private inputContainer!: HTMLElement;
+    private navRailEl: HTMLElement | null = null;
+    private navListEl: HTMLElement | null = null;
+    private navOpenTimer: number | null = null;
+    private jumpBtnEl: HTMLElement | null = null;
     private selectedFilesDisplay!: HTMLElement;
     private plugin: AIPlugin;
     get activeDocument() { return this.containerEl.ownerDocument; }
@@ -978,6 +990,8 @@ export class ResponseView extends ItemView {
     private aiChatSessionManager: AIChatSessionManager;
     private sessionHistoryModal: HTMLElement | null = null;
     private currentSessionId: string | null = null;
+    private currentSessionType: 'chat' | 'agent' | null = null;
+    private currentSessionCreatedAt: number | null = null;
     private renderingRestoredSession: boolean = false; 
     private currentSystemInstructions: string = ''; 
 
@@ -1283,6 +1297,36 @@ export class ResponseView extends ItemView {
 
         
         this.inputContainer = wrapper.createDiv({ cls: 'chat-input-container' });
+
+        const navRail = wrapper.createDiv({ cls: 'agent-nav-rail' });
+        this.navRailEl = navRail;
+        const navBar = navRail.createDiv({ cls: 'agent-nav-rail-bar' });
+        navBar.setAttr('aria-label', 'Session questions navigation');
+        navBar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            navRail.addClass('is-open');
+        });
+        navRail.addEventListener('mouseenter', () => this.setNavOpen(true));
+        navRail.addEventListener('mouseleave', () => this.scheduleNavClose());
+        document.addEventListener('click', (e) => {
+            if (this.navRailEl && !this.navRailEl.contains(e.target as Node)) {
+                this.setNavOpen(false);
+            }
+        });
+        const navPopover = navRail.createDiv({ cls: 'agent-nav-rail-popover' });
+        this.navListEl = navPopover.createDiv({ cls: 'agent-nav-rail-list' });
+
+        const jumpBtn = this.inputContainer.createDiv({ cls: 'agent-jump-bottom-btn' });
+        this.jumpBtnEl = jumpBtn;
+        setIcon(jumpBtn, 'arrow-down');
+        jumpBtn.setAttr('aria-label', 'Scroll to bottom');
+        jumpBtn.setAttr('tabindex', '0');
+        jumpBtn.addEventListener('click', () => {
+            if (this.contentContainer) {
+                this.contentContainer.scrollTo({ top: this.contentContainer.scrollHeight, behavior: 'smooth' });
+            }
+        });
+        this.contentContainer.addEventListener('scroll', () => this.updateJumpButton());
 
         
         if (Platform.isMobile) {
@@ -1746,6 +1790,9 @@ export class ResponseView extends ItemView {
         brainBtn.addClass('nl-cursor-pointer');
         brainBtn.setAttr('aria-label', `${activeProvider === 'gemini' ? 'Gemini' : activeProvider === 'groq' ? 'Groq' : 'Ollama'} thinking controls`);
         brainBtn.setAttr('tabindex', '0');
+        if (isGemini25 || isGemini3 || isGptOss) {
+            brainBtn.addClass('has-dropdown');
+        }
         if (isActive) {
             brainBtn.addClass('has-instructions');
         }
@@ -5527,11 +5574,20 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             actionsContainer.classList.add('liquid-glass-active');
         }
 
+        const getResponseIndex = (): number => {
+            const items = this.contentContainer
+                ? Array.from(this.contentContainer.querySelectorAll('.response-item'))
+                : [];
+            const domIndex = items.indexOf(responseEl);
+            if (domIndex !== -1) return domIndex;
+            return this.responses.findIndex(r => r.question === question);
+        };
+
         const deleteBtn = actionsContainer.createDiv({ cls: 'response-action-btn delete-response' });
         deleteBtn.setAttribute('aria-label', 'Delete response');
         setIcon(deleteBtn, 'trash-2');
         deleteBtn.addEventListener('click', () => {
-            const index = this.responses.findIndex(r => r.question === question);
+            const index = getResponseIndex();
             if (index !== -1) {
                 this.responses.splice(index, 1);
             }
@@ -5539,6 +5595,8 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             new Notice('Response deleted');
             
             this.updateContextBar();
+            this.updateNavRail();
+            this.updateJumpButton();
             
             void this.saveCurrentSession();
         });
@@ -5547,13 +5605,15 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         regenerateBtn.setAttribute('aria-label', 'Regenerate response');
         setIcon(regenerateBtn, 'refresh-cw');
         regenerateBtn.addEventListener('click', () => {
-            const index = this.responses.findIndex(r => r.question === question);
+            const index = getResponseIndex();
             if (index !== -1) {
                 this.responses.splice(index, 1);
             }
             responseEl.remove();
             
             this.updateContextBar();
+            this.updateNavRail();
+            this.updateJumpButton();
 
             this.loadingSpinner.classList.add('visible');
             this.processQuery(question).then(() => {
@@ -5897,6 +5957,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         void this.saveCurrentSession();
+
+        this.updateNavRail();
+        this.updateJumpButton();
 
         return { responseEl, progressEl, newResponse };
     }
@@ -6900,7 +6963,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                             bm25Config.buildProgress = 0;
                         }
 
-                        const allFiles = this.app.vault.getMarkdownFiles();
+                        const allFiles = this.app.vault.getFiles().filter(f => f.extension === 'md' || (!Platform.isMobile && f.extension === 'pdf'));
                         const bm25Count = bm25Config ? bm25Config.fileCount : 0;
                         this.settings.bm25IndexedFiles = allFiles.length > 0
                             ? Math.round((bm25Count / allFiles.length) * 100) : 0;
@@ -7045,7 +7108,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     const docs = loadResponse?.documents || loadResponse?.metadata?.documents || [];
                     for (const doc of docs) {
                         const docPath = String(doc.path || '');
-                        if (docPath && docPath.endsWith('.md')) {
+                        if (docPath && (docPath.endsWith('.md') || (!Platform.isMobile && isBM25 && docPath.endsWith('.pdf')))) {
                             indexedFilePaths.add(docPath);
                         }
                     }
@@ -7054,7 +7117,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             
-            const allFiles = this.app.vault.getMarkdownFiles();
+            const allFiles = isBM25
+                ? this.app.vault.getFiles().filter(f => f.extension === 'md' || (!Platform.isMobile && f.extension === 'pdf'))
+                : this.app.vault.getMarkdownFiles();
             const includedFiles = isBM25
                 ? allFiles
                 : allFiles.filter((file) => !embeddingsManager.isFileExcluded(file.path, indexId));
@@ -7106,8 +7171,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             const session: AIChatSession = {
                 id: this.currentSessionId,
                 name: sessionName,
-                createdAt: now, 
+                createdAt: this.currentSessionCreatedAt ?? now, 
                 updatedAt: now,
+                sessionType: this.currentSessionType ?? 'chat',
                 systemInstructions: this.currentSystemInstructions || undefined, 
                 messages: this.responses.map(r => ({
                     question: r.question,
@@ -7132,7 +7198,20 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     
                     searchMode: r.searchMode,
                     
-                    vaultIndexName: r.vaultIndexName
+                    vaultIndexName: r.vaultIndexName,
+
+                    isAgentResponse: r.isAgentResponse,
+                    agentSteps: r.agentSteps as unknown[] | undefined,
+                    vaultAnswer: r.vaultAnswer,
+                    vaultResults: r.vaultResults as Array<{ path: string; score: number }> | undefined,
+                    fileOperations: r.fileOperations as unknown[] | undefined,
+                    summary: r.summary,
+                    keywords: r.keywords,
+                    lessons: r.lessons,
+                    importance: r.importance,
+                    stepsCount: r.stepsCount,
+                    success: r.success,
+                    artifacts: r.artifacts
                 }))
             };
 
@@ -7183,6 +7262,8 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         this.responses = [];
         this.currentSessionId = null;
+        this.currentSessionType = 'chat';
+        this.currentSessionCreatedAt = null;
         this.currentSystemInstructions = ''; 
 
         
@@ -7215,6 +7296,67 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             setIcon(btn, 'wrench');
         }
+
+        this.updateNavRail();
+        this.updateJumpButton();
+    }
+
+    private setNavOpen(open: boolean): void {
+        if (this.navOpenTimer !== null) {
+            window.clearTimeout(this.navOpenTimer);
+            this.navOpenTimer = null;
+        }
+        this.navRailEl?.toggleClass('is-open', open);
+    }
+
+    private scheduleNavClose(): void {
+        if (this.navOpenTimer !== null) {
+            window.clearTimeout(this.navOpenTimer);
+        }
+        this.navOpenTimer = window.setTimeout(() => this.setNavOpen(false), 220);
+    }
+
+    private truncateQuery(text: string): string {
+        const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
+        if (!cleaned) return '';
+        const words = cleaned.split(' ');
+        const trimmed = words.slice(0, 5).join(' ');
+        const truncated = trimmed.length > 34 ? trimmed.slice(0, 34).replace(/\s+\S*$/, '') : trimmed;
+        const shortened = truncated.length < cleaned.length ? `${truncated.replace(/[.,;:]+$/, '')}…` : truncated;
+        return shortened || cleaned.slice(0, 34) + '…';
+    }
+
+    private updateNavRail(): void {
+        if (!this.navRailEl || !this.navListEl || !this.contentContainer) return;
+        const listEl = this.navListEl;
+        listEl.empty();
+        const items = Array.from(this.contentContainer.querySelectorAll('.response-item'));
+        this.navRailEl.toggleClass('is-hidden', items.length === 0);
+        items.forEach((el, index) => {
+            const question = this.responses[index]?.question ?? '';
+            if (!question.trim()) return;
+            const row = listEl.createDiv({ cls: 'agent-nav-rail-item' });
+            const dot = row.createDiv({ cls: 'agent-nav-rail-item-dot' });
+            if (index === items.length - 1 && el.querySelector('.response-progress-text')) {
+                dot.setAttr('data-running', 'true');
+            }
+            const labelEl = row.createDiv({ cls: 'agent-nav-rail-item-text' });
+            labelEl.setText(this.truncateQuery(question));
+            labelEl.setAttr('title', question);
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                this.setNavOpen(false);
+            });
+        });
+    }
+
+    private updateJumpButton(): void {
+        const btn = this.jumpBtnEl;
+        const container = this.contentContainer;
+        if (!btn || !container) return;
+        const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 80;
+        btn.toggleClass('is-visible', this.responses.length > 0 && !atBottom && container.scrollHeight > container.clientHeight);
     }
 
     private createQuestionActions(questionEl: HTMLElement, question: string) {
@@ -8446,204 +8588,17 @@ const availableServers = (this.settings.mcpServers || []).filter((s) => !s.disab
     }
 
     private async openSessionHistoryModal() {
-        if (this.sessionHistoryModal) {
-            this.sessionHistoryModal.remove();
-            this.sessionHistoryModal = null;
-        }
-        const modal = this.activeDocument.createElement('div');
-        modal.className = 'ai-chat-session-history-modal';
-        
-        modal.createDiv({ cls: 'modal-bg' });
-        const modalContent = modal.createDiv({ cls: 'modal-content' });
-        const modalHeader = modalContent.createDiv({ cls: 'modal-header' });
-        modalHeader.createEl('h3', { text: 'AI Chat Sessions' });
-        const closeBtn = modalHeader.createEl('button', { cls: 'close-btn', attr: { title: 'Close' } });
-        setIcon(closeBtn, 'x');
-
-        const searchContainer = modalContent.createDiv({ cls: 'session-search-container' });
-        const searchInput = searchContainer.createEl('input', { 
-            type: 'text', 
-            cls: 'session-search-input', 
-            placeholder: 'Search sessions by name or message content...' 
+        this.sessionHistoryModal = openSessionHistoryModal({
+            app: this.app,
+            aiChatSessionManager: this.aiChatSessionManager,
+            activeViewType: 'chat',
+            onLoadChatSession: async (id) => {
+                await this.loadAIChatSession(id);
+            },
+            onLoadAgentSession: async (id) => {
+                await this.loadAIChatSession(id);
+            },
         });
-        searchContainer.createSpan({ cls: 'search-icon', text: '🔍' });
-
-        const sessionList = modalContent.createDiv({ cls: 'session-list' });
-        const paginationDiv = modalContent.createDiv({ cls: 'session-pagination nl-display-none' });
-        const prevBtn = paginationDiv.createEl('button', { cls: 'prev-page-btn', text: 'Previous' });
-        const pageInfo = paginationDiv.createSpan({ cls: 'page-info' });
-        const nextBtn = paginationDiv.createEl('button', { cls: 'next-page-btn', text: 'Next' });
-
-        this.activeDocument.body.appendChild(modal);
-        this.sessionHistoryModal = modal;
-
-        closeBtn.addEventListener('click', () => {
-            modal.remove();
-            this.sessionHistoryModal = null;
-        });
-
-        let currentPage = 0;
-        const pageSize = 20;
-        let totalSessions = 0;
-        let currentSearchQuery = '';
-        let searchTimeout: number | null = null;
-
-        const loadPage = async (page: number, searchQuery: string = '') => {
-            sessionList.empty();
-            sessionList.createDiv({ cls: 'loading-sessions', text: 'Searching...' });
-            const offset = page * pageSize;
-            const { sessions, total } = await this.aiChatSessionManager.listSessionsLazy(pageSize, offset, searchQuery);
-            totalSessions = total;
-
-            sessionList.empty();
-            if (sessions.length === 0) {
-                if (searchQuery) {
-                    const noSessions = sessionList.createDiv({ cls: 'no-sessions-message' });
-                    noSessions.appendText(`No sessions found matching "${searchQuery}"`);
-                    noSessions.createEl('br');
-                    noSessions.createEl('small', { text: 'Searched in session names and all message content' });
-                } else if (page === 0) {
-                    sessionList.createDiv({ cls: 'no-sessions-message', text: 'No sessions yet.' });
-                }
-                paginationDiv.addClass('nl-display-none');
-            } else {
-                
-                const fragment = this.activeDocument.createDocumentFragment();
-                sessions.forEach(meta => {
-                    const card = this.activeDocument.createElement('div');
-                    card.className = 'session-card';
-
-                    const sessionInfo = card.createDiv({ cls: 'session-info' });
-                    const nameSpan = sessionInfo.createSpan({ cls: 'session-name' });
-
-                    
-                    if (searchQuery) {
-                        const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                        const parts = meta.name.split(regex);
-                        parts.forEach(part => {
-                            if (part.toLowerCase() === searchQuery.toLowerCase()) {
-                                nameSpan.createEl('mark', { text: part });
-                            } else {
-                                nameSpan.appendText(part);
-                            }
-                        });
-                    } else {
-                        nameSpan.textContent = meta.name;
-                    }
-
-                    
-                    if (searchQuery && meta.matchCount !== undefined) {
-                        if (meta.matchCount === -1) {
-                            const matchIndicator = sessionInfo.createSpan({ 
-                                cls: 'match-indicator name-match', 
-                                text: '📝 Name match' 
-                            });
-                            matchIndicator.setAttr('title', 'Match found in session name');
-                        } else if (meta.matchCount > 0) {
-                            const plural = meta.matchCount === 1 ? 'message' : 'messages';
-                            const matchIndicator = sessionInfo.createSpan({ 
-                                cls: 'match-indicator content-match', 
-                                text: `💬 ${meta.matchCount} ${plural}` 
-                            });
-                            matchIndicator.setAttr('title', `${meta.matchCount} ${plural} contain your search term`);
-                        }
-                    }
-
-                    card.createSpan({ 
-                        cls: 'session-date', 
-                        text: new Date(meta.updatedAt).toLocaleString() 
-                    });
-
-                    card.addEventListener('click', () => {
-                        this.loadAIChatSession(meta.id).then(() => {
-                            modal.remove();
-                            this.sessionHistoryModal = null;
-                        }).catch(console.error);
-                    });
-                    const deleteBtn = this.activeDocument.createElement('button');
-                    deleteBtn.className = 'delete-session-btn';
-                    setIcon(deleteBtn, 'trash-2');
-                    deleteBtn.title = 'Delete session';
-                    deleteBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        this.aiChatSessionManager.deleteSession(meta.id).then(() => {
-                            card.remove();
-                            totalSessions--;
-                            updatePagination();
-                            
-                            if (sessionList.querySelectorAll('.session-card').length === 0 && currentPage > 0) {
-                                currentPage--;
-                                return loadPage(currentPage, currentSearchQuery);
-                            }
-                        }).catch(console.error);
-                    });
-                    card.appendChild(deleteBtn);
-                    fragment.appendChild(card);
-                });
-                sessionList.appendChild(fragment);
-
-                
-                if (totalSessions > pageSize) {
-                    paginationDiv.addClass('nl-display-flex');
-                    updatePagination();
-                } else {
-                    paginationDiv.addClass('nl-display-none');
-                }
-            }
-        };
-
-        const updatePagination = () => {
-            const totalPages = Math.ceil(totalSessions / pageSize);
-            const searchSuffix = currentSearchQuery ? ' (filtered)' : '';
-            pageInfo.textContent = `Page ${currentPage + 1} of ${totalPages} (${totalSessions} sessions${searchSuffix})`;
-            prevBtn.disabled = currentPage === 0;
-            nextBtn.disabled = currentPage >= totalPages - 1;
-        };
-
-        
-        searchInput.addEventListener('input', () => {
-            if (searchTimeout) {
-                window.clearTimeout(searchTimeout);
-            }
-
-            searchTimeout = window.setTimeout(() => {
-                currentSearchQuery = searchInput.value.trim();
-                currentPage = 0; 
-                loadPage(currentPage, currentSearchQuery).catch(console.error);
-            }, 300); 
-        });
-
-        
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && searchInput.value) {
-                e.stopPropagation();
-                searchInput.value = '';
-                currentSearchQuery = '';
-                currentPage = 0;
-                void loadPage(currentPage, currentSearchQuery);
-            }
-        });
-
-        prevBtn.addEventListener('click', () => {
-            if (currentPage > 0) {
-                currentPage--;
-                loadPage(currentPage, currentSearchQuery).catch(console.error);
-            }
-        });
-
-        nextBtn.addEventListener('click', () => {
-            const totalPages = Math.ceil(totalSessions / pageSize);
-            if (currentPage < totalPages - 1) {
-                currentPage++;
-                loadPage(currentPage, currentSearchQuery).catch(console.error);
-            }
-        });
-
-        
-        await loadPage(0);
-
-        
-        searchInput.focus();
     }
 
     private openSystemInstructionsModal() {
@@ -8685,7 +8640,16 @@ const availableServers = (this.settings.mcpServers || []).filter((s) => !s.disab
     }
 
     private async loadAIChatSession(sessionId: string) {
-        
+        // Cross-view guardrail: block if the session is open in an Agent view
+        const agentLeaves = this.app.workspace.getLeavesOfType('NEXUS_LM_AGENT');
+        for (const leaf of agentLeaves) {
+            const view = leaf.view as { currentSessionId?: string | null } | null;
+            if (view?.currentSessionId === sessionId) {
+                new Notice('This session is already open in the Agent view.');
+                return;
+            }
+        }
+
         const existingLeaf = this.findLeafWithSession(sessionId);
         if (existingLeaf && existingLeaf !== this.leaf) {
             
@@ -8728,10 +8692,20 @@ const availableServers = (this.settings.mcpServers || []).filter((s) => !s.disab
 
                 searchMode: m.searchMode as Response['searchMode'],
 
-                vaultIndexName: m.vaultIndexName
+                vaultIndexName: m.vaultIndexName,
+
+                summary: m.summary,
+                keywords: m.keywords,
+                lessons: m.lessons,
+                importance: m.importance,
+                stepsCount: m.stepsCount,
+                success: m.success,
+                artifacts: m.artifacts
             }});
 
             this.currentSessionId = sessionId;
+            this.currentSessionType = session.sessionType ?? (session.messages?.some(m => m.isAgentResponse) ? 'agent' : 'chat');
+            this.currentSessionCreatedAt = session.createdAt || Date.now();
 
             
             this.updateContextBar();
@@ -8774,6 +8748,8 @@ const availableServers = (this.settings.mcpServers || []).filter((s) => !s.disab
                     this.renderRestoredResponse(r);
                 });
                 this.renderingRestoredSession = false;
+                this.updateNavRail();
+                this.updateJumpButton();
             }
         } else {
             // No action needed for this case
@@ -10580,6 +10556,8 @@ ${jsonContent}
 
         
         void this.saveCurrentSession();
+        this.updateNavRail();
+        this.updateJumpButton();
     }
 
     /**
@@ -11052,7 +11030,7 @@ ${jsonContent}
  * - Mermaid/Markdown/Dataview: live preview via Obsidian's MarkdownRenderer
  * - JSON: formatted, syntax-highlighted view
  */
-class CodeCanvasModal extends Modal {
+export class CodeCanvasModal extends Modal {
     private code: string;
     private language: string;
     private onSave?: (newCode: string) => void;

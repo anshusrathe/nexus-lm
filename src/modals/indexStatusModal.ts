@@ -1,4 +1,4 @@
-import { App, Modal, setIcon } from 'obsidian';
+import { App, Modal, setIcon, Platform } from 'obsidian';
 import { AISettings } from '../settings';
 import { EmbeddingsManager } from '../managers/embeddingsManager';
 
@@ -135,7 +135,9 @@ export class IndexStatusModal extends Modal {
     }
 
     private async loadAndRender(config: IndexConfig, type: 'embedding' | 'bm25') {
-        const allVaultFiles = this.app.vault.getMarkdownFiles();
+        const allVaultFiles = type === 'bm25'
+            ? this.app.vault.getFiles().filter(f => f.extension === 'md' || (!Platform.isMobile && f.extension === 'pdf'))
+            : this.app.vault.getMarkdownFiles();
 
         // Non-excluded files for this index
         const includedFiles = allVaultFiles.filter(

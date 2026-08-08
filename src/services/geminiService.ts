@@ -5,7 +5,7 @@
  * rate limit header tracking across all providers.
  */
 
-import { GoogleGenerativeAI, GenerativeModel, ChatSession, GenerationConfig, Content } from '@google/generative-ai';
+import { GoogleGenerativeAI, GenerativeModel, ChatSession, GenerationConfig, Content, Part } from '@google/generative-ai';
 import { requestUrl } from 'obsidian';
 
 interface OpenAIMessage {
@@ -147,7 +147,8 @@ export class GeminiService {
     model: string,
     prompt: string,
     generationConfig?: Record<string, unknown>,
-    abortSignal?: AbortSignal
+    abortSignal?: AbortSignal,
+    onFinish?: (finishReason: string) => void
   ): Promise<string> {
     const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
     const { response, headers } = await this.makeDirectApiCall(model, contents, generationConfig, undefined, abortSignal);
@@ -156,8 +157,32 @@ export class GeminiService {
     if (this.onHeadersReceived) {
       this.onHeadersReceived(headers);
     }
+
+    const finishReason = response.candidates?.[0]?.finishReason;
+    if (finishReason && onFinish) onFinish(finishReason);
     
     return (response.candidates?.[0]?.content?.parts?.[0]?.text as string) || '';
+  }
+
+  async generateContentStream(
+    model: string,
+    prompt: string,
+    generationConfig: GeminiGenerationOptions | undefined,
+    onChunk: (chunk: string) => void
+  ): Promise<string> {
+    const modelInstance = this.genAI.getGenerativeModel({
+      model,
+      generationConfig: generationConfig as GenerationConfig,
+    });
+    const result = await modelInstance.generateContentStream(prompt, { signal: generationConfig?.abortSignal });
+    let content = '';
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      if (!text) continue;
+      content += text;
+      onChunk(text);
+    }
+    return content;
   }
   
   /**
@@ -356,6 +381,59 @@ export class GeminiService {
   }
 
   /**
+   * Single-round native tool calling: one request, returns function calls without executing them.
+   * The caller owns the tool execution loop.
+   */
+  async generateContentWithToolsOnce(
+    model: string,
+    messages: OpenAIMessage[],
+    tools: OpenAITool[],
+    options: GeminiGenerationOptions
+  ): Promise<{ content: string; finishReason?: string; toolCalls?: Array<Record<string, unknown>>; thinking?: string }> {
+    if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+    const geminiTools = this.convertToolsToGeminiFormat(tools);
+    const { systemInstruction, contents } = this.convertMessagesToGeminiContents(messages);
+
+    const modelInstance = this.genAI.getGenerativeModel({
+      model,
+      systemInstruction: systemInstruction ? { text: systemInstruction } : undefined,
+      tools: geminiTools.length > 0 ? geminiTools : undefined
+    });
+
+    const result = await modelInstance.generateContent({
+      contents,
+      generationConfig: {
+        temperature: options.temperature ?? 0.7,
+        topK: options.topK ?? 40,
+        topP: options.topP ?? 0.95,
+        maxOutputTokens: options.maxOutputTokens ?? 8192,
+        ...(options.thinkingConfig ? { thinkingConfig: options.thinkingConfig } : {})
+      }
+    }, { signal: options.abortSignal });
+
+    const response = result.response;
+    const candidate = response.candidates?.[0];
+    if (!candidate) return { content: '' };
+
+    const parts = candidate.content?.parts ?? [];
+    const functionCalls = parts.filter((part) => (part as unknown as Record<string, unknown>).functionCall);
+    const textPart = parts.find((part) => (part as unknown as Record<string, unknown>).text && (part as unknown as Record<string, unknown>).thought !== true);
+    const thinking = parts
+      .filter((part) => (part as unknown as Record<string, unknown>).thought === true)
+      .map((part) => String((part as unknown as Record<string, unknown>).text ?? ''))
+      .filter((t) => t.length > 0)
+      .join('\n');
+
+    return {
+      content: (textPart as unknown as Record<string, unknown>)?.text ? String((textPart as unknown as Record<string, unknown>).text) : '',
+      finishReason: candidate.finishReason ? candidate.finishReason.toLowerCase() : undefined,
+      toolCalls: functionCalls.length > 0 ? functionCalls as unknown as Array<Record<string, unknown>> : undefined,
+      thinking: thinking.length > 0 ? thinking : undefined,
+    };
+  }
+
+  /**
    * Convert OpenAI-style messages to Gemini generateContent format.
    * Returns systemInstruction and a contents array ready for generateContent().
    * This handles injected tool history (assistant+tool pairs) correctly by
@@ -368,11 +446,37 @@ export class GeminiService {
     let systemInstruction: string | null = null;
     const contents: Content[] = [];
 
+    // Gemini 3.x validates thought signatures per "step". Parallel function calls
+    // returned in ONE response form ONE step: the API attaches a thought_signature
+    // only to the FIRST functionCall part of that step. Splitting parallel calls
+    // into separate model/functionCall turns would make each one a new step whose
+    // first functionCall requires its own signature — causing 400 errors. So we
+    // rebuild each assistant tool_calls message as ONE model content with N parts,
+    // followed by ONE user content with N functionResponse parts.
+    let pendingToolResponses = 0;
+    const pendingResponseParts: Array<Record<string, unknown>> = [];
+
+    const flushPendingToolResponses = () => {
+      if (pendingResponseParts.length > 0) {
+        contents.push({
+          role: 'user',
+          parts: [...pendingResponseParts] as unknown as Part[]
+        });
+        pendingResponseParts.length = 0;
+        pendingToolResponses = 0;
+      }
+    };
+
     for (const msg of messages) {
       if (msg.role === 'system') {
-        systemInstruction = msg.content ?? null;
+        // Multiple system messages (policy, memory, tool rules, context) must all
+        // be preserved — join them instead of letting the last one win.
+        systemInstruction = systemInstruction
+          ? `${systemInstruction}\n\n${msg.content ?? ''}`
+          : (msg.content ?? null);
 
       } else if (msg.role === 'user') {
+        flushPendingToolResponses();
         // Plain user text message
         contents.push({
           role: 'user',
@@ -381,26 +485,39 @@ export class GeminiService {
 
       } else if (msg.role === 'assistant' || msg.role === 'model') {
         if (msg.tool_calls && msg.tool_calls.length > 0) {
-          // Each tool_call becomes its own model/functionCall turn so that
-          // the following user/functionResponse turn pairs correctly with it
-          for (const tc of msg.tool_calls) {
-            contents.push({
-              role: 'model',
-              parts: [{
-                functionCall: {
-                  name: tc.function?.name || tc.name || 'unknown',
-                  args: (() => {
-                    try {
-                      return typeof tc.function?.arguments === 'string'
-                        ? JSON.parse(tc.function.arguments) as Record<string, unknown>
-                        : (tc.function?.arguments || {});
-                    } catch { return {}; }
-                  })()
-                }
-              }]
-            });
-          }
+          flushPendingToolResponses();
+          // One model content with N functionCall parts (one step).
+          const parts = msg.tool_calls.map((tc) => {
+            const fn = (tc.function ?? {}) as Record<string, unknown>;
+            const functionCall: Record<string, unknown> = {
+              name: tc.function?.name || tc.name || 'unknown',
+              args: (() => {
+                try {
+                  return typeof tc.function?.arguments === 'string'
+                    ? JSON.parse(tc.function.arguments) as Record<string, unknown>
+                    : (tc.function?.arguments || {});
+                } catch { return {}; }
+              })()
+            };
+            // Gemini 3.x requires the thought_signature to be echoed back on the
+            // PART that carries the functionCall (part-level field, not inside
+            // functionCall). Missing signatures on the current turn's first
+            // functionCall part cause 400s; the post-pass below injects the
+            // documented sentinel when the real signature is unavailable.
+            const thoughtSignature = fn.thought_signature ?? fn.thoughtSignature;
+            const part: Record<string, unknown> = { functionCall };
+            if (typeof thoughtSignature === 'string' && thoughtSignature.length > 0) {
+              part.thoughtSignature = thoughtSignature;
+            }
+            return part;
+          });
+          contents.push({
+            role: 'model',
+            parts: parts as unknown as Part[]
+          });
+          pendingToolResponses = msg.tool_calls.length;
         } else if (msg.content) {
+          flushPendingToolResponses();
           contents.push({
             role: 'model',
             parts: [{ text: msg.content }]
@@ -408,21 +525,72 @@ export class GeminiService {
         }
 
       } else if (msg.role === 'tool') {
-        // Tool result — must be a user turn with functionResponse part,
-        // immediately following the model/functionCall turn
-        contents.push({
-          role: 'user',
-          parts: [{
+        // Tool result — user/functionResponse part, grouped with the other
+        // results of the same response into one user content.
+        if (pendingToolResponses === 0) {
+          // No pending assistant tool_calls turn (e.g. history cut by context
+          // compaction). A functionResponse part with no preceding functionCall
+          // would 400 — degrade to a plain user text part instead.
+          contents.push({
+            role: 'user',
+            parts: [{ text: `Tool result: ${msg.content || ''}` }]
+          });
+        } else {
+          pendingResponseParts.push({
             functionResponse: {
               name: msg.name || 'tool',
               response: { content: msg.content || '' }
             }
-          }]
-        });
+          });
+          if (pendingResponseParts.length >= pendingToolResponses) {
+            flushPendingToolResponses();
+          }
+        }
       }
     }
+    flushPendingToolResponses();
 
-    return { systemInstruction, contents };
+    return { systemInstruction, contents: this.ensureActiveLoopThoughtSignatures(contents) };
+  }
+
+  /**
+   * Gemini 3.x strictly validates thought signatures on the first functionCall
+   * part of every model step in the CURRENT turn (the turn starts at the most
+   * recent user message that is not a functionResponse). History from older
+   * rounds or sessions often lacks the real signature, which produces
+   * 400 errors like "Function call ... is missing a thought_signature".
+   * Mirror gemini-cli's ensureActiveLoopHasThoughtSignatures(): for each model
+   * content inside the active loop, ensure the first functionCall part carries
+   * a signature — the real one if present, otherwise the documented
+   * "skip_thought_signature_validator" sentinel.
+   */
+  private ensureActiveLoopThoughtSignatures(contents: Content[]): Content[] {
+    let activeLoopStartIndex = -1;
+    for (let i = contents.length - 1; i >= 0; i--) {
+      const content = contents[i];
+      if (content.role === 'user' && content.parts?.some((p) => (p as unknown as Record<string, unknown>).text)) {
+        activeLoopStartIndex = i;
+        break;
+      }
+    }
+    if (activeLoopStartIndex === -1) return contents;
+
+    const newContents = contents.slice();
+    for (let i = activeLoopStartIndex; i < newContents.length; i++) {
+      const content = newContents[i];
+      if (content.role !== 'model' || !content.parts) continue;
+      const newParts = content.parts.slice();
+      for (let j = 0; j < newParts.length; j++) {
+        const part = newParts[j] as unknown as Record<string, unknown>;
+        if (!part.functionCall) continue;
+        if (!part.thoughtSignature) {
+          newParts[j] = { ...part, thoughtSignature: 'skip_thought_signature_validator' } as unknown as Part;
+          newContents[i] = { ...content, parts: newParts };
+        }
+        break;
+      }
+    }
+    return newContents;
   }
   
   /**

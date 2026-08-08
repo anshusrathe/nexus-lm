@@ -75,6 +75,15 @@ export class LandingView extends ItemView {
             () => void this.plugin.activateView('chat')
         );
 
+        // Nexus Agent Card
+        this.createFeatureCard(
+            cardsGrid,
+            'Nexus-Agent',
+            'bot',
+            '#8b5cf6',
+            () => void this.plugin.activateView('agent')
+        );
+
         // Your Feed Card
         if (PLATFORM_FEATURES.RSS_FEEDS) {
             this.createFeatureCard(

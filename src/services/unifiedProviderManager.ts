@@ -20,6 +20,7 @@ export interface UnifiedResponse {
         completionTokens: number;
         totalTokens: number;
     };
+    finishReason?: string;
 }
 
 export abstract class BaseProvider {
@@ -49,6 +50,13 @@ export abstract class BaseProvider {
         executeToolsCallback?: (toolCalls: Record<string, unknown>[]) => Promise<Array<Record<string, unknown>>>,
         onThinking?: (text: string) => void
     ): Promise<{ content: string; totalTokens?: number }>;
+
+    generateContentWithToolsOnce?(
+        modelId: string,
+        messages: UnifiedMessage[],
+        tools: Record<string, unknown>[],
+        options?: UnifiedGenerationOptions & { toolChoice?: string }
+    ): Promise<{ content: string; finishReason?: string; toolCalls?: Array<Record<string, unknown>>; thinking?: string }>;
 }
 
 export class UnifiedProviderManager {

@@ -189,6 +189,7 @@ interface SSEChoiceDelta {
     choices?: Array<{
         delta?: { content?: string; reasoning?: string; reasoning_content?: string };
         message?: { content?: string; role?: string; tool_calls?: unknown[] };
+        finish_reason?: string;
     }>;
 }
 
@@ -202,6 +203,7 @@ interface StreamingResponseData {
     choices?: Array<{
         delta?: { content?: string; reasoning?: string; reasoning_content?: string };
         message?: { content?: string; role?: string; tool_calls?: unknown[] };
+        finish_reason?: string;
     }>;
     done?: boolean;
 }

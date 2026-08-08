@@ -6,7 +6,7 @@
  */
 
 import { requestUrl } from 'obsidian';
-import { simulatedStream, fetchStream, createSSEParser } from '../utils/streamingUtils';
+import { simulatedStream, fetchStream, createSSEParser, PartialStreamError } from '../utils/streamingUtils';
 
 export type GroqContentPart = 
   | { type: 'text'; text: string }
@@ -364,7 +364,8 @@ export class GroqService {
   async generateContent(
     model: string,
     messages: ChatMessage[],
-    options?: GenerationOptions
+    options?: GenerationOptions,
+    onFinish?: (finishReason: string) => void
   ): Promise<string> {
     const body: GroqChatCompletionRequest = {
       model,
@@ -405,6 +406,8 @@ export class GroqService {
     }
 
     const data = response.json as GroqChatCompletionResponse;
+    const finishReason = data.choices?.[0]?.finish_reason;
+    if (finishReason && onFinish) onFinish(finishReason);
     return data.choices?.[0]?.message?.content || '';
   }
 
@@ -420,7 +423,8 @@ export class GroqService {
     model: string,
     messages: ChatMessage[],
     options: GenerationOptions | undefined,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    onFinish?: (finishReason: string) => void
   ): Promise<string> {
     const body: GroqChatCompletionRequest = {
       model,
@@ -443,7 +447,7 @@ export class GroqService {
 
     const parser = createSSEParser();
     let fullContent = '';
-    const callbacks = { onChunk: (text: string) => { fullContent += text; onChunk(text); } };
+    const callbacks = { onChunk: (text: string) => { fullContent += text; onChunk(text); }, onFinish };
 
     
     try {
@@ -457,6 +461,7 @@ export class GroqService {
       );
       return fullContent;
     } catch (error) {
+      if (error instanceof PartialStreamError) throw error;
       if (error instanceof GroqApiError) throw error;
           }
 
@@ -478,6 +483,7 @@ export class GroqService {
       }
       return fullContent;
     } catch (error) {
+      if (error instanceof PartialStreamError) throw error;
       if (error instanceof GroqApiError) throw error;
       throw new GroqApiError(
         `Streaming failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -504,7 +510,8 @@ export class GroqService {
     model: string,
     messages: ChatMessage[],
     onEvent: (evt: GroqStreamEvent) => void,
-    options?: GenerationOptions
+    options?: GenerationOptions,
+    onFinish?: (finishReason: string) => void
   ): Promise<void> {
     const isGptOss = model.toLowerCase().includes('gpt-oss');
     const useThinking = isGptOss && options?.thinkingLevel;
@@ -515,7 +522,7 @@ export class GroqService {
     };
 
     if (useThinking) {
-      await this.generateContentWithThinking(model, messages, onEvent, options, headers);
+      await this.generateContentWithThinking(model, messages, onEvent, options, headers, onFinish);
       return;
     }
 
@@ -536,7 +543,8 @@ export class GroqService {
     const parser = createSSEParser();
     const callbacks = {
       onChunk: (text: string) => onEvent({ type: 'content', text }),
-      onThinking: (text: string) => onEvent({ type: 'thinking', text })
+      onThinking: (text: string) => onEvent({ type: 'thinking', text }),
+      onFinish: onFinish
     };
 
     
@@ -551,6 +559,7 @@ export class GroqService {
       );
       return;
     } catch (error) {
+      if (error instanceof PartialStreamError) throw error;
       if (error instanceof GroqApiError) throw error;
           }
 
@@ -585,7 +594,8 @@ export class GroqService {
     messages: ChatMessage[],
     onEvent: (evt: GroqStreamEvent) => void,
     options: GenerationOptions | undefined,
-    headers: Record<string, string>
+    headers: Record<string, string>,
+    onFinish?: (finishReason: string) => void
   ): Promise<void> {
     const body: GroqChatCompletionRequest = {
       model,
@@ -623,6 +633,8 @@ export class GroqService {
       if (reasoning) onEvent({ type: 'thinking', text: reasoning });
       const content = message?.content || '';
       if (content) onEvent({ type: 'content', text: content });
+      const finishReason = data.choices?.[0]?.finish_reason;
+      if (finishReason && onFinish) onFinish(finishReason);
       return;
     } catch (error) {
       if (error instanceof GroqApiError) throw error;
@@ -649,6 +661,8 @@ export class GroqService {
       if (reasoning) onEvent({ type: 'thinking', text: reasoning });
       const content = message?.content || '';
       if (content) onEvent({ type: 'content', text: content });
+      const finishReason = data.choices?.[0]?.finish_reason;
+      if (finishReason && onFinish) onFinish(finishReason);
     } catch (error) {
       if (error instanceof GroqApiError) throw error;
       throw new GroqApiError(
@@ -1128,5 +1142,60 @@ export class GroqService {
     }
 
     return { content: fullContent, totalTokens };
+  }
+
+  /**
+   * Single-round native tool calling: one request, returns tool calls without executing them.
+   * The caller owns the tool execution loop.
+   */
+  async generateContentWithToolsOnce(
+    model: string,
+    messages: ChatMessage[],
+    tools: Array<Record<string, unknown>>,
+    options: GenerationOptions
+  ): Promise<{ content: string; finishReason?: string; toolCalls?: Array<Record<string, unknown>>; thinking?: string }> {
+    if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+    const response = await requestUrl({
+      url: `${this.baseUrl}/chat/completions`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        tools,
+        tool_choice: options.toolChoice ?? 'auto',
+        temperature: options.temperature ?? 0.7,
+        ...(options.maxTokens !== undefined ? { max_tokens: options.maxTokens } : {}),
+        top_p: options.topP ?? 1,
+        stream: false
+      }),
+      throw: false
+    });
+
+    if (response.status >= 400) {
+      const errorData = response.json as { error?: { message?: string; type?: string } };
+      throw new GroqApiError(
+        errorData.error?.message || 'Groq API request failed',
+        response.status,
+        'groq_api_error'
+      );
+    }
+
+    const data = response.json as GroqChatCompletionResponse;
+    const message = data.choices?.[0]?.message as unknown as Record<string, unknown> | undefined;
+    if (!message) return { content: '' };
+
+    return {
+      content: typeof message.content === 'string' ? message.content : '',
+      finishReason: data.choices?.[0]?.finish_reason,
+      toolCalls: (message.tool_calls as Array<Record<string, unknown>> | undefined) ?? undefined,
+      thinking: typeof message.reasoning_content === 'string' && (message.reasoning_content as string).length > 0
+        ? (message.reasoning_content as string)
+        : undefined,
+    };
   }
 }

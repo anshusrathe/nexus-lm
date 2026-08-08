@@ -1,12 +1,15 @@
-import { App, TFile, Notice } from 'obsidian';
+import { App, TFile, Notice, Platform } from 'obsidian';
 import { AISettings } from '../settings';
 import { OramaWorkerManager } from '../utils/oramaWorkerManager';
+import { extractTextFromPdf } from '../utils/pdfExtractor';
 
 interface NotebookDocumentChunk {
     path: string;
     chunkIndex: number;
     content: string;
     lastModified: number;
+    lineStart?: number;
+    lineEnd?: number;
     metadata: {
         title?: string;
         headings?: string;
@@ -131,18 +134,38 @@ export class NotebookBM25Manager {
     /**
      * Split document content into chunks with sentence-aware boundaries
      */
-    private splitIntoChunks(content: string): string[] {
+    private splitIntoChunks(content: string): Array<{ text: string; lineStart: number; lineEnd: number }> {
         if (!content || content.trim().length === 0) {
             return [];
         }
 
-        const chunks: string[] = [];
         const chunkSize = NotebookBM25Manager.CHUNK_SIZE_CHARS;
         const overlap = NotebookBM25Manager.CHUNK_OVERLAP_CHARS;
 
-        if (content.length <= chunkSize) {
-            return [content.trim()];
+        // Pre-compute line start offsets for O(1) line number lookups
+        const lineStartOffsets: number[] = [0];
+        for (let k = 0; k < content.length; k++) {
+            if (content[k] === '\n') {
+                lineStartOffsets.push(k + 1);
+            }
         }
+        const totalLines = lineStartOffsets.length;
+
+        const getLineNumber = (charOffset: number): number => {
+            let lo = 0, hi = lineStartOffsets.length - 1;
+            while (lo < hi) {
+                const mid = (lo + hi + 1) >> 1;
+                if (lineStartOffsets[mid] <= charOffset) lo = mid;
+                else hi = mid - 1;
+            }
+            return lo + 1;
+        };
+
+        if (content.length <= chunkSize) {
+            return [{ text: content.trim(), lineStart: 1, lineEnd: totalLines }];
+        }
+
+        const chunks: Array<{ text: string; lineStart: number; lineEnd: number }> = [];
 
         let startIndex = 0;
         while (startIndex < content.length) {
@@ -181,7 +204,9 @@ export class NotebookBM25Manager {
 
             const chunk = content.substring(startIndex, endIndex).trim();
             if (chunk.length > 0) {
-                chunks.push(chunk);
+                const lineStart = getLineNumber(startIndex);
+                const lineEnd = getLineNumber(Math.max(startIndex, endIndex - 1));
+                chunks.push({ text: chunk, lineStart, lineEnd });
             }
 
             // Move start with overlap, ensuring we don't get stuck
@@ -428,7 +453,8 @@ export class NotebookBM25Manager {
             // First pass: Calculate total chunks
             for (const path of pathsToIndex) {
                 const file = this.app.vault.getAbstractFileByPath(path);
-                if (!(file instanceof TFile) || file.extension !== 'md') {
+                const isSupported = file instanceof TFile && (file.extension === 'md' || (!Platform.isMobile && file.extension === 'pdf'));
+                if (!isSupported || !(file instanceof TFile)) {
                     continue;
                 }
 
@@ -443,7 +469,7 @@ export class NotebookBM25Manager {
                     continue;
                 }
 
-                const content = await this.app.vault.read(file);
+                const content = file.extension === 'pdf' ? await extractTextFromPdf(file, this.app.vault) : await this.app.vault.read(file);
                 if (!content) continue;
 
                 const estimatedChunks = this.splitIntoChunks(content);
@@ -458,7 +484,8 @@ export class NotebookBM25Manager {
             
             for (const path of pathsToIndex) {
                 const file = this.app.vault.getAbstractFileByPath(path);
-                if (!(file instanceof TFile) || file.extension !== 'md') {
+                const isSupported = file instanceof TFile && (file.extension === 'md' || (!Platform.isMobile && file.extension === 'pdf'));
+                if (!isSupported || !(file instanceof TFile)) {
                     continue;
                 }
 
@@ -479,7 +506,7 @@ export class NotebookBM25Manager {
                 // Yield to event loop between files to prevent UI freeze
                 await new Promise(resolve => window.setTimeout(resolve, 5));
 
-                const content = await this.app.vault.read(file);
+                const content = file.extension === 'pdf' ? await extractTextFromPdf(file, this.app.vault) : await this.app.vault.read(file);
 
                 // Skip empty files - they have no searchable content
                 if (!content || content.trim().length === 0) {
@@ -520,8 +547,10 @@ export class NotebookBM25Manager {
                     const doc: NotebookDocumentChunk = {
                         path,
                         chunkIndex: i,
-                        content: chunk,
+                        content: chunk.text,
                         lastModified: stats.mtime,
+                        lineStart: chunk.lineStart,
+                        lineEnd: chunk.lineEnd,
                         metadata: {
                             isFirstChunk: i === 0,
                             title: file.basename
@@ -560,7 +589,9 @@ export class NotebookBM25Manager {
                             tags: meta.tags || '',
 
                             content: doc.content,
-                            lastModified: doc.lastModified
+                            lastModified: doc.lastModified,
+                            lineStart: doc.lineStart || 0,
+                            lineEnd: doc.lineEnd || 0
                         };
                     });
                     await OramaWorkerManager.getInstance().insertBatch(this.notebookId, oramaDocs);

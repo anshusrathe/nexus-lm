@@ -1,6 +1,8 @@
 node_modules/
 data.json
 .obsidian/
+.opencode/
+planned/
 .DS_Store
 *.js.map
 line_debug.txt

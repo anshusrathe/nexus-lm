@@ -150,7 +150,38 @@ Nexus-LM is highly flexible, supporting both local offline models and industry-l
 | **Ollama (Local/Cloud)**    | ✅   | ✅    | ✅       | ✅         | ✅ (GPT-OSS) | ✅            | ✅ (Transcript) |
 | **NVIDIA NIM**              | ✅   | ✅    | ✅       | ✅         | ❌       | ❌            | ✅ (Transcript) |
 | **OpenCode Zen**            | ✅   | ✅    | ✅       | ❌         | ❌       | ❌            | ✅ (Transcript) |
+| **LM Studio (Local)**       | ✅   | ✅    | ✅       | ✅         | ✅ (Model-dependent) | ❌    | ✅ (Transcript) |
 | **Custom OpenAI-Compatible**| ✅   | ✅    | ✅       | ✅         | ❌       | ❌            | ✅ (Transcript) |
+
+---
+
+## 🔌 LM Studio (Local Server)
+
+Run fully local models on your own hardware. LM Studio is detected as a native provider — no API key required.
+
+### Quick Start
+
+1.  Open **LM Studio** and load (or download) a model in the **My Models** screen.
+2.  Go to **Developer → Start Server** (bottom panel, ▶ button). The address is shown next to the port, e.g. `http://localhost:1234`.
+3.  In Nexus-LM: **Settings → AI Assistant → Basic → AI provider → LM Studio**.
+4.  Click **Test connection** (or "Refresh models" / "Verify models" in the Custom AI models section) to load the model list.
+5.  Select the model in the model picker and chat.
+
+> **URL format**: Enter the address *without* `/v1` (e.g. `http://localhost:1234`). The `/v1` suffix is added automatically; if you already included a path, it is respected as-is.
+
+### Using LM Studio on Another Computer (LAN)
+
+1.  In LM Studio: **Settings → Developer → Enable "Serve on Local Network"**, then restart the server.
+2.  Find the machine's IP (`ipconfig` on Windows), e.g. `192.168.100.6`.
+3.  In Nexus-LM settings, set the server URL to `http://<that-IP>:1234` and click **Test connection**.
+4.  If the test fails: allow LM Studio through **Windows Firewall** (Private networks) and make sure both devices are on the same network.
+
+### Notes
+
+*   **No API key needed** — the token field is optional (only required if you enable "API key required" in LM Studio Settings → Developer).
+*   **JIT loading**: LM Studio loads models on demand, so the *first* request to a cold model can take a while. Verification requests wait up to 45s.
+*   **Embeddings**: models like `nomic-embed-text` are detected by their id and enabled for vault indexing automatically (Embeddings table in settings).
+*   **Tool calling, streaming and vision** work when the loaded model supports them.
 
 ---
 
@@ -159,6 +190,7 @@ Nexus-LM is highly flexible, supporting both local offline models and industry-l
 ### Basic Configuration
 *   **AI Provider**: Toggle your primary provider.
 *   **API Key**: Secure input validation for your provider keys.
+*   **LM Studio server URL**: Address of the local LM Studio server (default `http://localhost:1234`) plus an optional API token; a **Test connection** button fetches the available models.
 *   **Model Discovery**: Plugin tries to fetch the provided models and enable the ones available as per the user API key (Verify Models).
 
 ### Vault Chat Settings

@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting, Notice, Modal, setIcon, TFolder, Platform, requestUrl } from 'obsidian';
+import { SUPPORTED_EXTRACTABLE_EXTENSIONS } from './utils/localFileExtractor';
 import { MCPRegistryModal } from './modals/mcpRegistryModal';
 import { ModelLatencyModal } from './modals/modelLatencyModal';
 import { CustomProviderModal } from './modals/customProviderModal';
@@ -12,7 +13,7 @@ import { detectBinaryPath, clearBinaryCache } from './agent/cliExecutor';
 import type AIPlugin from './main';
 
 // Move Provider type directly into settings.ts
-export type Provider = 'gemini' | 'groq' | 'openrouter' | 'opencode' | 'ollama' | 'nvidia' | (string & {});
+export type Provider = 'gemini' | 'groq' | 'openrouter' | 'opencode' | 'ollama' | 'nvidia' | 'lmstudio' | (string & {});
 
 export interface CustomModel {
   provider: Provider;
@@ -81,6 +82,8 @@ export interface AISettings {
   nvidiaApiKey: string;     // NVIDIA API key
   ollamaBaseUrl: string;    // Ollama base URL (default: http://localhost:11434)
   ollamaMode: 'local' | 'cloud'; // Ollama mode toggle (local or cloud)
+  lmStudioBaseUrl: string;  // LM Studio server URL (default: http://localhost:1234)
+  lmStudioApiToken: string; // LM Studio API token (optional, for authenticated servers)
   provider: Provider;
   model: string;
   // Feature-specific model selections
@@ -118,6 +121,8 @@ export interface AISettings {
     nvidia?: CustomModel[];
     nvidiaEmbeddings?: CustomEmbeddingModel[];
     groq?: CustomModel[];
+    lmstudio?: CustomModel[];
+    lmstudioEmbeddings?: CustomEmbeddingModel[];
     customProviders?: Record<string, CustomModel[]>;
     customProviderEmbeddings?: Record<string, CustomEmbeddingModel[]>;
     lastFetched?: number;
@@ -162,9 +167,11 @@ export interface AISettings {
     buildError?: string;
     excludedFolders?: string[]; // Per-index folder exclusions (embedding only)
     excludedFiles?: string[];   // Per-index file exclusions (embedding only)
+    indexAllFileTypes?: boolean; // Per-index flag: include non-markdown files (embedding only)
   }>;
   selectedEmbeddingIndexId: string | null;
   selectedBM25IndexId: string | null;
+  indexAllFileTypes: boolean; // Flag to allow indexing of non-markdown files
   // Code execution settings
   codeExecutionAutoMode: boolean; // Auto-execute code blocks and auto-fix errors
   // Template settings
@@ -185,13 +192,31 @@ export interface AISettings {
   savedSlideshows: SavedSlideshow[];
   // Agent settings
   agentMaxSteps: number;
-  agentDefaultMode: 'react' | 'plan-react';
   agentApprovalMode: 'all' | 'writes-only' | 'never';
   agentDenyList: string[];
   agentEnableCLI: boolean;
   agentEnablePluginDiscovery: boolean;
   agentEnableMCP: boolean;
+  agentEnabledMCPs?: string[];
   agentCliBinaryPath: string;
+  // Agent skills settings
+  agentSkillsEnabled: boolean;
+  agentEnabledSkills: string[];
+  agentAutoModelChain: boolean;
+  // Agent memory settings
+  agentEpisodicMaxRecords: number;
+  agentEpisodicAutoConsolidate: boolean;
+  agentCompactionInterval: number;
+  agentCompactionMaxMessages: number;
+  agentSubagentMemoryEnabled: boolean;
+  agentSubagentMemoryMaxRecords: number;
+  // Agent web search settings
+  agentWebSearchEnabled: boolean;
+  agentExaApiKey: string;
+  agentWebSearchDefaultResults: number;
+  agentWebSearchMode: 'highlights' | 'text';
+  agentWebSearchCache: boolean;
+  agentWebSearchTokenBudget: 'low' | 'medium' | 'high';
 }
 
 export const DEFAULT_SETTINGS: AISettings = {
@@ -204,6 +229,8 @@ export const DEFAULT_SETTINGS: AISettings = {
   nvidiaApiKey: '',        // NVIDIA API key
   ollamaBaseUrl: 'http://localhost:11434', // Default Ollama base URL
   ollamaMode: 'local',     // Default to local mode
+  lmStudioBaseUrl: 'http://localhost:1234', // Default LM Studio server URL
+  lmStudioApiToken: '',    // LM Studio API token (optional)
   provider: 'gemini',
   model: 'gemini-2.5-flash',
   // Feature-specific model selections (default to main model)
@@ -223,7 +250,7 @@ export const DEFAULT_SETTINGS: AISettings = {
   indexPath: '.Nexus-LM-data/vault-embeddings/embeddings.bin',
   excludedFolders: [],  // Default to empty array
   excludedFiles: [],    // Default to empty array
-  pdfOutputDirectory: '/', // Default value for PDF output directory
+  pdfOutputDirectory: 'PDF-Extracted-Text', // Default value for PDF output directory
   // Default model token limits (per minute input tokens) - Add your models and limits here
   modelTokenLimits: {
     'gemini-2.5-flash': 1000000, // Example limit (check actual API docs)
@@ -319,6 +346,7 @@ customModels: [
   ],
   selectedEmbeddingIndexId: 'default-embedding',
   selectedBM25IndexId: 'default-bm25',
+  indexAllFileTypes: false,
   // Code execution defaults
   codeExecutionAutoMode: false, // Default to manual (user-triggered) mode
   // Template defaults
@@ -336,13 +364,31 @@ customModels: [
   customProviders: [],
   // Agent defaults
   agentMaxSteps: 25,
-  agentDefaultMode: 'react',
   agentApprovalMode: 'writes-only',
   agentDenyList: ['.obsidian', '.trash', 'backups'],
   agentEnableCLI: true,
   agentEnablePluginDiscovery: false,
   agentEnableMCP: false,
+  agentEnabledMCPs: undefined,
   agentCliBinaryPath: '',
+  // Agent skills defaults
+  agentSkillsEnabled: false,
+  agentEnabledSkills: [],
+  agentAutoModelChain: false,
+  // Agent memory defaults
+  agentEpisodicMaxRecords: 500,
+  agentEpisodicAutoConsolidate: true,
+  agentCompactionInterval: 3,
+  agentCompactionMaxMessages: 50,
+  agentSubagentMemoryEnabled: true,
+  agentSubagentMemoryMaxRecords: 50,
+  // Agent web search defaults
+  agentWebSearchEnabled: true,
+  agentExaApiKey: '',
+  agentWebSearchDefaultResults: 5,
+  agentWebSearchMode: 'highlights',
+  agentWebSearchCache: true,
+  agentWebSearchTokenBudget: 'medium',
 };
 
 export interface CustomEmbeddingModel {
@@ -534,6 +580,19 @@ export function getModelsGroupedByProvider(settings: AISettings): ModelMenuGroup
     });
   }
 
+  // LM Studio models group - only user-configured models (no defaults)
+  const lmStudioModels: ModelOption[] = settings.customModels
+    .filter(m => m.provider === 'lmstudio' && m.enabled !== false)
+    .map(m => ({ id: m.id, name: m.name, provider: m.provider, capabilities: m.capabilities }));
+
+  if (lmStudioModels.length > 0) {
+    groups.push({
+      provider: 'lmstudio',
+      label: 'LM Studio',
+      models: lmStudioModels
+    });
+  }
+
   // Add custom providers
   if (settings.customProviders) {
     settings.customProviders.forEach(cp => {
@@ -664,6 +723,10 @@ export function validateApiKey(key: string, provider: Provider): boolean {
   if (provider === 'nvidia') {
     return validateNvidiaApiKey(key);
   }
+  if (provider === 'lmstudio') {
+    // LM Studio does not require an API key by default (optional token only)
+    return true;
+  }
   if (provider === 'gemini') {
     return validateGeminiApiKey(key);
   }
@@ -780,9 +843,70 @@ export function migrateSettings(settings: AISettings): { settings: AISettings; m
   let migrated = false;
   
   // Ensure provider has a valid value (default to 'gemini' for backward compatibility)
-  const validProviders: Provider[] = ['gemini', 'groq', 'openrouter', 'opencode', 'ollama', 'nvidia'];
+  const validProviders: Provider[] = ['gemini', 'groq', 'openrouter', 'opencode', 'ollama', 'nvidia', 'lmstudio'];
   if (!settings.provider || !validProviders.includes(settings.provider)) {
     settings.provider = 'gemini';
+    migrated = true;
+  }
+
+  // Migrate legacy LM Studio / defaultModel schema (pre-2.0 plugin configs that
+  // stored `lmstudio: { enabled, apiKey: <baseUrl> }` and
+  // `defaultModel: { provider, model }`) into the native LM Studio provider.
+  const legacyRecord = settings as unknown as Record<string, unknown>;
+  const legacyLm = legacyRecord['lmstudio'] as { enabled?: boolean; apiKey?: string } | undefined;
+  if (legacyLm && typeof legacyLm === 'object') {
+    const legacyUrl = typeof legacyLm.apiKey === 'string' && legacyLm.apiKey.trim().length > 0
+      ? legacyLm.apiKey.trim().replace(/\/+$/, '')
+      : 'http://localhost:1234';
+    if (legacyUrl !== settings.lmStudioBaseUrl) {
+      settings.lmStudioBaseUrl = legacyUrl;
+      migrated = true;
+    }
+    delete legacyRecord['lmstudio'];
+  }
+
+  const legacyDefault = legacyRecord['defaultModel'] as { provider?: string; model?: string } | undefined;
+  if (legacyDefault && typeof legacyDefault === 'object') {
+    if (typeof legacyDefault.model === 'string' && legacyDefault.model.trim().length > 0) {
+      const legacyModel = legacyDefault.model.trim();
+      if (!settings.model || settings.model === 'gemini-2.5-flash') {
+        settings.model = legacyModel;
+        migrated = true;
+      }
+      if (!settings.aiChatModel || settings.aiChatModel === 'gemini-2.5-flash') {
+        settings.aiChatModel = legacyModel;
+        migrated = true;
+      }
+    }
+    if (legacyDefault.provider === 'lmstudio') {
+      settings.provider = 'lmstudio';
+      settings.aiChatProvider = 'lmstudio';
+      migrated = true;
+    }
+    delete legacyRecord['defaultModel'];
+  }
+
+  // Any stale custom-provider entry for LM Studio is superseded by the native
+  // provider — remove it and reuse its base URL.
+  if (settings.customProviders) {
+    const staleLm = settings.customProviders.find((p: CustomProviderConfig) => p.id === 'lmstudio');
+    if (staleLm) {
+      if (staleLm.baseUrl && staleLm.baseUrl !== settings.lmStudioBaseUrl) {
+        settings.lmStudioBaseUrl = staleLm.baseUrl;
+        migrated = true;
+      }
+      settings.customProviders = settings.customProviders.filter((p: CustomProviderConfig) => p.id !== 'lmstudio');
+      migrated = true;
+    }
+  }
+
+  // Ensure LM Studio settings exist for very old configs
+  if (settings.lmStudioBaseUrl === undefined) {
+    settings.lmStudioBaseUrl = 'http://localhost:1234';
+    migrated = true;
+  }
+  if (settings.lmStudioApiToken === undefined) {
+    settings.lmStudioApiToken = '';
     migrated = true;
   }
   
@@ -1031,6 +1155,9 @@ export class AISettingTab extends PluginSettingTab {
       return true;
     } else if (provider === 'nvidia') {
       return !!this.plugin.settings.nvidiaApiKey && this.plugin.settings.nvidiaApiKey.length > 0;
+    } else if (provider === 'lmstudio') {
+      // LM Studio does not require an API key by default
+      return true;
     } else if (this.plugin.settings.customProviders?.some((p: CustomProviderConfig) => p.id === provider)) {
       const cp = this.plugin.settings.customProviders.find((p: CustomProviderConfig) => p.id === provider);
       return !!cp?.apiKey && cp.apiKey.length > 0;
@@ -1052,6 +1179,7 @@ export class AISettingTab extends PluginSettingTab {
       { id: 'basic', label: 'Basic' },
       { id: 'vault', label: 'Vault chat' },
       { id: 'tools', label: 'Tools' },
+      { id: 'agent', label: 'Agent' },
       { id: 'misc', label: 'Miscellaneous' },
       { id: 'support', label: '\u2764\uFE0F Support' }
     ];
@@ -1082,6 +1210,9 @@ export class AISettingTab extends PluginSettingTab {
       case 'tools':
         this.renderToolsTab(tabContent);
         break;
+      case 'agent':
+        this.renderAgentTab(tabContent);
+        break;
       case 'misc':
         this.renderMiscTab(tabContent);
         break;
@@ -1103,7 +1234,8 @@ export class AISettingTab extends PluginSettingTab {
            .addOption('openrouter', 'OpenRouter')
            .addOption('opencode', 'OpenCode Zen')
            .addOption('ollama', 'Ollama')
-           .addOption('nvidia', 'NVIDIA');
+           .addOption('nvidia', 'NVIDIA')
+           .addOption('lmstudio', 'LM Studio');
         
         // Add custom providers to the dropdown
         if (this.plugin.settings.customProviders) {
@@ -1154,6 +1286,10 @@ export class AISettingTab extends PluginSettingTab {
       apiKeyPlaceholder = 'nvapi-...';
       apiKeyDesc = 'Enter your NVIDIA API key (starts with nvapi-)';
       currentApiKey = this.plugin.settings.nvidiaApiKey;
+    } else if (currentProvider === 'lmstudio') {
+      apiKeyPlaceholder = 'Optional';
+      apiKeyDesc = 'LM Studio does not require an API key. If you enabled "API key required" in LM Studio (Settings > Developer), enter the token here.';
+      currentApiKey = this.plugin.settings.lmStudioApiToken;
     } else if (this.plugin.settings.customProviders?.some((p: CustomProviderConfig) => p.id === currentProvider)) {
       const cp = this.plugin.settings.customProviders.find((p: CustomProviderConfig) => p.id === currentProvider)!;
       apiKeyPlaceholder = 'Enter API key';
@@ -1170,6 +1306,7 @@ export class AISettingTab extends PluginSettingTab {
                                 currentProvider === 'opencode' ? 'OpenCode Zen' :
                                 currentProvider === 'ollama' ? 'Ollama' :
                                 currentProvider === 'nvidia' ? 'NVIDIA' : 
+                                currentProvider === 'lmstudio' ? 'LM Studio' :
                                 (this.plugin.settings.customProviders?.find((p: CustomProviderConfig) => p.id === currentProvider)?.name || 'Google Gemini');
 
     const apiSetting = new Setting(containerEl)
@@ -1191,6 +1328,8 @@ export class AISettingTab extends PluginSettingTab {
                 } else if (this.plugin.settings.provider === 'ollama') {                  this.plugin.settings.ollamaApiKey = val;
                 } else if (this.plugin.settings.provider === 'nvidia') {
                   this.plugin.settings.nvidiaApiKey = val;
+                } else if (this.plugin.settings.provider === 'lmstudio') {
+                  this.plugin.settings.lmStudioApiToken = val;
                 } else if (this.plugin.settings.customProviders?.some((p: CustomProviderConfig) => p.id === this.plugin.settings.provider)) {
                   const cp = this.plugin.settings.customProviders.find((p: CustomProviderConfig) => p.id === this.plugin.settings.provider)!;
                   cp.apiKey = val;
@@ -1204,6 +1343,10 @@ await this.plugin.saveSettings();
 
    // Depopulate models if API key is removed
    const provider = this.plugin.settings.provider;
+
+   // LM Studio does not require an API key — clearing the optional token
+   // must never wipe discovered models or embeddings.
+   if (provider !== 'lmstudio') {
 
    // Initialize modelCache if it doesn't exist
    if (!this.plugin.settings.modelCache) {
@@ -1235,6 +1378,7 @@ await this.plugin.saveSettings();
 
    // Save the cleared models/cache
    await this.plugin.saveSettings();
+   }
  } else {
    new Notice('API key saved successfully');
  }                 // Refresh models from providers when API key is updated
@@ -1265,6 +1409,7 @@ await this.plugin.saveSettings();
     else if (currentProvider === 'opencode') apiKeyUrl = 'https://opencode.ai/zen';
     else if (currentProvider === 'ollama') apiKeyUrl = 'https://ollama.com/settings';
     else if (currentProvider === 'nvidia') apiKeyUrl = 'https://build.nvidia.com/settings/api-keys';
+    else if (currentProvider === 'lmstudio') apiKeyUrl = 'https://lmstudio.ai/docs/local-server';
     else apiKeyUrl = 'https://aistudio.google.com/app/apikey';
 
     // Style the control element to stack items vertically and align to the right
@@ -1277,9 +1422,54 @@ await this.plugin.saveSettings();
     linkContainer.addClass('nl-max-width-200px', 'nl-text-align-right', 'nl-margin-top-4px', 'nl-line-height-12', 'nl-white-space-normal', 'nl-word-break-break-word');
 
     linkContainer.createEl('a', {
-      text: `Get your Free ${providerDisplayName} API key here`,
+      text: currentProvider === 'lmstudio' ? 'Open LM Studio local server guide' : `Get your Free ${providerDisplayName} API key here`,
       href: apiKeyUrl
     });
+
+    // LM Studio server URL and optional token settings (only show for LM Studio provider)
+    if (currentProvider === 'lmstudio') {
+      new Setting(containerEl)
+        .setName('LM Studio server URL')
+        .setDesc('Address of the LM Studio local server. Use "http://localhost:1234" when LM Studio runs on this computer; use "http://<computer-IP>:1234" for another machine on your network (enable "Serve on Local Network" in LM Studio). You do not need to add "/v1" — it is appended automatically.')
+        .addText(text => {
+          text.setPlaceholder('http://localhost:1234')
+            .setValue(this.plugin.settings.lmStudioBaseUrl)
+            .onChange(async val => {
+              this.plugin.settings.lmStudioBaseUrl = val.trim().replace(/\/+$/, '');
+              await this.plugin.saveSettings();
+            });
+        });
+
+      new Setting(containerEl)
+        .setName('Test connection')
+        .setDesc('Fetch the list of models from your LM Studio server and verify the connection.')
+        .addButton(btn => {
+          btn.setButtonText('Test connection')
+            .setCta()
+            .onClick(async () => {
+              btn.setDisabled(true);
+              btn.setButtonText('Testing...');
+              try {
+                const models = await this.plugin.fetchLmStudioModels(this.plugin.settings.lmStudioBaseUrl, this.plugin.settings.lmStudioApiToken);
+                if (models.length > 0) {
+                  new Notice(`Connected to LM Studio — ${models.length} model(s) found. Loading them now...`);
+                  await this.plugin.refreshModelsFromProviders(true);
+                  // Re-render the settings tab so the discovered models appear
+                  // in the table immediately (refresh already saved them).
+                  this.expandedSections.add('lmstudio');
+                  this.display();
+                } else {
+                  new Notice('Connected to LM Studio, but no models were found. Load or download a model first (dropdown in LM Studio\'s main screen).');
+                }
+              } catch (e) {
+                new Notice(`Failed to connect to LM Studio at ${this.plugin.settings.lmStudioBaseUrl}. Check that the local server is running, the URL is correct, and that network access is allowed (Windows Firewall).`);
+              } finally {
+                btn.setDisabled(false);
+                btn.setButtonText('Test connection');
+              }
+            });
+        });
+    }
 
     // Ollama mode toggle and base URL setting (only show for Ollama provider)
     if (currentProvider === 'ollama') {
@@ -1557,6 +1747,38 @@ await this.plugin.saveSettings();
         // Add some horizontal padding to make the plus look better
         btn.buttonEl.addClass('nl-padding-010px');
       });
+    } else if (type === 'bm25') {
+      const descEl = sectionEl.createEl('p', {
+        text: 'Indexing all file types may take longer than usual but allows full file discoverability (PDFs, PPTs, etc.).',
+        cls: 'setting-item-description'
+      });
+      descEl.style.marginBottom = '8px';
+
+      const checkboxContainer = sectionEl.createDiv({ cls: 'nl-display-flex', attr: { style: 'gap: 16px; margin-bottom: 12px; align-items: center;' } });
+      
+      const mdLabel = checkboxContainer.createEl('label', { cls: 'nl-display-flex', attr: { style: 'align-items: center; gap: 4px; cursor: pointer;' } });
+      const mdCheckbox = mdLabel.createEl('input', { type: 'radio', attr: { name: 'index-file-types' } });
+      mdCheckbox.checked = !this.plugin.settings.indexAllFileTypes;
+      mdLabel.createSpan({ text: 'Markdown files only' });
+
+      const allLabel = checkboxContainer.createEl('label', { cls: 'nl-display-flex', attr: { style: 'align-items: center; gap: 4px; cursor: pointer;' } });
+      const allCheckbox = allLabel.createEl('input', { type: 'radio', attr: { name: 'index-file-types' } });
+      allCheckbox.checked = this.plugin.settings.indexAllFileTypes;
+      allLabel.createSpan({ text: 'All file types' });
+
+      mdCheckbox.addEventListener('change', () => {
+        if (mdCheckbox.checked) {
+          this.plugin.settings.indexAllFileTypes = false;
+          this.plugin.saveSettings();
+        }
+      });
+
+      allCheckbox.addEventListener('change', () => {
+        if (allCheckbox.checked) {
+          this.plugin.settings.indexAllFileTypes = true;
+          this.plugin.saveSettings();
+        }
+      });
     }
 
     const indexesOfType = this.plugin.settings.indexConfigurations.filter((i) => i.type === type);
@@ -1638,16 +1860,18 @@ await this.plugin.saveSettings();
       
       // Calculate total files in vault for percentage
       // BM25 indexes everything (no exclusions); embedding respects per-index exclusions
-      const allFiles = this.app.vault.getMarkdownFiles();
+      const allEligibleFiles = (type === 'embedding' && index.indexAllFileTypes && !Platform.isMobile)
+        ? this.app.vault.getFiles().filter(f => SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(f.extension))
+        : this.app.vault.getMarkdownFiles();
       let totalFiles: number;
       if (type === 'bm25') {
         // BM25 indexes the whole vault — no exclusions
-        totalFiles = allFiles.length;
+        totalFiles = allEligibleFiles.length;
       } else {
         // Embedding: use per-index exclusions if set, else global exclusions
         const perIndexExcludedFolders: string[] = index.excludedFolders || [];
         const perIndexExcludedFiles: string[] = index.excludedFiles || [];
-        totalFiles = allFiles.filter(file => {
+        totalFiles = allEligibleFiles.filter(file => {
           const inExcludedFolder = perIndexExcludedFolders.some(folder => {
             // Root sentinel: only match files with no subfolder (no '/' in path)
             if (folder === '') return !file.path.includes('/');
@@ -1881,8 +2105,37 @@ await this.plugin.saveSettings();
 
     let indexName = '';
     let selectedModel = '';
+    let embedAllFileTypes = false;
     const pendingExcludedFolders: string[] = [];
     const pendingExcludedFiles: string[] = [];
+
+    // File type selection (embedding indexes only)
+    if (type === 'embedding') {
+      const descEl = dialogEl.createEl('p', {
+        text: 'Indexing all file types may take longer but allows full file discoverability (PDFs, DOCX, PPTX, etc.).',
+        cls: 'setting-item-description'
+      });
+      descEl.style.marginBottom = '8px';
+
+      const checkboxContainer = dialogEl.createDiv({ cls: 'nl-display-flex', attr: { style: 'gap: 16px; margin-bottom: 12px; align-items: center;' } });
+
+      const mdLabel = checkboxContainer.createEl('label', { cls: 'nl-display-flex', attr: { style: 'align-items: center; gap: 4px; cursor: pointer;' } });
+      const mdRadio = mdLabel.createEl('input', { type: 'radio', attr: { name: 'embed-index-file-types' } });
+      mdRadio.checked = true;
+      mdLabel.createSpan({ text: 'Markdown files only' });
+
+      const allLabel = checkboxContainer.createEl('label', { cls: 'nl-display-flex', attr: { style: 'align-items: center; gap: 4px; cursor: pointer;' } });
+      const allRadio = allLabel.createEl('input', { type: 'radio', attr: { name: 'embed-index-file-types' } });
+      allRadio.checked = false;
+      allLabel.createSpan({ text: 'All file types' });
+
+      mdRadio.addEventListener('change', () => {
+        if (mdRadio.checked) { embedAllFileTypes = false; }
+      });
+      allRadio.addEventListener('change', () => {
+        if (allRadio.checked) { embedAllFileTypes = true; }
+      });
+    }
 
     new Setting(dialogEl)
       .setName('Index name')
@@ -1935,6 +2188,7 @@ await this.plugin.saveSettings();
         lastUpdated: 0,
         excludedFolders: type === 'embedding' ? [...pendingExcludedFolders] : undefined,
         excludedFiles: type === 'embedding' ? [...pendingExcludedFiles] : undefined,
+        indexAllFileTypes: type === 'embedding' ? embedAllFileTypes : undefined,
       };
 
       this.plugin.settings.indexConfigurations.push(newIndex);
@@ -2335,8 +2589,60 @@ await this.plugin.saveSettings();
       }
     }
 
-    // Agent configuration
-    new Setting(containerEl).setName('Agent').setHeading();
+    // Code Execution and Canvas (Below MCP)
+    new Setting(containerEl).setName('Code execution and canvas').setHeading();
+    containerEl.createEl('p', {
+      text: 'Control how code blocks in AI responses are executed. Supported languages: JavaScript, TypeScript, HTML, CSS, Python.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Auto-execute code blocks')
+      .setDesc('When enabled, code blocks are executed automatically and errors are fixed without user interaction. When disabled, a run toggle appears on each code block — you control when to run and when to repair errors.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.codeExecutionAutoMode ?? false)
+        .onChange(async (value) => {
+          this.plugin.settings.codeExecutionAutoMode = value;
+          await this.plugin.saveSettings();
+          new Notice(`Code execution: ${value ? 'auto mode' : 'manual mode'}`);
+        }));
+
+    // Advanced rate limit (Bottom)
+    new Setting(containerEl).setName('Delay limit').setHeading();
+    containerEl.createEl('p', {
+      text: 'Configure delay limiting for MCP queries to prevent API rate limit errors.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Delay Duration')
+      .setDesc('Delay in seconds between API calls for multi-step processes (5-60 seconds). Very low values may cause rate limit errors or poor responses in manual model selection mode. Default: 25 seconds.')      .addSlider(slider => slider
+        .setLimits(5, 60, 1)
+        .setValue(this.plugin.settings.rateLimitSeconds)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.rateLimitSeconds = value;
+          await this.plugin.saveSettings();
+        }));
+  }
+
+  private updateAgentRuntimeConfig(): void {
+    this.plugin.agentOrchestrator?.updateConfig({
+      maxSteps: this.plugin.settings.agentMaxSteps ?? 25,
+      approvalMode: this.plugin.settings.agentApprovalMode ?? 'writes-only',
+      denyList: this.plugin.settings.agentDenyList ?? ['.obsidian', '.trash', 'backups'],
+      enableCLI: this.plugin.settings.agentEnableCLI ?? true,
+      enablePluginDiscovery: this.plugin.settings.agentEnablePluginDiscovery ?? false,
+      enableMCP: this.plugin.settings.agentEnableMCP ?? false,
+      enableSkills: this.plugin.settings.agentSkillsEnabled ?? false,
+      enabledSkills: this.plugin.settings.agentSkillsEnabled ? this.plugin.settings.agentEnabledSkills ?? [] : [],
+      enableAutoModelChain: this.plugin.settings.agentAutoModelChain ?? false,
+      canDelegate: true,
+    });
+  }
+
+  private renderAgentTab(containerEl: HTMLElement): void {
+    new Setting(containerEl).setName('Agent configuration').setHeading();
     containerEl.createEl('p', {
       text: 'Configure the autonomous AI agent that can read, write, search, and manage your vault.',
       cls: 'setting-item-description'
@@ -2356,26 +2662,17 @@ await this.plugin.saveSettings();
             this.plugin.agentOrchestrator.updateConfig({
               ...this.plugin.settings,
               maxSteps: value,
-              defaultMode: this.plugin.settings.agentDefaultMode,
               approvalMode: this.plugin.settings.agentApprovalMode,
               denyList: this.plugin.settings.agentDenyList,
               enableCLI: this.plugin.settings.agentEnableCLI,
               enablePluginDiscovery: this.plugin.settings.agentEnablePluginDiscovery,
               enableMCP: this.plugin.settings.agentEnableMCP ?? false,
+              enableSkills: this.plugin.settings.agentSkillsEnabled ?? false,
+              enabledSkills: this.plugin.settings.agentEnabledSkills ?? [],
+              enableAutoModelChain: this.plugin.settings.agentAutoModelChain ?? false,
+              canDelegate: true,
             });
           }
-        }));
-
-    new Setting(containerEl)
-      .setName('Default mode')
-      .setDesc('ReAct: simple thought-action loop. Plan+ReAct: create a plan first for complex tasks.')
-      .addDropdown(drop => drop
-        .addOption('react', 'ReAct')
-        .addOption('plan-react', 'Plan + ReAct')
-        .setValue(this.plugin.settings.agentDefaultMode ?? 'react')
-        .onChange(async (value) => {
-          this.plugin.settings.agentDefaultMode = value as 'react' | 'plan-react';
-          await this.plugin.saveSettings();
         }));
 
     new Setting(containerEl)
@@ -2458,6 +2755,16 @@ await this.plugin.saveSettings();
         }));
 
     new Setting(containerEl)
+      .setName('Auto model chain')
+      .setDesc('Automatically use all enabled tool-capable models as a fallback chain. If one model fails or is rate-limited, the next capable model is tried without interrupting your workflow.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.agentAutoModelChain ?? false)
+        .onChange(async (value) => {
+          this.plugin.settings.agentAutoModelChain = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
       .setName('Deny list')
       .setDesc('Comma-separated paths the agent is not allowed to modify.')
       .addText(text => text
@@ -2467,41 +2774,195 @@ await this.plugin.saveSettings();
           await this.plugin.saveSettings();
         }));
 
-    // Code Execution and Canvas (Below MCP and Agent)
-    new Setting(containerEl).setName('Code execution and canvas').setHeading();
-    containerEl.createEl('p', {
-      text: 'Control how code blocks in AI responses are executed. Supported languages: JavaScript, TypeScript, HTML, CSS, Python.',
-      cls: 'setting-item-description'
-    });
+    // ── Agent Web Search Section ──
+    new Setting(containerEl).setName('Web search').setHeading();
 
     new Setting(containerEl)
-      .setName('Auto-execute code blocks')
-      .setDesc('When enabled, code blocks are executed automatically and errors are fixed without user interaction. When disabled, a run toggle appears on each code block — you control when to run and when to repair errors.')
+      .setName('Enable web search')
+      .setDesc('Allow the agent to use web_search and webfetch tools to find and retrieve information from the internet.')
       .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.codeExecutionAutoMode ?? false)
+        .setValue(this.plugin.settings.agentWebSearchEnabled ?? true)
         .onChange(async (value) => {
-          this.plugin.settings.codeExecutionAutoMode = value;
+          this.plugin.settings.agentWebSearchEnabled = value;
           await this.plugin.saveSettings();
-          new Notice(`Code execution: ${value ? 'auto mode' : 'manual mode'}`);
+          new Notice(`Web search tools ${value ? 'enabled' : 'disabled'}. Restart to apply.`);
         }));
 
-    // Advanced rate limit (Bottom)
-    new Setting(containerEl).setName('Delay limit').setHeading();
-    containerEl.createEl('p', {
-      text: 'Configure delay limiting for MCP queries to prevent API rate limit errors.',
-      cls: 'setting-item-description'
-    });
+    new Setting(containerEl)
+      .setName('Exa API key')
+      .setDesc('Optional. Get a free key at dashboard.exa.ai/api-keys — enables semantic search with page content extraction and higher limits. Without a key, searches go through Exa\'s MCP endpoint (rate-limited).')
+      .addText(text => text
+        .setPlaceholder('Enter Exa API key (optional)')
+        .setValue(this.plugin.settings.agentExaApiKey ?? '')
+        .onChange(async (value) => {
+          this.plugin.settings.agentExaApiKey = value;
+          await this.plugin.saveSettings();
+          if (this.plugin.webSearchService) {
+            this.plugin.webSearchService.updateApiKey(value);
+          }
+        }));
 
     new Setting(containerEl)
-      .setName('Delay Duration')
-      .setDesc('Delay in seconds between API calls for multi-step processes (5-60 seconds). Very low values may cause rate limit errors or poor responses in manual model selection mode. Default: 25 seconds.')      .addSlider(slider => slider
-        .setLimits(5, 60, 1)
-        .setValue(this.plugin.settings.rateLimitSeconds)
+      .setName('Default results per search')
+      .setDesc('Number of results returned by default (1-10).')
+      .addSlider(slider => slider
+        .setLimits(1, 10, 1)
+        .setValue(this.plugin.settings.agentWebSearchDefaultResults ?? 5)
         .setDynamicTooltip()
         .onChange(async (value) => {
-          this.plugin.settings.rateLimitSeconds = value;
+          this.plugin.settings.agentWebSearchDefaultResults = value;
           await this.plugin.saveSettings();
         }));
+
+    new Setting(containerEl)
+      .setName('Content mode')
+      .setDesc('Highlights: token-efficient excerpts (recommended). Text: full page content (uses more tokens). Only applies when a direct Exa API key is configured (MCP fallback always returns full text).')
+      .addDropdown(drop => drop
+        .addOption('highlights', 'Highlights (token-efficient)')
+        .addOption('text', 'Full text')
+        .setValue(this.plugin.settings.agentWebSearchMode ?? 'highlights')
+        .onChange(async (value) => {
+          this.plugin.settings.agentWebSearchMode = value as 'highlights' | 'text';
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Token budget')
+      .setDesc('Controls how much search result text is kept per query. Low=~500 tokens, Medium=~2K tokens, High=~5K tokens.')
+      .addDropdown(drop => drop
+        .addOption('low', 'Low')
+        .addOption('medium', 'Medium')
+        .addOption('high', 'High')
+        .setValue(this.plugin.settings.agentWebSearchTokenBudget ?? 'medium')
+        .onChange(async (value) => {
+          this.plugin.settings.agentWebSearchTokenBudget = value as 'low' | 'medium' | 'high';
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Enable caching')
+      .setDesc('Cache search results for 15 minutes to avoid redundant API calls.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.agentWebSearchCache ?? true)
+        .onChange(async (value) => {
+          this.plugin.settings.agentWebSearchCache = value;
+          await this.plugin.saveSettings();
+        }));
+
+    // ── Agent Skills Section (collapsible) ──
+    new Setting(containerEl).setName('Skills').setHeading();
+
+    const skillsSection = containerEl.createDiv({ cls: `provider-section ${this.expandedSections.has('agent-skills') ? 'expanded' : ''}` });
+    const skillsHeader = skillsSection.createDiv({ cls: 'provider-section-header' });
+    const headerLeft = skillsHeader.createDiv({ cls: 'provider-header-left' });
+    headerLeft.createSpan({ cls: 'provider-chevron', text: this.expandedSections.has('agent-skills') ? '▼' : '▶' });
+    headerLeft.createSpan({ cls: 'provider-title', text: 'Agent Skills' });
+
+    const skillCountEl = headerLeft.createSpan({ cls: 'provider-model-count nl-color-var--text-muted nl-font-size-085em' });
+
+    const refreshCount = () => {
+      const reg = (this.plugin as unknown as Record<string, unknown>).skillRegistry as { getAll: () => unknown[] } | undefined;
+      const count = reg?.getAll().length ?? 0;
+      skillCountEl.textContent = `${count} skill${count !== 1 ? 's' : ''}`;
+    };
+    refreshCount();
+
+    skillsHeader.addEventListener('click', () => {
+      const expanded = skillsSection.classList.toggle('expanded');
+      if (expanded) {
+        this.expandedSections.add('agent-skills');
+      } else {
+        this.expandedSections.delete('agent-skills');
+      }
+      const chevron = skillsHeader.querySelector('.provider-chevron');
+      if (chevron) chevron.textContent = expanded ? '▼' : '▶';
+    });
+
+    const skillsContent = skillsSection.createDiv({ cls: 'provider-section-content' });
+
+    new Setting(skillsContent)
+      .setName('Enable skills')
+      .setDesc('Allow the agent to load and use skills — reusable instructions and tools loaded on demand.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.agentSkillsEnabled ?? false)
+        .onChange(async (value) => {
+          this.plugin.settings.agentSkillsEnabled = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    if (this.plugin.settings.agentSkillsEnabled) {
+      const reg = (this.plugin as unknown as Record<string, unknown>).skillRegistry as
+        { getAll: () => Array<{ metadata: { name: string; description: string }; enabled: boolean; installedByAgent: boolean }>;
+          enable: (name: string) => void; disable: (name: string) => void; isEnabled: (name: string) => boolean } | undefined;
+
+      if (reg) {
+        const allSkills = reg.getAll();
+
+        if (allSkills.length === 0) {
+          skillsContent.createEl('p', {
+            text: 'No skills found. Skills can be created by placing SKILL.md files in .Nexus-LM-data/skills/ or by asking the agent to create one.',
+            cls: 'setting-item-description'
+          });
+        }
+
+        for (const skill of allSkills) {
+          const skillSetting = new Setting(skillsContent)
+            .setName(skill.metadata.name)
+            .setDesc(skill.metadata.description);
+
+          if (skill.installedByAgent) {
+            const badgeEl = skillSetting.descEl.createSpan({ cls: 'tag', text: 'by agent' });
+            badgeEl.style.marginLeft = '8px';
+            badgeEl.style.fontSize = '0.8em';
+            badgeEl.style.opacity = '0.7';
+          }
+
+          skillSetting.addToggle(toggle => toggle
+            .setValue(skill.enabled)
+            .onChange(async (value) => {
+              if (value) {
+                reg.enable(skill.metadata.name);
+              } else {
+                reg.disable(skill.metadata.name);
+              }
+              this.plugin.settings.agentEnabledSkills = allSkills
+                .filter(s => reg.isEnabled(s.metadata.name))
+                .map(s => s.metadata.name);
+              await this.plugin.saveSettings();
+            }));
+        }
+
+        new Setting(skillsContent)
+          .addButton(btn => btn
+            .setButtonText('Refresh skills')
+            .onClick(async () => {
+              const refreshFn = (this.plugin as unknown as Record<string, unknown>).refreshAgentSkills as (() => Promise<void>) | undefined;
+              if (refreshFn) {
+                await refreshFn();
+                this.display();
+                new Notice('Skills refreshed');
+              }
+            }))
+          .addButton(btn => btn
+            .setButtonText('Open skills folder')
+            .onClick(() => {
+              const vaultDir = (this.app.vault.adapter as unknown as { getBasePath?: () => string })?.getBasePath?.();
+              if (vaultDir) {
+                const { exec } = require('child_process');
+                const skillsPath = `${vaultDir}/.Nexus-LM-data/skills`;
+                const platform = (typeof process !== 'undefined' && process.platform) || '';
+                if (platform === 'win32') {
+                  exec(`explorer "${skillsPath}"`);
+                } else if (platform === 'darwin') {
+                  exec(`open "${skillsPath}"`);
+                } else {
+                  exec(`xdg-open "${skillsPath}"`);
+                }
+              }
+            }));
+      }
+    }
   }
 
   private renderMiscTab(containerEl: HTMLElement): void {
@@ -2739,6 +3200,7 @@ if (this.validatePath(normalizedPath)) {
       { id: 'opencode', name: 'OpenCode Zen' },
       { id: 'ollama', name: 'Ollama' },
       { id: 'nvidia', name: 'NVIDIA' },
+      { id: 'lmstudio', name: 'LM Studio' },
       ...this.plugin.settings.customProviders.map((p: CustomProviderConfig) => ({ id: p.id, name: p.name }))
     ];
     new Setting(containerEl).setName('Custom AI models' ).setHeading();
@@ -2831,7 +3293,7 @@ if (this.validatePath(normalizedPath)) {
         header.querySelector('.provider-chevron')!.textContent = expanded ? '▼' : '▶';
       });
 
-      if (!hasKey && providerInfo.id !== 'ollama') {
+      if (!hasKey && providerInfo.id !== 'ollama' && providerInfo.id !== 'lmstudio') {
         const infoDiv = content.createDiv({ cls: 'api-key-info provider-specific api-key-warning' });
         infoDiv.setText(`⚠️ API key for ${providerInfo.name} is not configured. Models below will be disabled.`);
       }
@@ -3126,6 +3588,7 @@ if (this.validatePath(normalizedPath)) {
       { id: 'openrouter', name: 'OpenRouter' },
       { id: 'ollama', name: 'Ollama' },
       { id: 'nvidia', name: 'NVIDIA' },
+      { id: 'lmstudio', name: 'LM Studio' },
       ...this.plugin.settings.customProviders
         .filter((p: CustomProviderConfig) => p.enableEmbeddings)
         .map((p: CustomProviderConfig) => ({ id: p.id, name: p.name }))
@@ -3208,7 +3671,7 @@ if (this.validatePath(normalizedPath)) {
         header.querySelector('.provider-chevron')!.textContent = expanded ? '▼' : '▶';
       });
 
-      if (!hasKey && providerInfo.id !== 'ollama') {
+      if (!hasKey && providerInfo.id !== 'ollama' && providerInfo.id !== 'lmstudio') {
         const infoDiv = content.createDiv({ cls: 'api-key-info provider-specific api-key-warning' });
         infoDiv.setText(`⚠️ API key for ${providerInfo.name} is not configured. Embedding models below will be disabled.`);
       }

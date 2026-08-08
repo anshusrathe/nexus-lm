@@ -51,7 +51,7 @@ export function isWriteCliCommand(command: string): boolean {
 }
 
 interface ExecProxy {
-  exec: (command: string, options: Record<string, unknown>, callback: (err: ExecException | null, stdout: string, stderr: string) => void) => void;
+  exec: (command: string, options: Record<string, unknown>, callback: (err: ExecException | null, stdout: string, stderr: string) => void) => any;
 }
 
 function loadExec(): ExecProxy | null {
@@ -67,14 +67,14 @@ function loadExec(): ExecProxy | null {
  * When encoding is 'utf-8' (as we always pass), stdout and stderr are strings.
  * On error, the rejection includes attached stdout/stderr properties.
  */
-function execAsync(command: string, options: Record<string, unknown>): Promise<{stdout: string; stderr: string}> {
+function execAsync(command: string, options: Record<string, unknown>, onProgress?: (chunk: string) => void): Promise<{stdout: string; stderr: string}> {
   return new Promise((resolve, reject) => {
     const cp = loadExec();
     if (!cp) {
       reject(new Error('child_process not available'));
       return;
     }
-    cp.exec(command, options, (err: ExecException | null, stdout: string, stderr: string) => {
+    const child = cp.exec(command, options, (err: ExecException | null, stdout: string, stderr: string) => {
       if (err) {
         (err as ExecException & { stdout?: string; stderr?: string }).stdout = stdout;
         (err as ExecException & { stdout?: string; stderr?: string }).stderr = stderr;
@@ -83,6 +83,15 @@ function execAsync(command: string, options: Record<string, unknown>): Promise<{
         resolve({ stdout, stderr });
       }
     });
+
+    if (onProgress) {
+      if (child.stdout) {
+        child.stdout.on('data', (data: any) => onProgress(String(data)));
+      }
+      if (child.stderr) {
+        child.stderr.on('data', (data: any) => onProgress(String(data)));
+      }
+    }
   });
 }
 
@@ -264,7 +273,7 @@ function shouldRetryForPipeInit(result: CliResult): boolean {
  * code, it is retried once with a visible console window to establish the
  * pipe connection.
  */
-export async function executeCliCommand(command: string, timeoutMs = 60000, explicitPath?: string): Promise<CliResult> {
+export async function executeCliCommand(command: string, timeoutMs = 60000, explicitPath?: string, onProgress?: (chunk: string) => void): Promise<CliResult> {
   const binary = await locateBinary(explicitPath);
   console.log('[cliExecutor] executeCliCommand binary=' + (binary ?? 'null') + ' command="' + command + '"');
 
@@ -290,7 +299,7 @@ export async function executeCliCommand(command: string, timeoutMs = 60000, expl
   };
 
   try {
-    const { stdout, stderr } = await execAsync(fullCommand, execOptions);
+    const { stdout, stderr } = await execAsync(fullCommand, execOptions, onProgress);
     console.log('[cliExecutor] SUCCESS stdout=' + stdout.substring(0, 200));
     return { stdout, stderr, exitCode: 0 };
   } catch (error: unknown) {
@@ -333,7 +342,7 @@ export async function executeCliCommand(command: string, timeoutMs = 60000, expl
           maxBuffer: 10 * 1024 * 1024,
           encoding: 'utf-8',
           windowsHide: false,
-        });
+        }, onProgress);
         console.log('[cliExecutor] RETRY SUCCESS stdout=' + retryStdout.substring(0, 200));
         pipeInitialized = true;
         return { stdout: retryStdout, stderr: retryStderr, exitCode: 0 };

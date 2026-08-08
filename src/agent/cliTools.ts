@@ -47,7 +47,13 @@ const CLI_TOOL: ToolHandler = {
     const settings = deps.settings as Record<string, unknown>;
     const explicitPath = String(settings.agentCliBinaryPath ?? '') || undefined;
 
-    const result = await executeCliCommand(command, 60000, explicitPath);
+    const result = await executeCliCommand(command, 60000, explicitPath, (chunk) => {
+      deps.onEvent({
+        type: 'tool_progress',
+        data: { toolName: 'cli', chunk },
+        timestamp: Date.now(),
+      });
+    });
 
     if (result.exitCode !== 0) {
       throw new Error(result.stderr || `CLI command failed with exit code ${result.exitCode}`);

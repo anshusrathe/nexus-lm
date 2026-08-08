@@ -1,7 +1,5 @@
 import type { App, TFile } from 'obsidian';
 
-export type AgentMode = 'react' | 'plan-react';
-
 export type ToolCategory = 'vault-native' | 'mcp' | 'cli' | 'plugin';
 
 export type ApprovalMode = 'all' | 'writes-only' | 'never';
@@ -10,12 +8,15 @@ export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipp
 
 export interface AgentConfig {
   maxSteps: number;
-  defaultMode: AgentMode;
   approvalMode: ApprovalMode;
   denyList: string[];
   enableCLI: boolean;
   enablePluginDiscovery: boolean;
   enableMCP: boolean;
+  enableSkills?: boolean;
+  enabledSkills?: string[];
+  enableAutoModelChain?: boolean;
+  canDelegate?: boolean;
 }
 
 export interface ToolDefinition {
@@ -30,6 +31,8 @@ export interface ToolCall {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+  /** Gemini 3.x thought signature — must be echoed back on the functionCall part in history. */
+  thoughtSignature?: string;
 }
 
 export interface ToolResult {
@@ -37,6 +40,7 @@ export interface ToolResult {
   success: boolean;
   content: string;
   error?: string;
+  retryCount?: number;
 }
 
 export interface AgentStep {
@@ -55,63 +59,28 @@ export interface AgentSession {
   task: string;
   steps: AgentStep[];
   finalAnswer: string | null;
+  confidence: number | null;
   config: AgentConfig;
+  scratchpad?: string;
 }
 
-export interface MemoryEntry {
-  id: string;
-  content: string;
-  type: 'working' | 'episodic' | 'semantic';
-  createdAt: number;
-  metadata: Record<string, unknown>;
-}
-
-export interface EditOperation {
-  path: string;
-  lineRef: string;
-  newContent: string;
-  type: 'replace' | 'insert' | 'delete';
-}
-
-export interface EditVerification {
-  valid: boolean;
-  reason?: string;
-  currentHash?: string;
-  expectedHash?: string;
-}
-
-export interface FileOutlineNode {
-  name: string;
-  type: 'heading' | 'function' | 'class' | 'block' | 'section';
-  lineStart: number;
-  lineEnd: number;
-  hash: string;
-  children: FileOutlineNode[];
-  depth: number;
-}
-
-export interface HashLine {
-  lineNumber: number;
-  hash: string;
+export interface FileEditDiffLine {
+  type: 'added' | 'removed';
   content: string;
 }
 
-export interface VaultFileRef {
+export interface FileEditDiff {
   path: string;
-  basename: string;
-  extension: string;
-}
-
-export interface SearchResult {
-  path: string;
-  content: string;
-  similarity: number;
+  additions: number;
+  removals: number;
+  diffLines: FileEditDiffLine[];
+  cliCommand?: string;
 }
 
 export type AgentEventCallback = (event: AgentEvent) => void;
 
 export interface AgentEvent {
-  type: 'step' | 'thought' | 'tool_call' | 'tool_result' | 'error' | 'final_answer' | 'plan' | 'answer_chunk';
+  type: 'step' | 'thought' | 'tool_call' | 'tool_result' | 'tool_progress' | 'error' | 'final_answer' | 'answer_chunk' | 'subagent_started' | 'subagent_step' | 'subagent_result' | 'pending_approval' | 'approval_resolved' | 'model_status';
   data: Record<string, unknown>;
   timestamp: number;
 }
@@ -120,7 +89,6 @@ export interface AgentDependencies {
   app: App;
   settings: {
     maxSteps: number;
-    defaultMode: AgentMode;
     approvalMode: ApprovalMode;
     denyList: string[];
     enableCLI: boolean;
@@ -130,7 +98,14 @@ export interface AgentDependencies {
     apiKey: string;
     [key: string]: unknown;
   };
-  searchVaultBM25: (query: string, limit: number) => Promise<Array<{ path: string; content: string }>>;
+  searchVaultBM25: (query: string, limit: number) => Promise<Array<{ path: string; content: string; lineStart?: number; lineEnd?: number; similarity?: number }>>;
+  searchEmbeddingIndexes: (query: string, indexIds: string[], limit: number) => Promise<Array<{
+    path: string;
+    content: string;
+    similarity: number;
+    chunkIndex?: number;
+    indexName: string;
+  }>>;
   onEvent: AgentEventCallback;
   getActiveFile: () => TFile | null;
   getSetting: (key: string) => unknown;
