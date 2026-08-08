@@ -91,16 +91,16 @@ export class FeedEntrySelectModal extends Modal {
       if (!entry.title || !entry.link) return;
       const item = entriesListContainer.createDiv({ cls: 'feed-entry-card' });
       // Title
-      item.createEl('div', { text: entry.title, cls: 'entry-title' });
+      item.createDiv({ text: entry.title, cls: 'entry-title' });
       // Metadata Line (Author and Date)
       const metadataLine = item.createDiv({ cls: 'entry-metadata-line' });
       if (entry.author) {
-        metadataLine.createEl('span', { text: entry.author, cls: 'entry-author' });
+        metadataLine.createSpan({ text: entry.author, cls: 'entry-author' });
       }
       if (entry.pubDate) {
-        metadataLine.createEl('span', { text: this.formatDate(entry.pubDate), cls: 'entry-date' });
+        metadataLine.createSpan({ text: this.formatDate(entry.pubDate), cls: 'entry-date' });
       } else if (!entry.author) {
-        metadataLine.createEl('span', { text: 'No Date', cls: 'entry-date' });
+        metadataLine.createSpan({ text: 'No Date', cls: 'entry-date' });
       }
       // Checkbox
       const checkbox = item.createEl('input', { type: 'checkbox', value: entry.link });

@@ -740,7 +740,7 @@ export class AITutorView extends ItemView {
       
       
       const nameContainer = card.createDiv({ cls: 'notebook-name-container' });
-      nameContainer.createEl('span', { text: notebook.name, cls: 'notebook-name' });
+      nameContainer.createSpan({ text: notebook.name, cls: 'notebook-name' });
 
       
       card.addEventListener('click', (e) => {
@@ -1051,7 +1051,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = this.activeDocument.createElement('div');
+      const progressContainer = this.activeDocument.createDiv();
       progressContainer.className = 'qna-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1247,7 +1247,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
 
-      const progressContainer = this.activeDocument.createElement('div');
+      const progressContainer = this.activeDocument.createDiv();
       progressContainer.className = 'mcq-inline-progress';
 
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1489,7 +1489,7 @@ export class AITutorView extends ItemView {
     }
     
     
-    const dialog = this.activeDocument.createElement('div');
+    const dialog = this.activeDocument.createDiv();
     dialog.className = 'mcq-progress-dialog mcq-progress-inline';
     
     
@@ -1557,11 +1557,11 @@ export class AITutorView extends ItemView {
     }
     
     
-    const overlay = this.activeDocument.createElement('div');
+    const overlay = this.activeDocument.createDiv();
     overlay.className = 'mcq-error-overlay';
     
     
-    const dialog = this.activeDocument.createElement('div');
+    const dialog = this.activeDocument.createDiv();
     dialog.className = 'mcq-error-dialog';
     
     
@@ -1649,7 +1649,7 @@ export class AITutorView extends ItemView {
     else if (result.accuracy >= 65) accuracyClass = 'accuracy-medium';
     else accuracyClass = 'accuracy-low';
     
-    accuracyCell.createEl('span', {
+    accuracyCell.createSpan({
       text: `${result.accuracy.toFixed(1)}%`,
       cls: accuracyClass
     });
@@ -1694,7 +1694,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = this.activeDocument.createElement('div');
+      const progressContainer = this.activeDocument.createDiv();
       progressContainer.className = 'concept-map-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1784,7 +1784,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = this.activeDocument.createElement('div');
+      const progressContainer = this.activeDocument.createDiv();
       progressContainer.className = 'slideshow-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1945,7 +1945,7 @@ export class AITutorView extends ItemView {
       setIcon(iconEl, 'network');
       
       
-      const nameEl = nameContainer.createEl('span', { cls: 'visual-name' });
+      const nameEl = nameContainer.createSpan({ cls: 'visual-name' });
       if (searchQuery) {
         this.highlightText(nameEl, conceptMap.name, searchQuery);
       } else {
@@ -1953,7 +1953,7 @@ export class AITutorView extends ItemView {
       }
       
       const timestamp = new Date(conceptMap.timestamp).toLocaleDateString();
-      cardContent.createEl('span', { text: timestamp, cls: 'visual-date' });
+      cardContent.createSpan({ text: timestamp, cls: 'visual-date' });
 
       
       card.addEventListener('click', (e) => {
@@ -1990,7 +1990,7 @@ export class AITutorView extends ItemView {
       setIcon(iconEl, 'presentation');
       
       
-      const nameEl = nameContainer.createEl('span', { cls: 'visual-name' });
+      const nameEl = nameContainer.createSpan({ cls: 'visual-name' });
       if (searchQuery) {
         this.highlightText(nameEl, slideshow.name, searchQuery);
       } else {
@@ -1999,7 +1999,7 @@ export class AITutorView extends ItemView {
       
       const timestamp = new Date(slideshow.timestamp).toLocaleDateString();
       const typeLabel = 'Zen';
-      cardContent.createEl('span', { text: `${timestamp} • ${typeLabel}`, cls: 'visual-date' });
+      cardContent.createSpan({ text: `${timestamp} • ${typeLabel}`, cls: 'visual-date' });
 
       
       card.addEventListener('click', (e) => {

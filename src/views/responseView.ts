@@ -276,7 +276,7 @@ class FileModal extends SuggestModal<TFile> {
     }
 
     renderSuggestion(file: TFile, el: HTMLElement) {
-        el.createEl("div", { text: file.path });
+        el.createDiv({ text: file.path });
     }
 
     onChooseSuggestion(file: TFile) {
@@ -309,7 +309,7 @@ class FolderModal extends SuggestModal<TFolder> {
     }
 
     renderSuggestion(folder: TFolder, el: HTMLElement) {
-        el.createEl("div", { text: folder.path + '/' });
+        el.createDiv({ text: folder.path + '/' });
     }
 
     onChooseSuggestion(folder: TFolder) {
@@ -342,7 +342,7 @@ class ImageModal extends SuggestModal<TFile> {
     }
 
     renderSuggestion(file: TFile, el: HTMLElement) {
-        el.createEl("div", { text: file.path });
+        el.createDiv({ text: file.path });
     }
 
     onChooseSuggestion(file: TFile) {
@@ -821,8 +821,8 @@ class SystemInstructionsModal extends Modal {
                 }
 
                 const itemContent = itemEl.createDiv({ cls: 'collections-item-content' });
-                itemContent.createEl('span', { text: saved.name, cls: 'collections-item-name' });
-                itemContent.createEl('span', {
+                itemContent.createSpan({ text: saved.name, cls: 'collections-item-name' });
+                itemContent.createSpan({
                     text: `${saved.instructions.length} chars`,
                     cls: 'collections-item-meta'
                 });
@@ -2767,7 +2767,7 @@ export class ResponseView extends ItemView {
             return;
         }
 
-        const pickerEl = this.activeDocument.createElement('div');
+        const pickerEl = this.activeDocument.createDiv();
         pickerEl.className = 'wallpaper-picker';
         pickerEl.addClass('nl-position-absolute');
         pickerEl.addClass('nl-z-index-1000');
@@ -5069,7 +5069,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 }
 
                 if (targetEl) {
-                    const tooltip = this.activeDocument.createElement('div');
+                    const tooltip = this.activeDocument.createDiv();
                     tooltip.classList.add('footnote-tooltip');
                     tooltip.addClass('footnote-tooltip-style');
 
@@ -5116,7 +5116,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 const id = itemEl.getAttribute('id');
 
                 if (id) {
-                    const backArrow = this.activeDocument.createElement('a');
+                    const backArrow = this.activeDocument.createEl('a');
                     backArrow.classList.add('footnote-backref');
                     backArrow.textContent = ' ↩';
                     backArrow.setAttribute('aria-label', 'Back to content');
@@ -5242,7 +5242,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             if (hasCitations) {
                 
-                const citationsList = sourcesContent.createEl('div', { cls: 'footnote-citations' });
+                const citationsList = sourcesContent.createDiv({ cls: 'footnote-citations' });
                 sources.forEach((source, idx) => {
                     const citationItem = citationsList.createDiv({ cls: 'citation-item' });
                     citationItem.setText(`[^${idx + 1}]: `);
@@ -5471,7 +5471,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         if (hasCitations) {
             
-            const citationsList = sourcesContent.createEl('div', { cls: 'footnote-citations' });
+            const citationsList = sourcesContent.createDiv({ cls: 'footnote-citations' });
             let citationIndex = 1;
 
             
@@ -5973,7 +5973,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             if (table.parentElement?.classList.contains('table-wrapper')) return;
 
-            const wrapper = this.activeDocument.createElement('div');
+            const wrapper = this.activeDocument.createDiv();
             wrapper.className = 'table-wrapper';
             table.parentNode?.insertBefore(wrapper, table);
             wrapper.appendChild(table);
@@ -6153,7 +6153,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             const executable = isExecutable(lang);
 
             
-            const wrapper = this.activeDocument.createElement('div');
+            const wrapper = this.activeDocument.createDiv();
             wrapper.className = 'code-block-wrapper';
             pre.parentNode?.insertBefore(wrapper, pre);
             wrapper.appendChild(pre);
@@ -6162,22 +6162,22 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             wrapper.dataset.code = initialCode;
 
             
-            const toolbar = this.activeDocument.createElement('div');
+            const toolbar = this.activeDocument.createDiv();
             toolbar.className = 'code-block-toolbar';
 
             
             if (lang !== 'unknown') {
-                const badge = this.activeDocument.createElement('span');
+                const badge = this.activeDocument.createSpan();
                 badge.className = 'code-lang-badge';
                 badge.textContent = lang;
                 toolbar.appendChild(badge);
             }
 
-            const toolbarRight = this.activeDocument.createElement('div');
+            const toolbarRight = this.activeDocument.createDiv();
             toolbarRight.className = 'code-block-toolbar-right';
 
             
-            const copyBtn = this.activeDocument.createElement('button');
+            const copyBtn = this.activeDocument.createEl('button');
             copyBtn.className = 'code-block-btn';
             copyBtn.setAttribute('aria-label', 'Copy code');
             setIcon(copyBtn, 'copy');
@@ -6190,7 +6190,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             toolbarRight.appendChild(copyBtn);
 
             
-            const expandBtn = this.activeDocument.createElement('button');
+            const expandBtn = this.activeDocument.createEl('button');
             expandBtn.className = 'code-block-btn';
             expandBtn.setAttribute('aria-label', 'Expand in canvas');
             setIcon(expandBtn, 'maximize-2');
@@ -6230,7 +6230,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             if (lang === 'json') {
-                const outputEl = this.activeDocument.createElement('div');
+                const outputEl = this.activeDocument.createDiv();
                 outputEl.className = 'code-exec-output hidden';
                 wrapper.appendChild(outputEl);
 
@@ -6243,20 +6243,20 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     return;
                 }
 
-                const renderToggleRow = this.activeDocument.createElement('div');
+                const renderToggleRow = this.activeDocument.createDiv();
                 renderToggleRow.className = 'code-exec-toggle-row';
 
-                const renderLabel = this.activeDocument.createElement('span');
+                const renderLabel = this.activeDocument.createSpan();
                 renderLabel.className = 'code-exec-label';
                 renderLabel.textContent = 'Render visualization';
 
-                const renderToggle = this.activeDocument.createElement('div');
+                const renderToggle = this.activeDocument.createDiv();
                 renderToggle.className = 'code-exec-toggle';
                 renderToggle.setAttribute('role', 'switch');
                 renderToggle.setAttribute('aria-checked', 'false');
                 renderToggle.setAttribute('aria-label', 'Render visualization');
 
-                const backBtn = this.activeDocument.createElement('button');
+                const backBtn = this.activeDocument.createEl('button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
                 backBtn.addClass('nl-display-none');
@@ -6292,7 +6292,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             if (!executable) return;
 
             
-            const outputEl = this.activeDocument.createElement('div');
+            const outputEl = this.activeDocument.createDiv();
             outputEl.className = 'code-exec-output hidden';
             
             wrapper.appendChild(outputEl);
@@ -6306,21 +6306,21 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 void this.runCode(pre, lang, outputEl, wrapper, true, question);
             } else {
                 
-                const runToggleRow = this.activeDocument.createElement('div');
+                const runToggleRow = this.activeDocument.createDiv();
                 runToggleRow.className = 'code-exec-toggle-row';
 
-                const runLabel = this.activeDocument.createElement('span');
+                const runLabel = this.activeDocument.createSpan();
                 runLabel.className = 'code-exec-label';
                 runLabel.textContent = 'Run code';
 
-                const runToggle = this.activeDocument.createElement('div');
+                const runToggle = this.activeDocument.createDiv();
                 runToggle.className = 'code-exec-toggle';
                 runToggle.setAttribute('role', 'switch');
                 runToggle.setAttribute('aria-checked', 'false');
                 runToggle.setAttribute('aria-label', 'Run code');
 
                 
-                const backBtn = this.activeDocument.createElement('button');
+                const backBtn = this.activeDocument.createEl('button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
                 backBtn.addClass('nl-display-none');
@@ -6375,7 +6375,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.classList.add('code-exec-running');
         outputEl.empty();
 
-        const spinner = this.activeDocument.createElement('span');
+        const spinner = this.activeDocument.createSpan();
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         outputEl.appendChild(spinner);
@@ -6387,7 +6387,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         if (result.isHtml && result.htmlContent) {
             outputEl.classList.add('code-exec-success');
-            const iframe = this.activeDocument.createElement('iframe');
+            const iframe = this.activeDocument.createEl('iframe');
             iframe.className = 'code-exec-iframe';
             iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-modals');
             iframe.srcdoc = result.htmlContent;
@@ -6408,13 +6408,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             void MarkdownRenderer.render(this.app, result.markdownContent, outputEl, '', this);
         } else if (result.success) {
             outputEl.classList.add('code-exec-success');
-            const outputPre = this.activeDocument.createElement('pre');
+            const outputPre = this.activeDocument.createEl('pre');
             outputPre.className = 'code-exec-output-text';
             outputPre.textContent = result.output;
             outputEl.appendChild(outputPre);
         } else {
             outputEl.classList.add('code-exec-error');
-            const errorPre = this.activeDocument.createElement('pre');
+            const errorPre = this.activeDocument.createEl('pre');
             errorPre.className = 'code-exec-output-text';
             errorPre.textContent = `Error: ${result.error}`;
             if (result.output) {
@@ -6446,14 +6446,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             if (wrapper.querySelector('.mermaid-repair-row')) return;
 
-            const repairRow = this.activeDocument.createElement('div');
+            const repairRow = this.activeDocument.createDiv();
             repairRow.className = 'code-exec-toggle-row mermaid-repair-row';
 
-            const repairLabel = this.activeDocument.createElement('span');
+            const repairLabel = this.activeDocument.createSpan();
             repairLabel.className = 'code-exec-label';
             repairLabel.textContent = 'Repair diagram';
 
-            const repairBtn = this.activeDocument.createElement('button');
+            const repairBtn = this.activeDocument.createEl('button');
             repairBtn.className = 'code-block-btn';
             repairBtn.setAttribute('aria-label', 'Repair mermaid diagram');
             setIcon(repairBtn, 'wrench');
@@ -6517,13 +6517,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         question = ''
     ) {
         
-        const loadingEl = this.activeDocument.createElement('div');
+        const loadingEl = this.activeDocument.createDiv();
         loadingEl.className = 'code-exec-output code-exec-running';
-        const spinner = this.activeDocument.createElement('span');
+        const spinner = this.activeDocument.createSpan();
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         loadingEl.appendChild(spinner);
-        const loadingText = this.activeDocument.createElement('span');
+        const loadingText = this.activeDocument.createSpan();
         loadingText.className = 'code-exec-label';
         loadingText.textContent = 'Repairing diagram…';
         loadingEl.appendChild(loadingText);
@@ -6553,7 +6553,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             this.saveCodeEdit(question, oldCode, fixedCode, 'mermaid');
 
             
-            const tempContainer = this.activeDocument.createElement('div');
+            const tempContainer = this.activeDocument.createDiv();
             await MarkdownRenderer.render(
                 this.app,
                 '```mermaid\n' + fixedCode + '\n```',
@@ -6575,13 +6575,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         } catch (err: unknown) {
             loadingEl.remove();
 
-            const errRow = this.activeDocument.createElement('div');
+            const errRow = this.activeDocument.createDiv();
             errRow.className = 'code-exec-toggle-row mermaid-repair-row';
-            const errLabel = this.activeDocument.createElement('span');
+            const errLabel = this.activeDocument.createSpan();
             errLabel.className = 'code-exec-label';
             errLabel.addClass('nl-color-remaining-13');
             errLabel.textContent = `Repair failed: ${err instanceof Error ? err.message : String(err)}`;
-            const retryBtn = this.activeDocument.createElement('button');
+            const retryBtn = this.activeDocument.createEl('button');
             retryBtn.className = 'code-block-btn';
             retryBtn.setAttribute('aria-label', 'Retry repair');
             setIcon(retryBtn, 'refresh-cw');
@@ -6608,14 +6608,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.querySelector('.code-repair-toggle-row')?.remove();
         wrapper.querySelector('.code-repair-toggle-row')?.remove();
 
-        const repairRow = this.activeDocument.createElement('div');
+        const repairRow = this.activeDocument.createDiv();
         repairRow.className = 'code-exec-toggle-row code-repair-toggle-row';
 
-        const repairLabel = this.activeDocument.createElement('span');
+        const repairLabel = this.activeDocument.createSpan();
         repairLabel.className = 'code-exec-label';
         repairLabel.textContent = 'Repair code';
 
-        const repairToggle = this.activeDocument.createElement('div');
+        const repairToggle = this.activeDocument.createDiv();
         repairToggle.className = 'code-exec-toggle code-repair-toggle-switch';
         repairToggle.setAttribute('role', 'switch');
         repairToggle.setAttribute('aria-checked', 'false');
@@ -6648,7 +6648,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.classList.remove('hidden', 'code-exec-error', 'code-exec-success');
         outputEl.classList.add('code-exec-running');
         outputEl.empty();
-        const spinner = this.activeDocument.createElement('span');
+        const spinner = this.activeDocument.createSpan();
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         outputEl.appendChild(spinner);
@@ -6684,7 +6684,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             outputEl.classList.remove('code-exec-running');
             outputEl.classList.add('code-exec-error');
             outputEl.empty();
-            const errPre = this.activeDocument.createElement('pre');
+            const errPre = this.activeDocument.createEl('pre');
             errPre.className = 'code-exec-output-text';
             errPre.textContent = `Repair failed: ${err instanceof Error ? err.message : String(err)}`;
             outputEl.appendChild(errPre);
@@ -7447,7 +7447,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         this.closeContextMenu();
         this.contextMenuOpenFromMore = fromMore;
         
-        const menu = this.activeDocument.createElement('div');
+        const menu = this.activeDocument.createDiv();
         menu.className = 'context-file-menu';
         
         const rect = anchorEl.getBoundingClientRect();
@@ -7456,14 +7456,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         menu.addClass('nl-z-index-9999');
         menu.addClass('nl-min-width-260px');
         
-        const searchInput = this.activeDocument.createElement('input');
+        const searchInput = this.activeDocument.createEl('input');
         searchInput.type = 'text';
         searchInput.className = 'context-file-menu-search';
         searchInput.placeholder = 'Search files directly by name, use / for folders';
         menu.appendChild(searchInput);
         this.contextMenuInput = searchInput;
         
-        const listContainer = this.activeDocument.createElement('div');
+        const listContainer = this.activeDocument.createDiv();
         listContainer.className = 'context-file-menu-list';
         menu.appendChild(listContainer);
         
@@ -7561,7 +7561,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         this.closeContextMenu();
         this.contextMenuOpenFromMore = fromMore;
 
-        const menu = this.activeDocument.createElement('div');
+        const menu = this.activeDocument.createDiv();
         menu.className = 'context-file-menu';
 
         
@@ -7572,7 +7572,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         menu.addClass('nl-min-width-260px');
 
         
-        const listContainer = this.activeDocument.createElement('div');
+        const listContainer = this.activeDocument.createDiv();
         listContainer.className = 'context-file-menu-list';
         menu.appendChild(listContainer);
 
@@ -7622,15 +7622,15 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         if (matchingPrefixes.length > 0) {
             matchingPrefixes.forEach((opt, index) => {
-                const item = this.activeDocument.createElement('div');
+                const item = this.activeDocument.createDiv();
                 item.className = 'context-file-menu-item';
 
                 
                 if ('badge' in opt && opt.badge) {
-                    const labelSpan = this.activeDocument.createElement('span');
+                    const labelSpan = this.activeDocument.createSpan();
                     labelSpan.textContent = opt.label;
 
-                    const badgeSpan = this.activeDocument.createElement('span');
+                    const badgeSpan = this.activeDocument.createSpan();
                     badgeSpan.className = 'feature-badge beta-badge';
                     badgeSpan.textContent = opt.badge!;
                     badgeSpan.addClass('nl-css-text-remaining-14');
@@ -7672,13 +7672,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             ).slice(0, 10); 
 
             if (matchingFiles.length > 0) {
-                const fileHeader = this.activeDocument.createElement('div');
+                const fileHeader = this.activeDocument.createDiv();
                 fileHeader.className = 'context-file-menu-section-header';
                 fileHeader.textContent = 'Files';
                 container.appendChild(fileHeader);
 
                 matchingFiles.forEach((file, index) => {
-                    const item = this.activeDocument.createElement('div');
+                    const item = this.activeDocument.createDiv();
                     item.className = 'context-file-menu-item';
 
                     const iconSpan = item.createSpan();
@@ -7715,7 +7715,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     container.appendChild(item);
                 });
             } else {
-                const noResults = this.activeDocument.createElement('div');
+                const noResults = this.activeDocument.createDiv();
                 noResults.className = 'context-file-menu-item';
                 noResults.textContent = 'No matches found';
                 noResults.addClass('nl-opacity-05');
@@ -8016,7 +8016,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             if (!this.contextMenuPreviewEl) {
-                this.contextMenuPreviewEl = this.activeDocument.createElement('div');
+                this.contextMenuPreviewEl = this.activeDocument.createDiv();
                 this.contextMenuPreviewEl.className = 'context-file-preview';
                 this.activeDocument.body.appendChild(this.contextMenuPreviewEl);
             }
@@ -8082,12 +8082,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         if (this.contextMenuOpenFromMore && files.length > maxVisible) {
             const remaining = files.slice(maxVisible);
-            const remHeader = this.activeDocument.createElement('div');
+            const remHeader = this.activeDocument.createDiv();
             remHeader.className = 'context-file-menu-section-header';
             remHeader.textContent = 'Added files';
             container.appendChild(remHeader);
             remaining.forEach(path => {
-                const item = this.activeDocument.createElement('div');
+                const item = this.activeDocument.createDiv();
                 item.className = 'context-file-menu-item added';
 
                 
@@ -8127,7 +8127,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 container.appendChild(item);
             });
             
-            const divider = this.activeDocument.createElement('div');
+            const divider = this.activeDocument.createDiv();
             divider.className = 'context-file-menu-divider';
             container.appendChild(divider);
         }
@@ -8140,14 +8140,14 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             .slice()
             .sort((a, b) => b.stat.mtime - a.stat.mtime)
             .slice(0, filter ? allFiles.length : 5); 
-        const recHeader = this.activeDocument.createElement('div');
+        const recHeader = this.activeDocument.createDiv();
         recHeader.className = 'context-file-menu-section-header';
         recHeader.textContent = 'Recent files';
         container.appendChild(recHeader);
         recentFiles.forEach(file => {
             
             if (this.selectedFiles.has(file.path)) return;
-            const item = this.activeDocument.createElement('div');
+            const item = this.activeDocument.createDiv();
             item.className = 'context-file-menu-item';
             const iconSpan = item.createSpan();
             setIcon(iconSpan, this.getFileTypeIcon(file.name));
@@ -8162,7 +8162,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             container.appendChild(item);
         });
         
-        const divider2 = this.activeDocument.createElement('div');
+        const divider2 = this.activeDocument.createDiv();
         divider2.className = 'context-file-menu-divider';
         container.appendChild(divider2);
         
@@ -8178,25 +8178,25 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 { label: '@youtube', value: '@youtube', action: 'modal', modalType: 'youtube' }
             ];
             prefixOptions.forEach(opt => {
-                const item = this.activeDocument.createElement('div');
+                const item = this.activeDocument.createDiv();
                 item.className = 'context-file-menu-item';
 
                 
                 if (opt.hasToggle && opt.value === '@vault ') {
-                    const labelSpan = this.activeDocument.createElement('span');
+                    const labelSpan = this.activeDocument.createSpan();
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = this.activeDocument.createElement('div');
+                    const toggleContainer = this.activeDocument.createDiv();
                     toggleContainer.className = 'vault-citation-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-13');
 
                     
-                    const toggleLabel = this.activeDocument.createElement('span');
+                    const toggleLabel = this.activeDocument.createSpan();
                     toggleLabel.textContent = 'Citations';
                     toggleLabel.addClass('nl-css-text-rem-14');
 
-                    const toggleSwitch = this.activeDocument.createElement('input');
+                    const toggleSwitch = this.activeDocument.createEl('input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'vault-citation-toggle';
                     toggleSwitch.checked = this.vaultInlineCitationsEnabled;
@@ -8216,19 +8216,19 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     item.addClass('nl-css-text-rem-15');
                 } else if (opt.hasToggle && opt.value === '@flash ') {
                     
-                    const labelSpan = this.activeDocument.createElement('span');
+                    const labelSpan = this.activeDocument.createSpan();
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = this.activeDocument.createElement('div');
+                    const toggleContainer = this.activeDocument.createDiv();
                     toggleContainer.className = 'flash-citation-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-16');
 
-                    const toggleLabel = this.activeDocument.createElement('span');
+                    const toggleLabel = this.activeDocument.createSpan();
                     toggleLabel.textContent = 'Citations';
                     toggleLabel.addClass('nl-css-text-rem-17');
 
-                    const toggleSwitch = this.activeDocument.createElement('input');
+                    const toggleSwitch = this.activeDocument.createEl('input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'flash-citation-toggle';
                     toggleSwitch.checked = this.flashInlineCitationsEnabled;
@@ -8296,19 +8296,19 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     */ 
                 } else if (opt.hasToggle && opt.value === '@mcp ') {
                     
-                    const labelSpan = this.activeDocument.createElement('span');
+                    const labelSpan = this.activeDocument.createSpan();
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = this.activeDocument.createElement('div');
+                    const toggleContainer = this.activeDocument.createDiv();
                     toggleContainer.className = 'mcp-ratelimit-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-24');
 
-                    const toggleLabel = this.activeDocument.createElement('span');
+                    const toggleLabel = this.activeDocument.createSpan();
                     toggleLabel.textContent = 'Delay Limit';
                     toggleLabel.addClass('nl-css-text-rem-25');
 
-                    const toggleSwitch = this.activeDocument.createElement('input');
+                    const toggleSwitch = this.activeDocument.createEl('input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'mcp-ratelimit-toggle';
                     toggleSwitch.checked = this.mcpRateLimitEnabled;
@@ -11162,7 +11162,7 @@ export class CodeCanvasModal extends Modal {
             if (lang === 'json') {
                 const result = await executeCode(code, 'json');
                 if (result.isHtml && result.htmlContent) {
-                    const iframe = this.activeDocument.createElement('iframe');
+                    const iframe = this.activeDocument.createEl('iframe');
                     iframe.className = 'code-exec-iframe code-canvas-iframe';
                     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
                     iframe.srcdoc = result.htmlContent;
@@ -11288,7 +11288,7 @@ export class CodeCanvasModal extends Modal {
             outputArea.empty();
 
             if (result.isHtml && result.htmlContent) {
-                const iframe = this.activeDocument.createElement('iframe');
+                const iframe = this.activeDocument.createEl('iframe');
                 iframe.className = 'code-exec-iframe code-canvas-iframe';
                 iframe.setAttribute('sandbox',
                     'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-modals allow-popups'

@@ -39,7 +39,7 @@ export class EditSelectionModal extends Modal {
 
         // Show selected text preview
         const previewContainer = contentEl.createDiv({ cls: 'edit-selection-preview' });
-        previewContainer.createEl('div', { text: 'Selected text:', cls: 'edit-selection-preview-label' });
+        previewContainer.createDiv({ text: 'Selected text:', cls: 'edit-selection-preview-label' });
         const previewBox = previewContainer.createDiv({ cls: 'edit-selection-preview-box' });
         previewBox.textContent = this.selectedText.length > 200 
             ? this.selectedText.substring(0, 200) + '...' 
@@ -47,7 +47,7 @@ export class EditSelectionModal extends Modal {
 
         // Query input area
         const inputContainer = contentEl.createDiv({ cls: 'edit-selection-input-container' });
-        inputContainer.createEl('div', { text: 'What would you like to do with this text?', cls: 'edit-selection-input-label' });
+        inputContainer.createDiv({ text: 'What would you like to do with this text?', cls: 'edit-selection-input-label' });
         
         this.queryInput = inputContainer.createEl('textarea', {
             cls: 'edit-selection-query-input',
@@ -314,7 +314,7 @@ function showInlineDiff(
  * Create the inline diff widget HTML structure
  */
 function createInlineDiffWidget(originalText: string, editedText: string, diffId: string, doc?: Document): HTMLElement {
-    const wrapper = (doc ?? activeDocument).createElement('div');
+    const wrapper = (doc ?? activeDocument).createDiv();
     
     // Add header
     const header = wrapper.createDiv({ cls: 'edit-selection-diff-header' });
@@ -370,7 +370,7 @@ function injectFloatingDiffWidget(
     const viewDoc = view.containerEl.doc;
     
     // Create overlay container
-    const overlay = viewDoc.createElement('div');
+    const overlay = viewDoc.createDiv();
     overlay.addClass('edit-selection-diff-overlay');
     overlay.addClass('nexus-overlay');
     overlay.setAttribute('data-diff-id', diffId);
@@ -379,7 +379,7 @@ function injectFloatingDiffWidget(
     overlay.appendChild(diffHtml);
     
     // Add backdrop
-    const backdrop = viewDoc.createElement('div');
+    const backdrop = viewDoc.createDiv();
     backdrop.addClass('edit-selection-diff-backdrop');
     backdrop.addClass('nexus-backdrop');
     

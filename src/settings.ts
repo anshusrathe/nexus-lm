@@ -1752,7 +1752,7 @@ await this.plugin.saveSettings();
         text: 'Indexing all file types may take longer than usual but allows full file discoverability (PDFs, PPTs, etc.).',
         cls: 'setting-item-description'
       });
-      descEl.style.marginBottom = '8px';
+      descEl.addClass('nl-margin-bottom-8px');
 
       const checkboxContainer = sectionEl.createDiv({ cls: 'nl-display-flex', attr: { style: 'gap: 16px; margin-bottom: 12px; align-items: center;' } });
       
@@ -2115,7 +2115,7 @@ await this.plugin.saveSettings();
         text: 'Indexing all file types may take longer but allows full file discoverability (PDFs, DOCX, PPTX, etc.).',
         cls: 'setting-item-description'
       });
-      descEl.style.marginBottom = '8px';
+      descEl.addClass('nl-margin-bottom-8px');
 
       const checkboxContainer = dialogEl.createDiv({ cls: 'nl-display-flex', attr: { style: 'gap: 16px; margin-bottom: 12px; align-items: center;' } });
 
@@ -2256,7 +2256,7 @@ await this.plugin.saveSettings();
         const item = searchResults.createDiv({ cls: 'index-excl-search-item' });
         const cb = item.createEl('input', { type: 'checkbox' });
         cb.checked = pendingFiles.includes(path);
-        const label = item.createEl('span', { cls: 'index-excl-search-label' });
+        const label = item.createSpan({ cls: 'index-excl-search-label' });
         label.setText(path);
         if (pendingFiles.includes(path)) label.addClass('index-excl-struck');
         cb.addEventListener('change', () => {
@@ -2296,7 +2296,7 @@ await this.plugin.saveSettings();
         const selectAllItem = folderListEl.createDiv({ cls: 'index-excl-folder-item' });
         const selectAllCb = selectAllItem.createEl('input', { type: 'checkbox' });
         selectAllCb.checked = allPaths.every(p => pendingFolders.includes(p));
-        const selectAllLabel = selectAllItem.createEl('span', { cls: 'index-excl-folder-label', text: 'Select All' });
+        const selectAllLabel = selectAllItem.createSpan({ cls: 'index-excl-folder-label', text: 'Select All' });
         selectAllLabel.addClass('nl-font-weight-bold');
 
         selectAllCb.addEventListener('change', () => {
@@ -2319,7 +2319,7 @@ await this.plugin.saveSettings();
       const rootItem = folderListEl.createDiv({ cls: 'index-excl-folder-item' });
       const rootCb = rootItem.createEl('input', { type: 'checkbox' });
       rootCb.checked = pendingFolders.includes('');
-      const rootLabel = rootItem.createEl('span', { cls: 'index-excl-folder-label index-excl-root-label' });
+      const rootLabel = rootItem.createSpan({ cls: 'index-excl-folder-label index-excl-root-label' });
       rootLabel.setText('/ (vault root)');
       if (pendingFolders.includes('')) rootLabel.addClass('index-excl-struck');
       rootCb.addEventListener('change', () => {
@@ -2340,7 +2340,7 @@ await this.plugin.saveSettings();
         const item = folderListEl.createDiv({ cls: 'index-excl-folder-item' });
         const cb = item.createEl('input', { type: 'checkbox' });
         cb.checked = pendingFolders.includes(folder);
-        const label = item.createEl('span', { cls: 'index-excl-folder-label' });
+        const label = item.createSpan({ cls: 'index-excl-folder-label' });
         label.setText(folder);
         if (pendingFolders.includes(folder)) label.addClass('index-excl-struck');
         cb.addEventListener('change', () => {
@@ -2368,8 +2368,8 @@ await this.plugin.saveSettings();
       summaryEl.createEl('p', { text: 'Excluded:', cls: 'index-excl-summary-title' });
       for (const f of pendingFolders) {
         const row = summaryEl.createDiv({ cls: 'index-excl-summary-item' });
-        row.createEl('span', { text: `📁 ${f === '' ? '/ (vault root)' : f}`, cls: 'index-excl-struck' });
-        const rm = row.createEl('span', { cls: 'index-excl-remove', text: '×' });
+        row.createSpan({ text: `📁 ${f === '' ? '/ (vault root)' : f}`, cls: 'index-excl-struck' });
+        const rm = row.createSpan({ cls: 'index-excl-remove', text: '×' });
         rm.addEventListener('click', () => {
           const i = pendingFolders.indexOf(f);
           if (i > -1) pendingFolders.splice(i, 1);
@@ -2379,8 +2379,8 @@ await this.plugin.saveSettings();
       }
       for (const f of pendingFiles) {
         const row = summaryEl.createDiv({ cls: 'index-excl-summary-item' });
-        row.createEl('span', { text: `📄 ${f}`, cls: 'index-excl-struck' });
-        const rm = row.createEl('span', { cls: 'index-excl-remove', text: '×' });
+        row.createSpan({ text: `📄 ${f}`, cls: 'index-excl-struck' });
+        const rm = row.createSpan({ cls: 'index-excl-remove', text: '×' });
         rm.addEventListener('click', () => {
           const i = pendingFiles.indexOf(f);
           if (i > -1) pendingFiles.splice(i, 1);
@@ -2913,9 +2913,9 @@ await this.plugin.saveSettings();
 
           if (skill.installedByAgent) {
             const badgeEl = skillSetting.descEl.createSpan({ cls: 'tag', text: 'by agent' });
-            badgeEl.style.marginLeft = '8px';
-            badgeEl.style.fontSize = '0.8em';
-            badgeEl.style.opacity = '0.7';
+            badgeEl.addClass('nl-margin-left-8px');
+            badgeEl.addClass('nl-font-size-08em');
+            badgeEl.addClass('nl-opacity-07');
           }
 
           skillSetting.addToggle(toggle => toggle
@@ -2989,13 +2989,13 @@ await this.plugin.saveSettings();
     const modeExplanation = containerEl.createDiv({ cls: 'setting-item-description youtube-mode-explanation' });
     modeExplanation.createEl('strong', { text: 'Mode descriptions:' });
     modeExplanation.createEl('br');
-    modeExplanation.createEl('span', { text: '• ' });
+    modeExplanation.createSpan({ text: '• ' });
     modeExplanation.createEl('strong', { text: 'Transcript (recommended):' });
-    modeExplanation.createEl('span', { text: ' Extracts video transcript and sends to your selected AI model. Works with Gemini, Groq, and OpenRouter. Faster and more cost-effective. Automatically detects available languages.' });
+    modeExplanation.createSpan({ text: ' Extracts video transcript and sends to your selected AI model. Works with Gemini, Groq, and OpenRouter. Faster and more cost-effective. Automatically detects available languages.' });
     modeExplanation.createEl('br');
-    modeExplanation.createEl('span', { text: '• ' });
+    modeExplanation.createSpan({ text: '• ' });
     modeExplanation.createEl('strong', { text: 'Gemini Native:' });
-    modeExplanation.createEl('span', { text: " Uses Gemini's multimodal API to analyze video directly (audio + visual). Requires Gemini API key. Best for videos without transcripts or when visual analysis is needed." });
+    modeExplanation.createSpan({ text: " Uses Gemini's multimodal API to analyze video directly (audio + visual). Requires Gemini API key. Best for videos without transcripts or when visual analysis is needed." });
 
     // Save YouTube transcripts toggle
     const folderSetting = new Setting(containerEl)
@@ -3443,7 +3443,7 @@ if (this.validatePath(normalizedPath)) {
     })(); });
 
     // Delete button (appears on hover) - added AFTER all cells
-    const deleteBtn = row.createEl('span', { 
+    const deleteBtn = row.createSpan({ 
       cls: 'row-delete-btn',
       attr: { title: 'Delete model' }
     });
@@ -3477,7 +3477,7 @@ if (this.validatePath(normalizedPath)) {
 
   private openModelSettingsModal(model: CustomModel) {
     const doc = this.containerEl.ownerDocument;
-    const modal = doc.createElement('div');
+    const modal = doc.createDiv();
     modal.className = 'model-settings-modal-container is-visible'; // Add is-visible class
     
     const modalBg = modal.createDiv({ cls: 'model-settings-modal-bg' });
@@ -3493,7 +3493,7 @@ if (this.validatePath(normalizedPath)) {
     // Temperature slider
     const tempContainer = modalBody.createDiv({ cls: 'model-settings-slider-container' });
     tempContainer.createEl('label', { text: 'Temperature' });
-    const tempValue = tempContainer.createEl('span', { 
+    const tempValue = tempContainer.createSpan({ 
       cls: 'model-settings-slider-value',
       text: (model.temperature ?? 0.7).toFixed(2)
     });
@@ -3507,7 +3507,7 @@ if (this.validatePath(normalizedPath)) {
         value: (model.temperature ?? 0.7).toString()
       }
     });
-    tempContainer.createEl('div', { 
+    tempContainer.createDiv({ 
       cls: 'setting-item-description',
       text: 'Controls randomness. Lower values make output more focused and deterministic. (0.0-2.0)'
     });
@@ -3519,7 +3519,7 @@ if (this.validatePath(normalizedPath)) {
     // Top P slider
     const topPContainer = modalBody.createDiv({ cls: 'model-settings-slider-container' });
     topPContainer.createEl('label', { text: 'Top P' });
-    const topPValue = topPContainer.createEl('span', { 
+    const topPValue = topPContainer.createSpan({ 
       cls: 'model-settings-slider-value',
       text: (model.topP ?? 0.95).toFixed(2)
     });
@@ -3533,7 +3533,7 @@ if (this.validatePath(normalizedPath)) {
         value: (model.topP ?? 0.95).toString()
       }
     });
-    topPContainer.createEl('div', { 
+    topPContainer.createDiv({ 
       cls: 'setting-item-description',
       text: 'Controls diversity via nucleus sampling. Lower values make output more focused. (0.0-1.0)'
     });
@@ -3787,7 +3787,7 @@ if (this.validatePath(normalizedPath)) {
     })(); });
 
     // Delete button
-    const deleteBtn = row.createEl('span', { 
+    const deleteBtn = row.createSpan({ 
       cls: 'row-delete-btn',
       attr: { title: 'Delete embedding model' }
     });
@@ -3882,8 +3882,8 @@ if (this.validatePath(normalizedPath)) {
     // Collapsible section to show current exclusions
     const exclusionsDisplay = exclusionContainer.createDiv({ cls: 'exclusions-display' });
     const exclusionsHeader = exclusionsDisplay.createDiv({ cls: 'exclusions-header' });
-    const toggleIcon = exclusionsHeader.createEl('span', { cls: 'exclusions-toggle-icon', text: '▶' });
-    exclusionsHeader.createEl('span', { text: 'View Excluded Items', cls: 'exclusions-title' });
+    const toggleIcon = exclusionsHeader.createSpan({ cls: 'exclusions-toggle-icon', text: '▶' });
+    exclusionsHeader.createSpan({ text: 'View Excluded Items', cls: 'exclusions-title' });
     
     const exclusionsContent = exclusionsDisplay.createDiv({ cls: 'exclusions-content collapsed' });
     
@@ -3901,12 +3901,12 @@ if (this.validatePath(normalizedPath)) {
     
     const excludedFolders: string[] = this.plugin.settings.excludedFolders || [];
     if (excludedFolders.length === 0) {
-      foldersList.createEl('span', { text: 'No folders excluded', cls: 'no-exclusions' });
+      foldersList.createSpan({ text: 'No folders excluded', cls: 'no-exclusions' });
     } else {
       excludedFolders.forEach((folder: string) => {
         const item = foldersList.createDiv({ cls: 'exclusion-item' });
-        item.createEl('span', { text: folder, cls: 'exclusion-item-text' });
-        const removeBtn = item.createEl('span', { cls: 'exclusion-remove-btn', text: '×' });
+        item.createSpan({ text: folder, cls: 'exclusion-item-text' });
+        const removeBtn = item.createSpan({ cls: 'exclusion-remove-btn', text: '×' });
         removeBtn.addEventListener('click', () => { void (async () => {
           const idx = this.plugin.settings.excludedFolders.indexOf(folder);
           if (idx > -1) {
@@ -3926,12 +3926,12 @@ if (this.validatePath(normalizedPath)) {
     
     const excludedFiles: string[] = this.plugin.settings.excludedFiles || [];
     if (excludedFiles.length === 0) {
-      filesList.createEl('span', { text: 'No files excluded', cls: 'no-exclusions' });
+      filesList.createSpan({ text: 'No files excluded', cls: 'no-exclusions' });
     } else {
       excludedFiles.forEach((file: string) => {
         const item = filesList.createDiv({ cls: 'exclusion-item' });
-        item.createEl('span', { text: file, cls: 'exclusion-item-text' });
-        const removeBtn = item.createEl('span', { cls: 'exclusion-remove-btn', text: '×' });
+        item.createSpan({ text: file, cls: 'exclusion-item-text' });
+        const removeBtn = item.createSpan({ cls: 'exclusion-remove-btn', text: '×' });
         removeBtn.addEventListener('click', () => { void (async () => {
           const idx = this.plugin.settings.excludedFiles.indexOf(file);
           if (idx > -1) {
@@ -4155,7 +4155,7 @@ if (this.validatePath(normalizedPath)) {
           // Show install link
           if (!card.querySelector('.mcp-prereq-install-link')) {
             const linkRow = card.createDiv({ cls: 'mcp-prereq-install-link' });
-            linkRow.createEl('span', { text: 'Not installed — ' });
+            linkRow.createSpan({ text: 'Not installed — ' });
             const a = linkRow.createEl('a', { text: `${installLabel} ↗`, cls: 'mcp-prereq-link' });
             a.href = installUrl;
             a.target = '_blank';
@@ -4254,7 +4254,7 @@ if (this.validatePath(normalizedPath)) {
     
     // Status cell
     const statusCell = row.createEl('td');
-    statusCell.createEl('span', { 
+    statusCell.createSpan({ 
       cls: `mcp-status-badge ${server.disabled ? 'disabled' : 'enabled'}`,
       text: server.disabled ? 'Disabled' : 'Enabled'
     });

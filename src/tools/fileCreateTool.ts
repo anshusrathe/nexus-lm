@@ -96,7 +96,7 @@ export class FileCreationReviewModal extends Modal {
     messageContainer.addClass('nl-padding-40px20px');
     messageContainer.addClass('nl-text-align-center');
 
-    messageContainer.createEl('div', {
+    messageContainer.createDiv({
       text: '📄',
       cls: 'file-preview-icon nl-font-size-48px nl-margin-bottom-20px'
     });
@@ -311,7 +311,7 @@ export async function handleFileCreationPrompt(
     const view = app.workspace.getActiveViewOfType(View);
     const doc = view?.containerEl.ownerDocument ?? activeDocument;
     const workspace = doc.querySelector('.workspace') || doc.body;
-    spinner = doc.createElement('div');
+    spinner = doc.createDiv();
     spinner.className = 'loading-spinner visible';
     spinner.addClass('nl-position-fixed');
     spinner.addClass('nl-top-18px');

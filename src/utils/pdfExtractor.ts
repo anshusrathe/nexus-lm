@@ -344,7 +344,7 @@ export class PdfExtractOptionsModal extends Modal {
     // Preview navigation
     const previewNav = rightPanel.createDiv({ cls: 'pdf-preview-nav' });
     this.previewNavPrev = previewNav.createEl('button', { text: '◀ Previous' });
-    this.previewPageInfo = previewNav.createEl('span', { cls: 'pdf-preview-page-info' });
+    this.previewPageInfo = previewNav.createSpan({ cls: 'pdf-preview-page-info' });
     this.previewNavNext = previewNav.createEl('button', { text: 'Next ▶' });
     
     this.previewNavPrev.onclick = () => {

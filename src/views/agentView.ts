@@ -369,7 +369,7 @@ export class AgentView extends ItemView {
   private openAgentFileMenu(anchorEl: HTMLElement): void {
     this.closeAgentFileMenu();
 
-    const menu = this.containerEl.ownerDocument.createElement('div');
+    const menu = this.containerEl.ownerDocument.createDiv();
     menu.className = 'context-file-menu';
 
     const rect = anchorEl.getBoundingClientRect();
@@ -458,7 +458,7 @@ export class AgentView extends ItemView {
 
     const section = container.createDiv({ cls: 'context-file-menu-section' });
     section.createEl('hr', { cls: 'menu-separator' });
-    section.createEl('div', {
+    section.createDiv({
       text: 'Embedding indexes',
       cls: 'context-file-menu-section-header',
     });
@@ -962,11 +962,11 @@ export class AgentView extends ItemView {
 
     for (const group of modelGroups) {
       const headerEl = modelList.createDiv({ cls: 'model-select-menu-header' });
-      headerEl.createEl('span', { text: group.label });
+      headerEl.createSpan({ text: group.label });
 
       for (const model of group.models) {
         const item = modelList.createDiv({ cls: 'model-select-menu-item' });
-        item.createEl('span', { text: model.name });
+        item.createSpan({ text: model.name });
         if (model.provider === activeProvider && model.id === activeModel) {
           item.addClass('selected');
         }
@@ -1037,7 +1037,7 @@ export class AgentView extends ItemView {
     const calloutEl = this.containerEl.createDiv({ cls: 'agent-plug-callout' });
 
     const header = calloutEl.createDiv({ cls: 'agent-plug-callout-header' });
-    header.createEl('span', { text: 'Agent Capabilities' });
+    header.createSpan({ text: 'Agent Capabilities' });
     const closeBtn = header.createEl('button', { cls: 'close-btn' });
     setIcon(closeBtn, 'x');
     closeBtn.addEventListener('click', (e) => {
@@ -1070,7 +1070,7 @@ export class AgentView extends ItemView {
 
         checkbox.checked = isChecked;
 
-        item.createEl('span', { text: server.name });
+        item.createSpan({ text: server.name });
 
         checkbox.addEventListener('change', async (e) => {
           e.stopPropagation();

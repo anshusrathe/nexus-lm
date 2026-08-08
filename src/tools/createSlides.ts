@@ -711,7 +711,7 @@ export class SlideshowSettingsModal extends Modal {
     let defaultVoice = this.availableVoices.find(v => v.default) || this.availableVoices[0];
     
     for (const voice of this.availableVoices) {
-      const option = this.containerEl.ownerDocument.createElement('option');
+      const option = this.containerEl.ownerDocument.createEl('option');
       option.value = voice.name;
       option.textContent = this.formatVoiceName(voice);
       if (voice.default) {
@@ -926,7 +926,7 @@ export class SlideshowVoiceSettingsModal extends Modal {
     }
     
     for (const voice of this.availableVoices) {
-      const option = this.containerEl.ownerDocument.createElement('option');
+      const option = this.containerEl.ownerDocument.createEl('option');
       option.value = voice.name;
       option.textContent = this.formatVoiceName(voice);
       this.voiceSelectDropdown.appendChild(option);
@@ -1214,7 +1214,7 @@ export class ZenSlideshowModal extends Modal {
   }
 
   private renderMindmapNode(parent: HTMLElement, node: ZenHeadingNode, isRoot: boolean): HTMLElement {
-    const nodeEl = parent.createEl('div', { 
+    const nodeEl = parent.createDiv({ 
       cls: `zen-node zen-node-h${node.level}`,
       attr: { 'data-level': node.level, 'data-node-id': this.getNodeId(node) }
     });

@@ -16,7 +16,7 @@ export function openSessionHistoryModal(options: SessionHistoryModalOptions): HT
   }
 
   const activeDoc = options.app.workspace.containerEl?.ownerDocument || document;
-  const modal = activeDoc.createElement('div');
+  const modal = activeDoc.createDiv();
   modal.className = 'ai-chat-session-history-modal';
 
   modal.createDiv({ cls: 'modal-bg' });
@@ -71,9 +71,9 @@ export function openSessionHistoryModal(options: SessionHistoryModalOptions): HT
       }
       paginationDiv.addClass('nl-display-none');
     } else {
-      const fragment = activeDoc.createDocumentFragment();
+      const fragment = createFragment();
       sessions.forEach(meta => {
-        const card = activeDoc.createElement('div');
+        const card = activeDoc.createDiv();
         card.className = 'session-card';
 
         const sessionInfo = card.createDiv({ cls: 'session-info' });
@@ -126,7 +126,7 @@ export function openSessionHistoryModal(options: SessionHistoryModalOptions): HT
           }
         });
 
-        const deleteBtn = activeDoc.createElement('button');
+        const deleteBtn = activeDoc.createEl('button');
         deleteBtn.className = 'delete-session-btn';
         setIcon(deleteBtn, 'trash-2');
         deleteBtn.title = 'Delete session';

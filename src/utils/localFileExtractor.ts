@@ -6,7 +6,7 @@ import { isTextFile } from './multimodalUtils';
 
 function getMammoth(): any {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-var-requires -- 'mammoth' has no ESM exports/types; lazy require keeps it out of the main bundle.
     return require('mammoth');
   } catch (err) {
     console.warn('[NexusLM] mammoth module could not be loaded:', err);

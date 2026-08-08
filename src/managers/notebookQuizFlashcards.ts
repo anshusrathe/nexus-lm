@@ -393,7 +393,7 @@ export function triggerConfetti(element: HTMLElement) {
   const confettiCount = 30;
   
   for (let i = 0; i < confettiCount; i++) {
-    const confetti = doc.createElement('div');
+    const confetti = doc.createDiv();
     confetti.className = 'quiz-confetti';
     confetti.setCssProps({
       '--confetti-bg': colors[Math.floor(Math.random() * colors.length)],
@@ -671,8 +671,8 @@ export class QuizRenderer {
       
       
       const questionText = questionDiv.createDiv({ cls: 'quiz-question-text' });
-      questionText.createEl('span', { text: `${qIndex + 1}. `, cls: 'quiz-question-number' });
-      const questionContent = questionText.createEl('span', { cls: 'quiz-question-content' });
+      questionText.createSpan({ text: `${qIndex + 1}. `, cls: 'quiz-question-number' });
+      const questionContent = questionText.createSpan({ cls: 'quiz-question-content' });
       
       { const _comp = new Component();
       void MarkdownRenderer.render(this.app, mcq.question, questionContent, '', _comp);
@@ -699,10 +699,10 @@ export class QuizRenderer {
         checkbox.checked = mcq.selectedOption === optIndex;
         checkbox.disabled = mcq.isAnswered;
         
-        const optionText = optionLabel.createEl('span', { cls: 'quiz-option-text' });
-        optionText.createEl('span', { text: `${String.fromCharCode(65 + optIndex)}. `, cls: 'quiz-option-letter' });
+        const optionText = optionLabel.createSpan({ cls: 'quiz-option-text' });
+        optionText.createSpan({ text: `${String.fromCharCode(65 + optIndex)}. `, cls: 'quiz-option-letter' });
         
-        const optionContent = optionText.createEl('span', { cls: 'quiz-option-content' });
+        const optionContent = optionText.createSpan({ cls: 'quiz-option-content' });
         { const _comp = new Component();
         void MarkdownRenderer.render(this.app, option.text, optionContent, '', _comp);
         _comp.load(); }
@@ -738,7 +738,7 @@ export class QuizRenderer {
         const explainContainer = questionDiv.createDiv({ cls: 'quiz-explain-container' });
         const explainBtn = explainContainer.createEl('button', { cls: 'quiz-explain-btn' });
         setIcon(explainBtn, 'help-circle');
-        explainBtn.createEl('span', { text: 'Explain' });
+        explainBtn.createSpan({ text: 'Explain' });
 
         
         const explanationBox = explainContainer.createDiv({ cls: 'quiz-explanation-box hidden' });
@@ -762,7 +762,7 @@ export class QuizRenderer {
           explainBtn.empty();
           setIcon(explainBtn, 'loader-2');
           explainBtn.querySelector('svg')?.addClass('spin');
-          explainBtn.createEl('span', { text: 'Generating...' });
+          explainBtn.createSpan({ text: 'Generating...' });
           
           try {
             
@@ -797,7 +797,7 @@ export class QuizRenderer {
             explainBtn.removeClass('loading');
             explainBtn.empty();
             setIcon(explainBtn, 'help-circle');
-            explainBtn.createEl('span', { text: 'Explain' });
+            explainBtn.createSpan({ text: 'Explain' });
           }
         };
       }
@@ -809,7 +809,7 @@ export class QuizRenderer {
     
     if (answeredCount > 0) {
       const scoreDiv = this.container.createDiv({ cls: 'quiz-score-summary' });
-      scoreDiv.createEl('span', { 
+      scoreDiv.createSpan({ 
         text: `Score: ${correctCount}/${answeredCount} (${Math.round(correctCount/answeredCount*100)}%)`,
         cls: 'quiz-score-text'
       });
@@ -819,22 +819,22 @@ export class QuizRenderer {
   private renderExplanationContent(container: HTMLElement, explanation: string) {
     
     const header = container.createDiv({ cls: 'quiz-explanation-header' });
-    header.createEl('span', { text: '💡 Explanation', cls: 'quiz-explanation-title' });
+    header.createSpan({ text: '💡 Explanation', cls: 'quiz-explanation-title' });
     
     const copyBtn = header.createEl('button', { cls: 'quiz-explanation-copy-btn' });
     setIcon(copyBtn, 'copy');
-    copyBtn.createEl('span', { text: 'Copy' });
+    copyBtn.createSpan({ text: 'Copy' });
     copyBtn.onclick = async () => {
       try {
         await navigator.clipboard.writeText(explanation);
         copyBtn.empty();
         setIcon(copyBtn, 'check');
-        copyBtn.createEl('span', { text: 'Copied!' });
+        copyBtn.createSpan({ text: 'Copied!' });
         copyBtn.addClass('copied');
         window.setTimeout(() => {
           copyBtn.empty();
           setIcon(copyBtn, 'copy');
-          copyBtn.createEl('span', { text: 'Copy' });
+          copyBtn.createSpan({ text: 'Copy' });
           copyBtn.removeClass('copied');
         }, 2000);
       } catch {
@@ -928,7 +928,7 @@ export class FlashcardRenderer {
       this.state.currentIndex = visibleCards.length - 1;
     }
 
-    header.createEl('span', { 
+    header.createSpan({ 
       text: `${this.state.currentIndex + 1} / ${visibleCards.length}`,
       cls: 'flashcard-counter'
     });

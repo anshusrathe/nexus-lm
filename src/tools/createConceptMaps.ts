@@ -1101,14 +1101,14 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     const defaultNodeColor = '#7c3aed';
 
     // Create SVG element
-    const svg = this.doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const svg = this.doc.createSvg('svg');
     svg.setAttribute('width', width.toString());
     svg.setAttribute('height', height.toString());
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     svg.addClass('nl-background-var--background-primary');
 
     // Add styles
-    const style = this.doc.createElementNS('http://www.w3.org/2000/svg', 'style');
+    const style = this.doc.createSvg('style');
     style.textContent = `
       .concept-circle { fill: none; stroke: rgba(100, 100, 100, 0.5); stroke-width: 2.5; transition: opacity 0.3s; }
       .concept-node { cursor: pointer; transition: opacity 0.3s; }
@@ -1134,7 +1134,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     svg.appendChild(style);
 
     // Add defs
-    const defs = this.doc.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const defs = this.doc.createSvg('defs');
     svg.appendChild(defs);
 
     // Build theme map (node ID -> theme index)
@@ -1162,7 +1162,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     );
 
     // Draw inner circle
-    const innerCircle = this.doc.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    const innerCircle = this.doc.createSvg('circle');
     innerCircle.setAttribute('class', 'concept-circle');
     innerCircle.setAttribute('cx', centerX.toString());
     innerCircle.setAttribute('cy', centerY.toString());
@@ -1170,7 +1170,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     svg.appendChild(innerCircle);
 
     // Draw outer circle
-    const outerCircle = this.doc.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    const outerCircle = this.doc.createSvg('circle');
     outerCircle.setAttribute('class', 'concept-circle');
     outerCircle.setAttribute('cx', centerX.toString());
     outerCircle.setAttribute('cy', centerY.toString());
@@ -1210,7 +1210,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
         const controlX = midX + (centerToMidX / centerDist) * curveFactor;
         const controlY = midY + (centerToMidY / centerDist) * curveFactor;
         
-        const path = this.doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const path = this.doc.createSvg('path');
         const d = `M ${fromNode.x} ${fromNode.y} Q ${controlX} ${controlY} ${toNode.x} ${toNode.y}`;
         path.setAttribute('class', 'concept-relation-line');
         path.setAttribute('d', d);
@@ -1227,7 +1227,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
         relationNodePositions.push({ x: curveX, y: curveY });
         
         // Draw relation node on the curve
-        const relNode = this.doc.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        const relNode = this.doc.createSvg('circle');
         relNode.setAttribute('class', 'concept-relation-node');
         relNode.setAttribute('cx', curveX.toString());
         relNode.setAttribute('cy', curveY.toString());
@@ -1455,11 +1455,11 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     centerX: number,
     centerY: number
   ) {
-    const group = this.doc.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const group = this.doc.createSvg('g');
     group.setAttribute('class', 'concept-node');
     
     // Draw circle with themed color
-    const circle = this.doc.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    const circle = this.doc.createSvg('circle');
     circle.setAttribute('class', 'concept-node-circle');
     circle.setAttribute('cx', x.toString());
     circle.setAttribute('cy', y.toString());
@@ -1511,7 +1511,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     textPositions.push({ x: textX, y: textY, width: textWidth, height: textHeight, label });
     
     // Create text element
-    const text = this.doc.createElementNS('http://www.w3.org/2000/svg', 'text');
+    const text = this.doc.createSvg('text');
     text.setAttribute('class', 'concept-node-text');
     text.setAttribute('x', textX.toString());
     text.setAttribute('y', textY.toString());
@@ -1528,7 +1528,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
   private showTooltip(event: MouseEvent, text: string, svg: SVGElement) {
     this.hideTooltip();
     
-    const tooltip = this.doc.createElement('div');
+    const tooltip = this.doc.createDiv();
     tooltip.className = 'concept-tooltip';
     tooltip.textContent = text;
     this.doc.body.appendChild(tooltip);
@@ -1590,12 +1590,12 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     themeColors: Array<{ glow: string; label: string }>,
     relations: Array<{ from: string; to: string; reason: string }>
   ) {
-    const group = this.doc.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const group = this.doc.createSvg('g');
     group.setAttribute('class', 'concept-node');
     group.setAttribute('data-node-id', nodeId);
     
     // Draw circle with default color
-    const circle = this.doc.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    const circle = this.doc.createSvg('circle');
     circle.setAttribute('class', 'concept-node-circle');
     circle.setAttribute('cx', x.toString());
     circle.setAttribute('cy', y.toString());
@@ -1687,7 +1687,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     textPositions.push({ x: textX, y: textY, width: textWidth, height: textHeight, label });
     
     // Create text element
-    const text = this.doc.createElementNS('http://www.w3.org/2000/svg', 'text');
+    const text = this.doc.createSvg('text');
     text.setAttribute('class', 'concept-node-text');
     text.setAttribute('x', textX.toString());
     text.setAttribute('y', textY.toString());
@@ -1948,7 +1948,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
   private showThemeInfo(text: string, borderColor: string, mouseX?: number, mouseY?: number, svg?: SVGElement) {
     this.hideThemeInfo();
     
-    const infoBox = this.doc.createElement('div');
+    const infoBox = this.doc.createDiv();
     infoBox.className = 'concept-theme-info';
     
     // Render markdown content
@@ -2296,12 +2296,12 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     });
     
     // Create overlay container
-    const overlay = this.doc.createElement('div');
+    const overlay = this.doc.createDiv();
     overlay.className = 'theme-overlay-container';
     overlay.addClass('theme-overlay-container-style');
     
     // Create theme box (left side)
-    const themeBox = this.doc.createElement('div');
+    const themeBox = this.doc.createDiv();
     themeBox.className = 'theme-overlay-box';
     themeBox.addClass('theme-overlay-box-style');
     themeBox.setCssProps({ '--theme-glow': glowColor });
@@ -2310,23 +2310,23 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     this.renderMarkdownTooltip(themeReason, themeBox);
     
     // Create nodes column (right side)
-    const nodesColumn = this.doc.createElement('div');
+    const nodesColumn = this.doc.createDiv();
     nodesColumn.className = 'theme-overlay-nodes';
     nodesColumn.addClass('theme-overlay-nodes-style');
     
     themeNodeLabels.forEach((node, index) => {
-      const nodeItem = this.doc.createElement('div');
+      const nodeItem = this.doc.createDiv();
       nodeItem.addClass('theme-overlay-node-item');
       nodeItem.setCssProps({
         '--theme-glow': glowColor,
         '--animation-delay': `${0.15 + index * 0.05}s`
       });
       
-      const bullet = this.doc.createElement('div');
+      const bullet = this.doc.createDiv();
       bullet.addClass('theme-overlay-bullet');
       bullet.setCssProps({ '--theme-glow': glowColor });
       
-      const label = this.doc.createElement('span');
+      const label = this.doc.createSpan();
       label.textContent = node.label;
       
       nodeItem.appendChild(bullet);
@@ -2413,7 +2413,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
   ) {
     this.hideThemeInfo();
     
-    const infoBox = this.doc.createElement('div');
+    const infoBox = this.doc.createDiv();
     infoBox.className = 'concept-theme-info';
     
     // Render markdown content
@@ -2520,7 +2520,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
   ) {
     this.hideThemeInfo();
     
-    const infoBox = this.doc.createElement('div');
+    const infoBox = this.doc.createDiv();
     infoBox.className = 'concept-theme-info';
     
     // Render markdown content
@@ -2677,7 +2677,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     
     // Draw each line
     displayLines.forEach((line, idx) => {
-      const textEl = this.doc.createElementNS('http://www.w3.org/2000/svg', 'text');
+      const textEl = this.doc.createSvg('text');
       textEl.setAttribute('class', 'concept-center-text');
       textEl.setAttribute('x', centerX.toString());
       textEl.setAttribute('y', (startY + idx * lineHeight).toString());
@@ -3279,7 +3279,7 @@ export class ConceptMapVisualizationModal extends Modal {
     if (!nodeText && !nodeId) return;
     
     // Create tooltip
-    const tooltip = this.containerEl.ownerDocument.createElement('div');
+    const tooltip = this.containerEl.ownerDocument.createDiv();
     tooltip.className = 'mobile-node-tooltip';
     tooltip.addClass('mobile-node-tooltip-style');
     
@@ -3380,7 +3380,7 @@ export class ConceptMapVisualizationModal extends Modal {
     });
     
     // Add visual feedback overlay
-    const overlay = this.containerEl.ownerDocument.createElement('div');
+    const overlay = this.containerEl.ownerDocument.createDiv();
     overlay.className = 'mobile-node-highlight-overlay';
     overlay.addClass('mobile-node-highlight-overlay-style');
     overlay.textContent = `Connections for: ${nodeId}`;
@@ -3441,21 +3441,21 @@ export class ConceptMapVisualizationModal extends Modal {
     }
     
     // Create thematic overlay
-    const overlay = this.containerEl.ownerDocument.createElement('div');
+    const overlay = this.containerEl.ownerDocument.createDiv();
     overlay.className = 'mobile-thematic-overlay';
     overlay.addClass('mobile-thematic-overlay-style');
     overlay.setCssProps({ '--theme-glow': glowColor });
     
-    const title = this.containerEl.ownerDocument.createElement('h3');
+    const title = this.containerEl.ownerDocument.createEl('h3');
     title.addClass('mobile-thematic-title');
     title.setCssProps({ '--theme-glow': glowColor });
     title.textContent = nodeId;
     
-    const content = this.containerEl.ownerDocument.createElement('p');
+    const content = this.containerEl.ownerDocument.createEl('p');
     content.addClass('mobile-thematic-content');
     content.textContent = themeReason;
     
-    const closeButton = this.containerEl.ownerDocument.createElement('button');
+    const closeButton = this.containerEl.ownerDocument.createEl('button');
     closeButton.addClass('mobile-thematic-close-btn');
     closeButton.textContent = '×';
     closeButton.addEventListener('click', () => overlay.remove());
