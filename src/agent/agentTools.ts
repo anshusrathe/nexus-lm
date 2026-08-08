@@ -108,14 +108,6 @@ async function searchContent(deps: AgentDependencies, query: string, limit: numb
   }
 
   const output = JSON.stringify(matched);
-  console.log('[NexusAgent::search_vault] BM25 search:', {
-    query,
-    limit,
-    resultCount: matched.length,
-    totalOutputLength: output.length,
-    paths: matched.map(m => m.path),
-  });
-  console.log('[NexusAgent::search_vault] Agent received result content:', matched);
   return output;
 }
 

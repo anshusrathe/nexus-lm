@@ -239,7 +239,7 @@ export class AgentView extends ItemView {
           answer: t.answer || '',
           timestamp: t.startedAt,
           id: t.id,
-          agentSteps: t.events as unknown[],
+          agentSteps: t.events,
           isAgentResponse: true,
           modelName: t.modelId,
           modelProvider: t.modelProvider,
@@ -875,7 +875,7 @@ export class AgentView extends ItemView {
           this.plugin.settings.enableThinkingMode = false;
         } else {
           this.plugin.settings.enableThinkingMode = true;
-          this.plugin.settings.gemini25ThinkingMode = option.id as AISettings['gemini25ThinkingMode'];
+          this.plugin.settings.gemini25ThinkingMode = option.id;
         }
         await this.plugin.saveSettings();
         menuEl.remove();
@@ -918,7 +918,7 @@ export class AgentView extends ItemView {
       item.addEventListener('click', async (e) => {
         e.stopPropagation();
         this.plugin.settings.enableThinkingMode = true;
-        this.plugin.settings.gemini3ThinkingLevel = option.id as AISettings['gemini3ThinkingLevel'];
+        this.plugin.settings.gemini3ThinkingLevel = option.id;
         await this.plugin.saveSettings();
         menuEl.remove();
         this.updateThinkingButtonLabel();
@@ -1455,7 +1455,7 @@ export class AgentView extends ItemView {
             modelId,
             messages as unknown as Parameters<typeof svc.generateContentWithToolsOnce>[1],
             providerTools as unknown as Parameters<typeof svc.generateContentWithToolsOnce>[2],
-            geminiOpts as Parameters<typeof svc.generateContentWithToolsOnce>[3]
+            geminiOpts
           );
           if (res.thinking) emitThinking(res.thinking);
           return {
@@ -1487,7 +1487,7 @@ export class AgentView extends ItemView {
           let geminiFinishReason: string | undefined;
           const { GoogleGenerativeAI } = await import('@google/generative-ai');
           const genAI = new GoogleGenerativeAI(this.plugin.settings.geminiApiKey || this.plugin.settings.apiKey);
-          const modelInstance = genAI.getGenerativeModel({ model: modelId, generationConfig: geminiOpts as Record<string, unknown> });
+          const modelInstance = genAI.getGenerativeModel({ model: modelId, generationConfig: geminiOpts });
           const streamResult = await modelInstance.generateContentStream(prompt, { signal: geminiOpts.abortSignal as AbortSignal | undefined });
           for await (const chunk of streamResult.stream) {
             captureGeminiThinking(chunk);
@@ -1516,7 +1516,7 @@ export class AgentView extends ItemView {
             modelId,
             messages as unknown as Parameters<typeof svc.generateContentWithToolsOnce>[1],
             providerTools,
-            groqOpts as Parameters<typeof svc.generateContentWithToolsOnce>[3]
+            groqOpts
           );
           if (res.thinking) emitThinking(res.thinking);
           return {
@@ -1553,7 +1553,7 @@ export class AgentView extends ItemView {
             modelId,
             messages as unknown as Parameters<typeof svc.generateContentWithToolsOnce>[1],
             providerTools,
-            baseOpts as Parameters<typeof svc.generateContentWithToolsOnce>[3]
+            baseOpts
           );
           if (res.thinking) emitThinking(res.thinking);
           return {
@@ -1591,7 +1591,7 @@ export class AgentView extends ItemView {
             modelId,
             ollamaMessages as unknown as Parameters<typeof svc.generateContentWithToolsOnce>[1],
             providerTools as unknown as Parameters<typeof svc.generateContentWithToolsOnce>[2],
-            ollamaOpts as Parameters<typeof svc.generateContentWithToolsOnce>[3]
+            ollamaOpts
           );
           if (res.thinking) emitThinking(res.thinking);
           return {
@@ -1627,7 +1627,7 @@ export class AgentView extends ItemView {
             modelId,
             messages as unknown as Parameters<typeof svc.generateContentWithToolsOnce>[1],
             providerTools as unknown as Parameters<typeof svc.generateContentWithToolsOnce>[2],
-            baseOpts as Parameters<typeof svc.generateContentWithToolsOnce>[3]
+            baseOpts
           );
           if (res.thinking) emitThinking(res.thinking);
           return {
@@ -1660,7 +1660,7 @@ export class AgentView extends ItemView {
             modelId,
             messages as unknown as Parameters<NonNullable<typeof unifiedProvider.generateContentWithToolsOnce>>[1],
             providerTools,
-            baseOpts as Parameters<NonNullable<typeof unifiedProvider.generateContentWithToolsOnce>>[3]
+            baseOpts
           );
           if (res.thinking) emitThinking(res.thinking);
           return {

@@ -4,10 +4,14 @@ import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { isTextFile } from './multimodalUtils';
 
-function getMammoth(): any {
+interface MammothModule {
+  extractRawText(input: { arrayBuffer: ArrayBuffer }): Promise<{ value: string }>;
+}
+
+function getMammoth(): MammothModule | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires -- 'mammoth' has no ESM exports/types; lazy require keeps it out of the main bundle.
-    return require('mammoth');
+     
+    return require('mammoth') as MammothModule;
   } catch (err) {
     console.warn('[NexusLM] mammoth module could not be loaded:', err);
     return null;

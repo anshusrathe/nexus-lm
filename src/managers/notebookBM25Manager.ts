@@ -374,7 +374,7 @@ export class NotebookBM25Manager {
             };
             const response = await OramaWorkerManager.getInstance().save(this.notebookId, true, metadata);
             const compressed = response.data as Uint8Array;
-            await this.app.vault.adapter.writeBinary(indexPath, compressed.buffer as ArrayBuffer);
+            await this.app.vault.adapter.writeBinary(indexPath, compressed.buffer);
         } catch {
             // Failed to save index
         }

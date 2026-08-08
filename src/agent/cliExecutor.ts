@@ -51,7 +51,10 @@ export function isWriteCliCommand(command: string): boolean {
 }
 
 interface ExecProxy {
-  exec: (command: string, options: Record<string, unknown>, callback: (err: ExecException | null, stdout: string, stderr: string) => void) => any;
+  exec: (command: string, options: Record<string, unknown>, callback: (err: ExecException | null, stdout: string, stderr: string) => void) => {
+    stdout: NodeJS.ReadableStream | null;
+    stderr: NodeJS.ReadableStream | null;
+  };
 }
 
 function loadExec(): ExecProxy | null {
@@ -140,10 +143,10 @@ async function verifyBinary(binaryPath: string): Promise<boolean> {
   if (!binaryPath) return false;
   try {
     const { stdout } = await execAsync(`"${binaryPath}" version`, { timeout: 5000, encoding: 'utf-8', windowsHide: true });
-    console.log('[cliExecutor] verifyBinary SUCCESS for path="' + binaryPath + '" stdout="' + stdout.trim() + '"');
+    
     return true;
   } catch (error: unknown) {
-    console.log('[cliExecutor] verifyBinary FAILED for path="' + binaryPath + '" error=' + String(error));
+    
     return false;
   }
 }
@@ -159,7 +162,7 @@ async function findBinaryInPaths(): Promise<string | null> {
       if (stdout) {
         const lines = stdout.split('\n').map((s) => s.trim()).filter(Boolean);
         if (lines.length > 0) {
-          console.log('[cliExecutor] findBinaryInPaths found via "' + cmd + '": ' + lines[0]);
+          
           return lines[0];
         }
       }
@@ -170,17 +173,17 @@ async function findBinaryInPaths(): Promise<string | null> {
 
   for (const candidate of knownInstallPaths()) {
     if (await verifyBinary(candidate)) {
-      console.log('[cliExecutor] findBinaryInPaths found via known path: ' + candidate);
+      
       return candidate;
     }
   }
 
-  console.log('[cliExecutor] findBinaryInPaths failed to find binary');
+  
   return null;
 }
 
 async function locateBinary(explicitPath?: string, force?: boolean): Promise<string | null> {
-  console.log('[cliExecutor] locateBinary called explicitPath=' + (explicitPath ?? '(none)') + ' force=' + (force ?? false) + ' cached=' + (resolvedBinary === undefined ? 'none' : (resolvedBinary ?? 'null')));
+  
 
   if (resolvedBinary !== undefined && !explicitPath && !force) return resolvedBinary;
 
@@ -189,7 +192,7 @@ async function locateBinary(explicitPath?: string, force?: boolean): Promise<str
       resolvedBinary = explicitPath;
       return resolvedBinary;
     }
-    console.log('[cliExecutor] locateBinary: explicit path FAILED verify=' + explicitPath);
+    
     return null;
   }
 
@@ -226,15 +229,15 @@ async function ensurePipeInitialized(binary: string): Promise<void> {
   if (pipeInitialized || !isWindows) return;
 
   try {
-    console.log('[cliExecutor] pipe warm-up starting with windowsHide=false');
+    
     await execAsync(`"${binary}" vault`, {
       timeout: 10000,
       encoding: 'utf-8',
       windowsHide: false,
     });
-    console.log('[cliExecutor] pipe warm-up succeeded');
+    
   } catch (error: unknown) {
-    console.log('[cliExecutor] pipe warm-up failed (best-effort): ' + String(error));
+    
   } finally {
     pipeInitialized = true;
   }
@@ -275,7 +278,7 @@ function shouldRetryForPipeInit(result: CliResult): boolean {
  */
 export async function executeCliCommand(command: string, timeoutMs = 60000, explicitPath?: string, onProgress?: (chunk: string) => void): Promise<CliResult> {
   const binary = await locateBinary(explicitPath);
-  console.log('[cliExecutor] executeCliCommand binary=' + (binary ?? 'null') + ' command="' + command + '"');
+  
 
   if (!binary) {
     return {
@@ -289,7 +292,7 @@ export async function executeCliCommand(command: string, timeoutMs = 60000, expl
   await ensurePipeInitialized(binary);
 
   const fullCommand = `"${binary}" ${command}`;
-  console.log('[cliExecutor] executing: ' + fullCommand);
+  
 
   const execOptions = {
     timeout: timeoutMs,
@@ -300,7 +303,7 @@ export async function executeCliCommand(command: string, timeoutMs = 60000, expl
 
   try {
     const { stdout, stderr } = await execAsync(fullCommand, execOptions, onProgress);
-    console.log('[cliExecutor] SUCCESS stdout=' + stdout.substring(0, 200));
+    
     return { stdout, stderr, exitCode: 0 };
   } catch (error: unknown) {
     const execErr = error as ExecException & {
@@ -329,13 +332,13 @@ export async function executeCliCommand(command: string, timeoutMs = 60000, expl
       exitCode,
     };
 
-    console.log('[cliExecutor] FAILED exitCode=' + exitCode + ' stderr="' + errStderr.substring(0, 200) + '"');
-    console.log('[cliExecutor] pipeInitialized=' + pipeInitialized + ' isWindows=' + (isWindows ?? process.platform === 'win32') + ' checking retry...');
+    
+    
 
     // Retry once with a visible console window if the failure looks like
     // the pipe was not yet established.
     if (shouldRetryForPipeInit(firstResult)) {
-      console.log('[cliExecutor] RETRY with windowsHide=false');
+      
       try {
         const { stdout: retryStdout, stderr: retryStderr } = await execAsync(fullCommand, {
           timeout: timeoutMs,
@@ -343,7 +346,7 @@ export async function executeCliCommand(command: string, timeoutMs = 60000, expl
           encoding: 'utf-8',
           windowsHide: false,
         }, onProgress);
-        console.log('[cliExecutor] RETRY SUCCESS stdout=' + retryStdout.substring(0, 200));
+        
         pipeInitialized = true;
         return { stdout: retryStdout, stderr: retryStderr, exitCode: 0 };
       } catch (retryError: unknown) {
@@ -353,7 +356,7 @@ export async function executeCliCommand(command: string, timeoutMs = 60000, expl
         };
         const retryStdout = retryExecErr.stdout || '';
         const retryStderr = retryExecErr.stderr || '';
-        console.log('[cliExecutor] RETRY ALSO FAILED');
+        
         return {
           stdout: retryStdout,
           stderr: retryStderr || retryExecErr.message || 'CLI command failed after retry',

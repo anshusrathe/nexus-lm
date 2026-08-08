@@ -356,16 +356,16 @@ export class OpenRouterService {
     }
 
     const data = response.json as OpenAIChatCompletionResponse;
-    const message = data.choices?.[0]?.message as unknown as Record<string, unknown> | undefined;
+    const message = data.choices?.[0]?.message;
     if (!message) return { content: '' };
 
-    const reasoning = message.reasoning as Record<string, unknown> | string | undefined;
-    const thinking = typeof message.reasoning_content === 'string' && (message.reasoning_content as string).length > 0
-      ? (message.reasoning_content as string)
+    const reasoning = message.reasoning;
+    const thinking = typeof message.reasoning_content === 'string' && (message.reasoning_content).length > 0
+      ? (message.reasoning_content)
       : typeof reasoning === 'string' && reasoning.length > 0
         ? reasoning
-        : typeof reasoning === 'object' && reasoning !== null && typeof reasoning.content === 'string' && (reasoning.content as string).length > 0
-          ? (reasoning.content as string)
+        : typeof reasoning === 'object' && reasoning !== null && typeof reasoning.content === 'string' && (reasoning.content).length > 0
+          ? (reasoning.content)
           : undefined;
 
     return {

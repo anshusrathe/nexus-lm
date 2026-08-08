@@ -2453,7 +2453,7 @@ export class EmbeddingsManager {
                 await adapter.mkdir(indexDir);
             }
 
-            await adapter.writeBinary(indexPath, compressed.buffer as ArrayBuffer);
+            await adapter.writeBinary(indexPath, compressed.buffer);
                     } catch {
                         // File may not exist or be accessible - safe to ignore
                     }

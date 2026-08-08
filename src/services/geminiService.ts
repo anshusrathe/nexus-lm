@@ -172,7 +172,7 @@ export class GeminiService {
   ): Promise<string> {
     const modelInstance = this.genAI.getGenerativeModel({
       model,
-      generationConfig: generationConfig as GenerationConfig,
+      generationConfig: generationConfig,
     });
     const result = await modelInstance.generateContentStream(prompt, { signal: generationConfig?.abortSignal });
     let content = '';

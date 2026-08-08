@@ -73,7 +73,7 @@ interface GeminiErrorResponse {
 
 interface GroqChatCompletionChoice {
     index: number;
-    message?: { role?: string; content?: string; reasoning_content?: string; reasoning?: string };
+    message?: { role?: string; content?: string; tool_calls?: unknown[]; reasoning_content?: string; reasoning?: string };
     finish_reason?: string;
 }
 
@@ -86,7 +86,7 @@ interface GroqChatCompletionResponse {
 
 interface OpenAIChatCompletionChoice {
     index: number;
-    message?: { role?: string; content?: string; tool_calls?: unknown[] };
+    message?: { role?: string; content?: string; tool_calls?: unknown[]; reasoning_content?: string; reasoning?: Record<string, unknown> | string };
     finish_reason?: string;
 }
 
@@ -112,7 +112,7 @@ interface NvidiaChatCompletionResponse {
     id?: string;
     choices?: Array<{
         index?: number;
-        message?: { role?: string; content?: string; tool_calls?: unknown[] };
+        message?: { role?: string; content?: string; tool_calls?: unknown[]; reasoning_content?: string; reasoning?: Record<string, unknown> | string };
         finish_reason?: string;
     }>;
     usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };

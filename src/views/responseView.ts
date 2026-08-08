@@ -7201,10 +7201,10 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     vaultIndexName: r.vaultIndexName,
 
                     isAgentResponse: r.isAgentResponse,
-                    agentSteps: r.agentSteps as unknown[] | undefined,
+                    agentSteps: r.agentSteps,
                     vaultAnswer: r.vaultAnswer,
-                    vaultResults: r.vaultResults as Array<{ path: string; score: number }> | undefined,
-                    fileOperations: r.fileOperations as unknown[] | undefined,
+                    vaultResults: r.vaultResults,
+                    fileOperations: r.fileOperations,
                     summary: r.summary,
                     keywords: r.keywords,
                     lessons: r.lessons,

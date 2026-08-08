@@ -93,7 +93,7 @@ export async function fetchLmStudioModels(baseUrl: string, apiToken: string = ''
     const isEmbedding = isLmStudioEmbeddingModel(id);
     const contextLength = typeof m.context_length === 'number' ? m.context_length : typeof m.max_model_len === 'number' ? m.max_model_len : 32768;
     return {
-      provider: 'lmstudio' as Provider,
+      provider: 'lmstudio',
       id,
       name,
       tokenLimit: contextLength,

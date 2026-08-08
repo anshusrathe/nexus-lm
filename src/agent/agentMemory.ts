@@ -157,8 +157,8 @@ export class AgentMemory {
           }
         }
       }
-    } catch (err) {
-      console.log('[AgentMemory] error updating unified memory session:', err);
+    } catch {
+      return '';
     }
     return '';
   }
@@ -178,8 +178,7 @@ export class AgentMemory {
         }
       }
       return deleted;
-    } catch (err) {
-      console.log('[AgentMemory] error deleting episodic memory:', err);
+    } catch {
       return false;
     }
   }

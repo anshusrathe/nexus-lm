@@ -50,6 +50,7 @@ export interface AgentStep {
   toolResult: ToolResult | null;
   status: StepStatus;
   timestamp: number;
+  approvalId?: string | null;
 }
 
 export interface AgentSession {

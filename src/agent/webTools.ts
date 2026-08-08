@@ -121,8 +121,8 @@ export function createWebFetchTool(webSearch: WebSearchService): ToolHandler {
         });
 
         return `Content from ${result.title} (${url}):\n\n${result.content}`;
-      } catch (err: any) {
-        return `Failed to fetch content from ${url}: ${err?.message || String(err)}`;
+      } catch (err: unknown) {
+        return `Failed to fetch content from ${url}: ${err instanceof Error ? err.message : String(err)}`;
       }
     },
   };

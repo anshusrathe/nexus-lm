@@ -81,7 +81,6 @@ export class ToolRegistry {
 
         const delay = Math.min(BASE_DELAY_MS * Math.pow(2, attempt - 1), MAX_DELAY_MS);
         const jitter = Math.random() * 0.5 * delay;
-        console.log(`[ToolRegistry] Retrying ${toolCall.name} (attempt ${attempt + 1}/${MAX_RETRIES + 1}) after ${Math.round(delay + jitter)}ms`);
         await sleep(delay + jitter);
       }
 
@@ -90,7 +89,6 @@ export class ToolRegistry {
       if (lastResult.success) {
         if (attempt > 0) {
           lastResult.retryCount = attempt;
-          console.log(`[ToolRegistry] ${toolCall.name} succeeded after ${attempt} retry(ies)`);
         }
         return lastResult;
       }

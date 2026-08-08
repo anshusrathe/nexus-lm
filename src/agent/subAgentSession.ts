@@ -166,7 +166,7 @@ export class SubAgentSession {
     this.executionState = 'thinking';
 
     const subRegistry = this.buildFilteredRegistry(mainRegistry);
-    const subSafety = new SafetyLayer(mainDeps.app, mainDeps.settings.denyList as string[], 'never');
+    const subSafety = new SafetyLayer(mainDeps.app, mainDeps.settings.denyList, 'never');
 
     const isolatedDeps: AgentDependencies = {
       ...mainDeps,
@@ -191,7 +191,7 @@ export class SubAgentSession {
       {
         maxSteps: SUBAGENT_HARD_SAFETY_STEP_CAP,
         approvalMode: 'never',
-        denyList: mainDeps.settings.denyList as string[],
+        denyList: mainDeps.settings.denyList,
         enableCLI: false,
         enablePluginDiscovery: false,
         enableMCP: false,

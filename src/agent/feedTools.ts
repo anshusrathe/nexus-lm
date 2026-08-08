@@ -19,6 +19,11 @@ export interface SavedFeedItem {
   folderId?: string;
 }
 
+interface FeedsPlugin {
+  settings: { savedFeeds: SavedFeedItem[] };
+  saveSettings: () => Promise<void> | void;
+}
+
 const SAVED_FEEDS_DIR = '.Nexus-LM-data/saved-feeds';
 const SAVED_FEEDS_FILE = '.Nexus-LM-data/saved-feeds/feeds.json';
 
@@ -78,7 +83,7 @@ async function ensureSavedFeedsJson(
   return { filePath, feeds };
 }
 
-export function createSavedFeedsTool(app: App, plugin?: any): ToolHandler {
+export function createSavedFeedsTool(app: App, plugin?: FeedsPlugin): ToolHandler {
   return {
     definition: {
       name: 'saved_feeds',
@@ -122,7 +127,7 @@ export function createSavedFeedsTool(app: App, plugin?: any): ToolHandler {
 
       const action = String(args.action ?? 'search').toLowerCase();
       const query = String(args.query ?? '').toLowerCase().trim();
-      const pluginFeeds = plugin?.settings?.savedFeeds as SavedFeedItem[] | undefined;
+      const pluginFeeds = plugin?.settings?.savedFeeds;
       const { filePath, feeds } = await ensureSavedFeedsJson(app, pluginFeeds);
 
       if (action === 'add') {
@@ -156,7 +161,7 @@ export function createSavedFeedsTool(app: App, plugin?: any): ToolHandler {
         await syncSavedFeedsJson(app, feeds);
 
         if (plugin?.settings?.savedFeeds) {
-          const pIndex = plugin.settings.savedFeeds.findIndex((f: any) => f.url === feedUrl);
+          const pIndex = plugin.settings.savedFeeds.findIndex((f) => f.url === feedUrl);
           if (pIndex >= 0) {
             plugin.settings.savedFeeds[pIndex] = { ...plugin.settings.savedFeeds[pIndex], ...newFeed };
           } else {
@@ -340,7 +345,7 @@ export function createSearchFeedsTool(): ToolHandler {
   };
 }
 
-export function createFeedTools(app: App, plugin?: any): ToolHandler[] {
+export function createFeedTools(app: App, plugin?: FeedsPlugin): ToolHandler[] {
   return [
     createSavedFeedsTool(app, plugin),
     createSearchFeedsTool(),

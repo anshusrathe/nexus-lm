@@ -31,21 +31,21 @@ export class ExaMCPProvider {
   private messageId = 0;
 
   async search(query: string, options?: { numResults?: number }): Promise<SearchResult[]> {
-    console.log('[ExaMCP] search called with query="' + query + '" numResults=' + (options?.numResults ?? 5));
+    
     const text = await this.callTool('web_search_exa', {
       query,
       numResults: options?.numResults ?? 5,
     });
-    console.log('[ExaMCP] search raw response length=' + text.length + ' text="' + text.slice(0, 200) + '..."');
+    
     const results = this.parseSearchResults(text);
-    console.log('[ExaMCP] parsed ' + results.length + ' search results');
+    
     return results;
   }
 
   async fetchUrl(url: string): Promise<{ title: string; content: string }> {
-    console.log('[ExaMCP] fetchUrl called for url=' + url);
+    
     const content = await this.callTool('web_fetch_exa', { url });
-    console.log('[ExaMCP] fetchUrl response length=' + content.length);
+    
     const titleMatch = content.match(/^#+\s+(.+)/m);
     return {
       title: titleMatch ? titleMatch[1].trim() : url,
@@ -55,17 +55,17 @@ export class ExaMCPProvider {
 
   private async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
-    console.log('[ExaMCP] Initializing...');
+    
 
     const initResult = await this.sendRequest('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {},
       clientInfo: { name: 'nexus-lm', version: '1.0.0' },
     });
-    console.log('[ExaMCP] initialize response received');
+    
 
     const listResult = await this.sendRequest('tools/list') as MCPListResult;
-    console.log('[ExaMCP] tools/list returned tools=' + JSON.stringify(listResult?.tools?.map((t: MCPTool) => t.name)));
+    
 
     if (!listResult || !Array.isArray(listResult.tools)) {
       throw new Error('Exa MCP: No tools discovered - server returned: ' + JSON.stringify(listResult));
@@ -75,11 +75,11 @@ export class ExaMCPProvider {
     }
 
     this.initialized = true;
-    console.log('[ExaMCP] Initialized successfully with ' + listResult.tools.length + ' tools');
+    
   }
 
   private async callTool(name: string, args: Record<string, unknown>): Promise<string> {
-    console.log('[ExaMCP] calling tool "' + name + '"');
+    
     await this.ensureInitialized();
 
     const result = await this.sendRequest('tools/call', {
@@ -87,34 +87,34 @@ export class ExaMCPProvider {
       arguments: args,
     }) as MCPCallResult;
 
-    console.log('[ExaMCP] tool response isError=' + result.isError + ' content=' + (result.content ? 'present' : 'undefined'));
+    
 
     if (result.isError) {
       throw new Error('Exa MCP tool "' + name + '" returned error');
     }
 
     if (!result.content) {
-      console.log('[ExaMCP] tool response has no content');
+      
       return '';
     }
 
     if (Array.isArray(result.content)) {
-      console.log('[ExaMCP] content is array of ' + result.content.length + ' items');
+      
       for (const item of result.content) {
         if (item.type === 'text' && item.text) {
-          console.log('[ExaMCP] found text item (type=' + item.type + ') length=' + item.text.length);
+          
           return item.text;
         }
-        console.log('[ExaMCP] content item type=' + item.type + ' text=' + (item.text ? 'present' : 'undefined'));
+        
       }
     } else {
-      console.log('[ExaMCP] content is single object, type=' + result.content.type);
+      
       if (result.content.type === 'text' && result.content.text) {
         return result.content.text;
       }
     }
 
-    console.log('[ExaMCP] no text content found in response');
+    
     return '';
   }
 
@@ -128,7 +128,7 @@ export class ExaMCPProvider {
     };
     const body = JSON.stringify(requestBody);
 
-    console.log('[ExaMCP] Sending request id=' + id + ' method=' + method + ' params=' + JSON.stringify(params));
+    
 
     const response = await requestUrl({
       url: this.baseUrl,
@@ -142,44 +142,44 @@ export class ExaMCPProvider {
       throw: false,
     });
 
-    console.log('[ExaMCP] Response status=' + response.status + ' content-type=' + (response.headers['content-type'] || 'none'));
+    
 
     if (response.status >= 400) {
-      console.log('[ExaMCP] HTTP error: ' + response.status + ' ' + response.text?.slice(0, 500));
+      
       throw new Error('Exa MCP error: HTTP ' + response.status);
     }
 
     const contentType = (response.headers['content-type'] || '').toLowerCase();
 
     if (contentType.includes('text/event-stream')) {
-      console.log('[ExaMCP] Parsing SSE response length=' + response.text?.length);
+      
       return this.parseSSE(response.text || '', id);
     }
 
     if (contentType.includes('application/json')) {
-      console.log('[ExaMCP] Parsing JSON response');
+      
     }
 
     let json: Record<string, unknown>;
     try {
       json = typeof response.json === 'object' ? response.json as Record<string, unknown> : JSON.parse(response.text || '{}');
     } catch (e) {
-      console.log('[ExaMCP] JSON parse failed: text=' + response.text?.slice(0, 500));
+      
       throw new Error('Exa MCP: Invalid JSON response: ' + response.text?.slice(0, 200));
     }
 
     if (json.error) {
       const errMsg = (json.error as Record<string, unknown>).message as string || 'Exa MCP request failed';
-      console.log('[ExaMCP] RPC error: ' + errMsg);
+      
       throw new Error(errMsg);
     }
 
-    console.log('[ExaMCP] Success response for method=' + method + ' id=' + id + ' has result=' + ('result' in json));
+    
     return json.result;
   }
 
   private parseSSE(body: string, requestId: number): unknown {
-    console.log('[ExaMCP] parseSSE for requestId=' + requestId + ' body length=' + body.length);
+    
     let result: unknown = null;
     const lines = body.split('\n');
     let currentEvent = '';
@@ -193,17 +193,17 @@ export class ExaMCPProvider {
       } else if (line === '') {
         if (currentEvent === 'message' && currentData) {
           try {
-            const msg = JSON.parse(currentData);
+            const msg = JSON.parse(currentData) as { id?: number; error?: { message?: string }; result?: unknown };
             if (msg.id === requestId) {
               if (msg.error) {
-                throw new Error((msg.error.message as string) || 'Exa MCP error');
+                throw new Error(msg.error.message || 'Exa MCP error');
               }
               result = msg.result;
-              console.log('[ExaMCP] SSE parsed result for requestId=' + requestId + ', has result=' + (result !== null));
+              
             }
           } catch (e) {
             if (e instanceof SyntaxError) {
-              console.log('[ExaMCP] SSE JSON parse error for data=' + currentData.slice(0, 200));
+              
             } else {
               throw e;
             }
@@ -215,7 +215,7 @@ export class ExaMCPProvider {
     }
 
     if (result === null) {
-      console.log('[ExaMCP] SSE stream did not contain matching response for requestId=' + requestId);
+      
       throw new Error('No response from Exa MCP stream');
     }
     return result;
@@ -223,7 +223,7 @@ export class ExaMCPProvider {
 
   private parseSearchResults(text: string): SearchResult[] {
     if (!text || text.trim() === '') {
-      console.log('[ExaMCP] parseSearchResults: empty text');
+      
       return [];
     }
 

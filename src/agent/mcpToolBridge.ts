@@ -55,7 +55,7 @@ export function registerMCPTools(
 ): void {
   const connectedServers = mcpService.getConnectedServers() as Array<{ id: string; name: string }>;
   const existingMCP = new Set(
-    (registry.getAll('mcp') as ToolHandler[]).map((h: ToolHandler) => h.definition.name)
+    registry.getAll('mcp').map((h: ToolHandler) => h.definition.name)
   );
 
   const newHandlers: ToolHandler[] = [];

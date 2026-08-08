@@ -23,8 +23,6 @@ export class SkillRegistry {
 
     // 2. Discover all skills from .Nexus-LM-data/skills/ (copied built-ins + user + agent-created)
     await this.discoverFromDir(normalizePath(SKILLS_DIR), false, false);
-
-    console.log(`[SkillRegistry] discovered ${this.skills.size} skills`);
   }
 
   private async copyBuiltInSkills(): Promise<void> {
@@ -54,7 +52,6 @@ export class SkillRegistry {
         const content = await adapter.read(sourceMd);
         await adapter.mkdir(targetDir);
         await adapter.write(normalizePath(`${targetDir}/SKILL.md`), content);
-        console.log(`[SkillRegistry] copied built-in skill: ${skillName}`);
       }
     } catch (err) {
       console.warn('[SkillRegistry] error copying built-in skills:', err);

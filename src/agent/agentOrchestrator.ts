@@ -115,10 +115,10 @@ export class AgentOrchestrator {
     this.safetyLayer = safetyLayer;
     if (skillRegistryOrDeps && 'onEvent' in skillRegistryOrDeps) {
       this.skillRegistry = null;
-      this.deps = skillRegistryOrDeps as AgentDependencies;
+      this.deps = skillRegistryOrDeps;
       this.config = depsOrConfig as AgentConfig;
     } else {
-      this.skillRegistry = skillRegistryOrDeps as SkillRegistry | null;
+      this.skillRegistry = skillRegistryOrDeps;
       this.deps = depsOrConfig as AgentDependencies;
       this.config = config!;
     }
@@ -193,7 +193,7 @@ export class AgentOrchestrator {
     finishReason?: string;
     thinking?: string;
   }>, onToken?: (chunk: string) => void, runContext: AgentRunContext = {}): Promise<string> {
-    console.log('[Orchestrator] runAgent task="' + task.substring(0, 60) + '..."');
+    
     this.abortFlag = false;
     this.callHistory = [];
     this.failureContext.clear();
@@ -251,7 +251,7 @@ export class AgentOrchestrator {
     // Build system prompt
     const allToolDefs = this.registry.getDefinitions();
     const toolDefs = this.filterRelevantTools(allToolDefs, task);
-    console.log('[Orchestrator] toolDefs count=' + allToolDefs.length + ' filtered=' + toolDefs.length);
+    
 
     // Build skill section
     const skillSection = this.buildSkillSection();
@@ -268,7 +268,7 @@ export class AgentOrchestrator {
       try {
         learnedMemoryContent = await this.agentMemory.readLearned();
         if (learnedMemoryContent) {
-          console.log('[Orchestrator] loaded learned memory: ' + learnedMemoryContent.length + ' chars');
+          
         }
       } catch {
         learnedMemoryContent = null;
@@ -286,10 +286,10 @@ export class AgentOrchestrator {
     this.currentIntent = classifyIntent(task, rawQuery, attachedEmbeddingIndexIds.length > 0);
     const intentInfo = this.currentIntent;
     const strategy = intentInfo.strategy;
-    console.log('[Orchestrator] intent=' + intentInfo.taskType + ' intents=[' + intentInfo.intents.join(',') + '] complexity=' + intentInfo.complexity);
+    
 
     const taskAnalysis = `Task profile: ${label.toUpperCase()}; intent=${intentInfo.taskType}; complexity=${intentInfo.complexity}; ${this.requiresRuntimeGrounding ? 'runtime grounding required' : 'direct answer allowed'} (${breakdown})`;
-    console.log('[Orchestrator] ' + taskAnalysis);
+    
 
     const systemPrompt = isContinue
       ? CONTINUATION_SYSTEM_PROMPT
@@ -332,7 +332,7 @@ export class AgentOrchestrator {
     }
     messages.push({ role: 'user', content: task });
 
-    console.log('[Orchestrator] starting ReAct loop');
+    
     this.currentProviderCall = providerCall;
     const result = await this.runReActLoop(messages, providerCall, onToken, isContinue ? [] : toolDefs);
     await this.saveSessionToMemory();
@@ -380,7 +380,7 @@ export class AgentOrchestrator {
       if (results.length === 0) return null;
 
       const experiences = results.map((r) => {
-        const e = r.record as import('./agentMemory').EpisodicRecord;
+        const e = r.record;
         const lessonsBlock = e.lessons && e.lessons.length > 0
           ? `\n    <learned_insights>\n${e.lessons.map(l => `      - ${l}`).join('\n')}\n    </learned_insights>`
           : '';
@@ -426,7 +426,7 @@ ${experiences}
       const keywords = this.agentMemory.extractKeywords(session.task, session.finalAnswer || undefined);
 
       const editedPaths = session.steps
-        .filter(s => s.toolCall?.arguments?.path && s.status === 'completed' && ['edit_note', 'multi_edit', 'create_note'].includes(s.toolCall!.name))
+        .filter(s => s.toolCall?.arguments?.path && s.status === 'completed' && ['edit_note', 'multi_edit', 'create_note'].includes(s.toolCall.name))
         .map(s => String(s.toolCall!.arguments.path))
         .filter(Boolean);
       const uniquePaths = [...new Set(editedPaths)];
@@ -464,7 +464,7 @@ ${experiences}
         artifacts: uniquePaths,
       });
     } catch (err) {
-      console.log('[Orchestrator] error saving session to memory:', err);
+      
     }
   }
 
@@ -1029,7 +1029,7 @@ ${context || 'No additional context provided.'}
     error?: string | null
   ): void {
     if (!this.currentSession) {
-      console.log('[Orchestrator] addStep SKIP - no currentSession');
+      
       return;
     }
 
@@ -1038,7 +1038,7 @@ ${context || 'No additional context provided.'}
 
     if (approvalId) {
       existingIndex = this.currentSession.steps.findIndex(
-        s => s.toolCall?.id === `pending_${approvalId}` || (s as any).approvalId === approvalId
+        s => s.toolCall?.id === `pending_${approvalId}` || s.approvalId === approvalId
       );
     }
 
@@ -1049,7 +1049,7 @@ ${context || 'No additional context provided.'}
       step.toolResult = toolResult;
       step.status = status;
       step.timestamp = Date.now();
-      console.log('[Orchestrator] addStep MERGED into existing step #' + step.stepNumber + ' status=' + status);
+      
     } else {
       const stepNumber = this.currentSession.steps.length + 1;
       step = {
@@ -1061,7 +1061,7 @@ ${context || 'No additional context provided.'}
         timestamp: Date.now(),
       };
       this.currentSession.steps.push(step);
-      console.log('[Orchestrator] addStep NEW #' + step.stepNumber + ' status=' + status + ' tool=' + (toolCall?.name ?? 'none'));
+      
     }
     this.currentSession.updatedAt = Date.now();
 
@@ -1095,7 +1095,7 @@ ${context || 'No additional context provided.'}
       data,
       timestamp: Date.now(),
     });
-    console.log('[Orchestrator] addStep -> onEvent fired, total steps=' + this.currentSession.steps.length);
+    
   }
 
   private async checkApproval(toolCall: ToolCall, thought: string, originalContent: string, isCreate: boolean, messages: Array<Record<string, unknown>>, nativeMode: boolean = false, nativeBuffer?: { results: Array<Record<string, unknown>>; nudges: Array<Record<string, unknown>> }): Promise<{ allowed: boolean; approvalId: string | null }> {
@@ -1167,26 +1167,26 @@ ${context || 'No additional context provided.'}
     const maxSteps = configuredMaxSteps === 0 ? HARD_SAFETY_STEP_CAP : configuredMaxSteps;
     const isUnlimited = this.config.maxSteps === 0;
     const nativeMode = tools !== undefined && tools.length > 0;
-    console.log('[Orchestrator] runReActLoop maxSteps=' + maxSteps + (isUnlimited ? ' (unlimited, safety cap=' + HARD_SAFETY_STEP_CAP + ')' : '') + ' initial messages=' + messages.length + ' nativeTools=' + (tools?.length ?? 0));
+    
     for (let step = 0; step < maxSteps; step++) {
-      console.log('[Orchestrator] ReAct iteration step=' + step + '/' + maxSteps + ' abort=' + this.abortFlag + ' messages.len=' + messages.length);
+      
       if (this.abortFlag) {
         const abortMsg = 'Agent execution aborted by user.';
-        console.log('[Orchestrator] abort flag set, returning');
+        
         this.addStep(abortMsg, null, null, 'failed', undefined, undefined, undefined, undefined, undefined, abortMsg);
         return abortMsg;
       }
 
       let response: { content?: string; toolCalls?: ToolCall[]; finishReason?: string; thinking?: string };
       try {
-        console.log('[Orchestrator] calling providerCall (iteration ' + step + ')');
+        
         response = await providerCall(messages, onToken, (thinking: string) => {
           this.deps.onEvent({ type: 'thought', data: { text: thinking }, timestamp: Date.now() });
         }, tools);
-        console.log('[Orchestrator] providerCall returned content=' + (response.content ? response.content.length + ' chars' : 'undefined') + ' toolCalls=' + (response.toolCalls ? response.toolCalls.length : 'undefined'));
+        
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        console.log('[Orchestrator] providerCall threw:', message);
+        
         this.addStep(`Provider call failed: ${message}`, null, null, 'failed', undefined, undefined, undefined, undefined, undefined, message);
         return `Agent encountered an error: ${message}`;
       }
@@ -1255,7 +1255,7 @@ ${context || 'No additional context provided.'}
 
             // Auto-cancel incomplete plan items before accepting final answer
 
-            console.log('[Orchestrator] found final_answer tag, returning');
+            
             this.addStep('Task complete. Providing final answer.', null, null, 'completed');
             if (this.currentSession) {
               this.currentSession.finalAnswer = fullAnswer;
@@ -1267,7 +1267,7 @@ ${context || 'No additional context provided.'}
 
         if (response.toolCalls && response.toolCalls.length > 0) {
           if (this.consecutiveLoopBlocks >= MAX_CONSECUTIVE_LOOPS_BEFORE_SHUTDOWN) {
-            console.log('[Orchestrator] FORCED SYNTHESIS: stripping ' + response.toolCalls.length + ' tool calls after shutdown latch fired');
+            
             const strippedContent = response.content
               ? response.content.replace(/ACTION:\s*[\w-]+\s*\([\s\S]*?\)/g, '[stripped — loop shutdown active]')
               : '';
@@ -1291,13 +1291,13 @@ ${context || 'No additional context provided.'}
             ...(nativeMode ? { tool_calls: response.toolCalls.map(toOpenAIFormat) } : {}),
             ...(response.thinking ? { reasoning_content: response.thinking } : {}),
           });
-        console.log('[Orchestrator] processing ' + response.toolCalls.length + ' tool calls from content');
+        
           const nativeBuffer: { results: Array<Record<string, unknown>>; nudges: Array<Record<string, unknown>> } = { results: [], nudges: [] };
           for (const toolCall of response.toolCalls) {
             const thought = this.extractThought(response.content) || `Using ${toolCall.name}`;
             const processResult = await this.processToolCall(toolCall, thought, messages, nativeMode, nativeBuffer);
             if (processResult === 'abort') {
-              console.log('[Orchestrator] processToolCall returned abort');
+              
               return 'Agent execution stopped.';
             }
           }
@@ -1317,13 +1317,13 @@ ${context || 'No additional context provided.'}
             }
             return directAnswer;
           }
-          console.log('[Orchestrator] empty response with no tool calls');
+          
           this.addStep('No output from model. Stopping.', null, null, 'completed');
           return 'No output from model.';
         }
       } else if (response.toolCalls && response.toolCalls.length > 0) {
         if (this.consecutiveLoopBlocks >= MAX_CONSECUTIVE_LOOPS_BEFORE_SHUTDOWN) {
-          console.log('[Orchestrator] FORCED SYNTHESIS: stripping ' + response.toolCalls.length + ' tool calls after shutdown latch fired (no-content path)');
+          
           messages.push({
             role: 'system',
             content: 'You attempted to call a tool after the shutdown latch was activated. Tool calls are disabled. Provide your answer now using all information gathered so far. If some information is missing, acknowledge that limitation — but do NOT propose a tool call.',
@@ -1332,7 +1332,7 @@ ${context || 'No additional context provided.'}
           this.addStep('Tool calls stripped by shutdown latch; redirecting to synthesis.', null, null, 'failed', undefined, undefined, undefined, undefined, undefined, 'Tool calls stripped by shutdown latch');
           continue;
         }
-        console.log('[Orchestrator] processing ' + response.toolCalls.length + ' tool calls (no content)');
+        
         if (nativeMode) {
           messages.push({
             role: 'assistant',
@@ -1351,13 +1351,13 @@ ${context || 'No additional context provided.'}
           await this.maybeCompactContext(messages);
         }
       } else {
-        console.log('[Orchestrator] no output from model, stopping');
+        
         this.addStep('No output from model. Stopping.', null, null, 'completed');
         return 'No output from model.';
       }
     }
 
-    console.log('[Orchestrator] exceeded max steps (' + maxSteps + ')');
+    
     if (this.currentSession) {
       if (!this.currentSession.finalAnswer) {
         const lastStep = this.currentSession.steps[this.currentSession.steps.length - 1];
@@ -1382,12 +1382,12 @@ ${context || 'No additional context provided.'}
     nativeMode: boolean = false,
     nativeBuffer?: { results: Array<Record<string, unknown>>; nudges: Array<Record<string, unknown>> }
   ): Promise<'continue' | 'abort'> {
-    console.log('[Orchestrator] processToolCall tool=' + toolCall.name + ' args=' + JSON.stringify(toolCall.arguments));
+    
 
     const loopResult = this.detectLoop(toolCall.name, toolCall.arguments);
     if (loopResult.isLoop) {
       this.consecutiveLoopBlocks++;
-      console.log('[Orchestrator] loop detected (' + this.consecutiveLoopBlocks + ' consecutive): ' + loopResult.message);
+      
 
       this.addStep(thought, toolCall, {
         toolCallId: toolCall.id, success: false, content: '', error: loopResult.message
@@ -1449,7 +1449,7 @@ ${context || 'No additional context provided.'}
 
     const approval = await this.checkApproval(toolCall, thought, originalContent, isCreate, messages, nativeMode, nativeBuffer);
     if (!approval.allowed) {
-      console.log('[Orchestrator] tool not approved: ' + toolCall.name);
+      
       const nudge = {
         role: 'user',
         content: `Tool ${toolCall.name} was not approved by user. Try a different approach or explain the issue.`
@@ -1463,11 +1463,11 @@ ${context || 'No additional context provided.'}
     }
     let approvalId = approval.approvalId;
 
-    console.log('[Orchestrator] executing tool: ' + toolCall.name);
+    
     const result: ToolResult = await this.registry.execute(toolCall, this.deps);
     this.lastToolResult = result;
     if (result.success) this.successfulToolCalls++;
-    console.log('[Orchestrator] tool result success=' + result.success + ' content.len=' + result.content.length);
+    
 
     // Track metrics for this tool call
     AgentMetrics.getInstance().recordToolCall(toolCall.name, result.success);
@@ -1549,7 +1549,7 @@ ${context || 'No additional context provided.'}
     });
 
     if (toolCall.name === 'search_vault') {
-      console.log('[Orchestrator] search_vault output received by agent:', result.success ? result.content : result.error);
+      
     }
 
     if (nativeMode && nativeBuffer) {
@@ -1597,7 +1597,7 @@ ${context || 'No additional context provided.'}
         } else {
           messages.push(healNudge);
         }
-        console.log('[Orchestrator] self-healing: injected recovery hint for ' + toolCall.name);
+        
       }
     } else {
       // Clear failure tracking on success
@@ -1629,7 +1629,7 @@ ${context || 'No additional context provided.'}
           } else {
             messages.push(reflectionMsg);
           }
-          console.log('[Orchestrator] reflection: injected self-critique prompt after ' + this.consecutiveWriteCount + ' writes');
+          
         }
       } else {
         // Non-write tool resets the consecutive write count
@@ -1665,7 +1665,7 @@ ${context || 'No additional context provided.'}
             } else {
               messages.push(fallbackMsg);
             }
-            console.log('[Orchestrator] fallback: injected search retry hint for ' + toolCall.name + (strategyFallback ? ' → ' + strategyFallback : ''));
+            
           }
         } else {
           this.searchFallbackAttempts.delete(toolCall.name);
@@ -1700,7 +1700,7 @@ ${context || 'No additional context provided.'}
 
     const compacted = await this.contextManager.compactMessages(messages, summarizer);
     if (compacted.wasCompacted) {
-      console.log('[Orchestrator] context compacted: ' + messages.length + ' -> ' + compacted.messages.length + ' messages');
+      
       messages.length = 0;
       messages.push(...compacted.messages);
 

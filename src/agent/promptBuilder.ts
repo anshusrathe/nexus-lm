@@ -98,10 +98,10 @@ Privacy rules:
       .map((t) => {
         const schema = t.inputSchema ?? {};
         const props = schema && typeof schema === 'object' && 'properties' in schema
-          ? (schema as Record<string, unknown>).properties as Record<string, unknown>
+          ? schema.properties as Record<string, unknown>
           : null;
-        const required = new Set(Array.isArray((schema as Record<string, unknown>).required)
-          ? (schema as Record<string, unknown>).required as string[]
+        const required = new Set(Array.isArray(schema.required)
+          ? schema.required as string[]
           : []);
         const params = props
           ? Object.entries(props).map(([name, value]) => {

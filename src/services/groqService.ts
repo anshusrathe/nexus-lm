@@ -1186,15 +1186,15 @@ export class GroqService {
     }
 
     const data = response.json as GroqChatCompletionResponse;
-    const message = data.choices?.[0]?.message as unknown as Record<string, unknown> | undefined;
+    const message = data.choices?.[0]?.message;
     if (!message) return { content: '' };
 
     return {
       content: typeof message.content === 'string' ? message.content : '',
       finishReason: data.choices?.[0]?.finish_reason,
       toolCalls: (message.tool_calls as Array<Record<string, unknown>> | undefined) ?? undefined,
-      thinking: typeof message.reasoning_content === 'string' && (message.reasoning_content as string).length > 0
-        ? (message.reasoning_content as string)
+      thinking: typeof message.reasoning_content === 'string' && (message.reasoning_content).length > 0
+        ? (message.reasoning_content)
         : undefined,
     };
   }

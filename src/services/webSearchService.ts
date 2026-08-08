@@ -138,13 +138,13 @@ export class WebSearchService {
         author: r.author,
       }));
     } else {
-      console.log('[WebSearch] Using Exa MCP fallback for query="' + query + '"');
+      
       const mcpResults = await this.mcpProvider.search(query, {
         numResults: effectiveOptions.numResults,
       });
-      console.log('[WebSearch] Exa MCP returned ' + mcpResults.length + ' results');
+      
       if (mcpResults.length > 0) {
-        console.log('[WebSearch] First result: title="' + mcpResults[0].title + '" url="' + mcpResults[0].url + '"');
+        
       }
       results = mcpResults.map((r: MCPResult) => ({
         title: r.title,
@@ -170,9 +170,9 @@ export class WebSearchService {
         return nativeResult;
       }
       console.warn(`[WebSearch] Native fetch returned minimal content for ${url}. Attempting Exa fallback.`);
-    } catch (nativeErr: any) {
+    } catch (nativeErr: unknown) {
       console.warn(
-        `[WebSearch] Native fetch failed for ${url}: ${nativeErr?.message || String(nativeErr)}. Attempting Exa fallback.`
+        `[WebSearch] Native fetch failed for ${url}: ${nativeErr instanceof Error ? nativeErr.message : String(nativeErr)}. Attempting Exa fallback.`
       );
     }
 
@@ -183,11 +183,11 @@ export class WebSearchService {
         });
       }
       return await this.mcpProvider.fetchUrl(url);
-    } catch (exaErr: any) {
-      console.error(`[WebSearch] Exa fallback fetch failed for ${url}: ${exaErr?.message || String(exaErr)}`);
+    } catch (exaErr: unknown) {
+      console.error(`[WebSearch] Exa fallback fetch failed for ${url}: ${exaErr instanceof Error ? exaErr.message : String(exaErr)}`);
       throw new Error(
         `Failed to fetch content from ${url}. Primary (Native Fetch) and Fallback (Exa) both failed: ${
-          exaErr?.message || String(exaErr)
+          exaErr instanceof Error ? exaErr.message : String(exaErr)
         }`
       );
     }

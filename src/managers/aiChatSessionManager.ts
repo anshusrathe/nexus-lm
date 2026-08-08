@@ -154,7 +154,7 @@ export class AIChatSessionManager {
               name = session.name || id;
               createdAt = session.createdAt || createdAt;
               updatedAt = session.updatedAt || updatedAt;
-              sType = session.sessionType ?? (session.messages?.some(msg => (msg as any).isAgentResponse) ? 'agent' : 'chat');
+              sType = session.sessionType ?? (session.messages?.some(msg => msg.isAgentResponse) ? 'agent' : 'chat');
               
               // Search in session name, ID, and all message content
               const query = searchQuery.toLowerCase();
@@ -216,7 +216,7 @@ export class AIChatSessionManager {
               name = session.name || id;
               createdAt = session.createdAt || createdAt;
               updatedAt = session.updatedAt || updatedAt;
-              sType = session.sessionType ?? (session.messages?.some(msg => (msg as any).isAgentResponse) ? 'agent' : 'chat');
+              sType = session.sessionType ?? (session.messages?.some(msg => msg.isAgentResponse) ? 'agent' : 'chat');
             } catch { // Intentionally ignored
             }
             return { id, name, createdAt, updatedAt, sessionType: sType };

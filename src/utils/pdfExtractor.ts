@@ -57,7 +57,7 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
       const textContent = await page.getTextContent();
 
       // Filter out empty strings if they don't have a meaningful position/width
-      const items = (textContent.items as any[]).filter((item: any): item is PdfTextItem => 
+      const items = (textContent.items as PdfTextItem[]).filter((item): item is PdfTextItem => 
         typeof item === 'object' && item !== null && 'str' in item && typeof item.str === 'string' && (item.str.trim().length > 0 || item.width > 0)
       );
 
@@ -219,7 +219,7 @@ export class PdfExtractOptionsModal extends Modal {
   private directory: string;
   private errorEl: HTMLElement | null = null;
   private dirSuggester: DirectorySuggester | null = null;
-  private pdfDocument: any;
+  private pdfDocument: PdfDocumentProxy;
   private previewCanvas: HTMLCanvasElement | null = null;
   private previewContainer: HTMLElement | null = null;
   private currentPreviewPage: number = 1;
@@ -230,7 +230,7 @@ export class PdfExtractOptionsModal extends Modal {
   private fromInput: HTMLInputElement | null = null;
   private toInput: HTMLInputElement | null = null;
 
-  constructor(app: App, numPages: number, defaultDir: string, pdfDocument: any, onSubmit: (opts: { from: number, to: number, full: boolean, directory: string }) => void) {
+  constructor(app: App, numPages: number, defaultDir: string, pdfDocument: PdfDocumentProxy, onSubmit: (opts: { from: number, to: number, full: boolean, directory: string }) => void) {
     super(app);
     this.numPages = numPages;
     this.onSubmit = onSubmit;

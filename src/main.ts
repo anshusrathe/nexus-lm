@@ -113,9 +113,9 @@ export default class AIPlugin extends Plugin {
         const webSearchConfig: WebSearchConfig = {
           exaApiKey: this.settings.agentExaApiKey ?? '',
           defaultNumResults: this.settings.agentWebSearchDefaultResults ?? 5,
-          contentMode: (this.settings.agentWebSearchMode as 'highlights' | 'text') ?? 'highlights',
+          contentMode: this.settings.agentWebSearchMode ?? 'highlights',
           cacheEnabled: this.settings.agentWebSearchCache ?? true,
-          tokenBudget: (this.settings.agentWebSearchTokenBudget as 'low' | 'medium' | 'high') ?? 'medium',
+          tokenBudget: this.settings.agentWebSearchTokenBudget ?? 'medium',
         };
         this.webSearchService = new WebSearchService(webSearchConfig);
 
@@ -965,7 +965,7 @@ export default class AIPlugin extends Plugin {
                     .map(m => ({
                         id: m.id,
                         name: m.name,
-                        provider: 'lmstudio' as Provider,
+                        provider: 'lmstudio',
                         contextWindow: m.tokenLimit,
                         enabled: m.enabled,
                         isFree: true,
