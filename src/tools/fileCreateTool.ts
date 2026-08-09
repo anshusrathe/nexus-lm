@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { WebSearchService } from '../services/webSearch';
 import { GroqService, ChatMessage, GroqApiError, GeminiHistoryMessage } from '../services/groqService';
 import { UnifiedProviderManager, UnifiedMessage } from '../services/unifiedProviderManager';
+import { createDetached } from '../utils/domUtils';
 
 interface FileCreationPlan {
   folderName: string;
@@ -311,7 +312,7 @@ export async function handleFileCreationPrompt(
     const view = app.workspace.getActiveViewOfType(View);
     const doc = view?.containerEl.ownerDocument ?? activeDocument;
     const workspace = doc.querySelector('.workspace') || doc.body;
-    spinner = doc.createDiv();
+    spinner = createDetached(doc, 'div');
     spinner.className = 'loading-spinner visible';
     spinner.addClass('nl-position-fixed');
     spinner.addClass('nl-top-18px');

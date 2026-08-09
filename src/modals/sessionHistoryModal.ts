@@ -1,5 +1,6 @@
 import { App, setIcon } from 'obsidian';
 import type { AIChatSessionManager } from '../managers/aiChatSessionManager';
+import { createDetached } from '../utils/domUtils';
 
 export interface SessionHistoryModalOptions {
   app: App;
@@ -16,7 +17,7 @@ export function openSessionHistoryModal(options: SessionHistoryModalOptions): HT
   }
 
   const activeDoc = options.app.workspace.containerEl?.ownerDocument || document;
-  const modal = activeDoc.createDiv();
+  const modal = createDetached(activeDoc, 'div');
   modal.className = 'ai-chat-session-history-modal';
 
   modal.createDiv({ cls: 'modal-bg' });
@@ -73,7 +74,7 @@ export function openSessionHistoryModal(options: SessionHistoryModalOptions): HT
     } else {
       const fragment = createFragment();
       sessions.forEach(meta => {
-        const card = activeDoc.createDiv();
+        const card = createDetached(activeDoc, 'div');
         card.className = 'session-card';
 
         const sessionInfo = card.createDiv({ cls: 'session-info' });
@@ -126,7 +127,7 @@ export function openSessionHistoryModal(options: SessionHistoryModalOptions): HT
           }
         });
 
-        const deleteBtn = activeDoc.createEl('button');
+        const deleteBtn = createDetached(activeDoc, 'button');
         deleteBtn.className = 'delete-session-btn';
         setIcon(deleteBtn, 'trash-2');
         deleteBtn.title = 'Delete session';

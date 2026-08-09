@@ -22,6 +22,7 @@ import { MCPToolCallingService } from '../mcp/mcpToolCalling';
 import { executeCode, detectLanguage, isExecutable, isRenderable, wrapInMarkdownFence } from '../tools/codeExecutor';
 import { SaveNoteModal } from '../modals/saveNoteModal';
 import { openSessionHistoryModal } from '../modals/sessionHistoryModal';
+import { createDetached } from '../utils/domUtils';
 
 interface MCPResourceReadResult {
     contents: Array<{
@@ -2767,7 +2768,7 @@ export class ResponseView extends ItemView {
             return;
         }
 
-        const pickerEl = this.activeDocument.createDiv();
+        const pickerEl = createDetached(this.activeDocument, 'div');
         pickerEl.className = 'wallpaper-picker';
         pickerEl.addClass('nl-position-absolute');
         pickerEl.addClass('nl-z-index-1000');
@@ -5069,7 +5070,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 }
 
                 if (targetEl) {
-                    const tooltip = this.activeDocument.createDiv();
+                    const tooltip = createDetached(this.activeDocument, 'div');
                     tooltip.classList.add('footnote-tooltip');
                     tooltip.addClass('footnote-tooltip-style');
 
@@ -5116,7 +5117,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 const id = itemEl.getAttribute('id');
 
                 if (id) {
-                    const backArrow = this.activeDocument.createEl('a');
+                    const backArrow = createDetached(this.activeDocument, 'a');
                     backArrow.classList.add('footnote-backref');
                     backArrow.textContent = ' ↩';
                     backArrow.setAttribute('aria-label', 'Back to content');
@@ -5973,7 +5974,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             if (table.parentElement?.classList.contains('table-wrapper')) return;
 
-            const wrapper = this.activeDocument.createDiv();
+            const wrapper = createDetached(this.activeDocument, 'div');
             wrapper.className = 'table-wrapper';
             table.parentNode?.insertBefore(wrapper, table);
             wrapper.appendChild(table);
@@ -6153,7 +6154,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             const executable = isExecutable(lang);
 
             
-            const wrapper = this.activeDocument.createDiv();
+            const wrapper = createDetached(this.activeDocument, 'div');
             wrapper.className = 'code-block-wrapper';
             pre.parentNode?.insertBefore(wrapper, pre);
             wrapper.appendChild(pre);
@@ -6162,22 +6163,22 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             wrapper.dataset.code = initialCode;
 
             
-            const toolbar = this.activeDocument.createDiv();
+            const toolbar = createDetached(this.activeDocument, 'div');
             toolbar.className = 'code-block-toolbar';
 
             
             if (lang !== 'unknown') {
-                const badge = this.activeDocument.createSpan();
+                const badge = createDetached(this.activeDocument, 'span');
                 badge.className = 'code-lang-badge';
                 badge.textContent = lang;
                 toolbar.appendChild(badge);
             }
 
-            const toolbarRight = this.activeDocument.createDiv();
+            const toolbarRight = createDetached(this.activeDocument, 'div');
             toolbarRight.className = 'code-block-toolbar-right';
 
             
-            const copyBtn = this.activeDocument.createEl('button');
+            const copyBtn = createDetached(this.activeDocument, 'button');
             copyBtn.className = 'code-block-btn';
             copyBtn.setAttribute('aria-label', 'Copy code');
             setIcon(copyBtn, 'copy');
@@ -6190,7 +6191,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             toolbarRight.appendChild(copyBtn);
 
             
-            const expandBtn = this.activeDocument.createEl('button');
+            const expandBtn = createDetached(this.activeDocument, 'button');
             expandBtn.className = 'code-block-btn';
             expandBtn.setAttribute('aria-label', 'Expand in canvas');
             setIcon(expandBtn, 'maximize-2');
@@ -6230,7 +6231,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             if (lang === 'json') {
-                const outputEl = this.activeDocument.createDiv();
+                const outputEl = createDetached(this.activeDocument, 'div');
                 outputEl.className = 'code-exec-output hidden';
                 wrapper.appendChild(outputEl);
 
@@ -6243,20 +6244,20 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     return;
                 }
 
-                const renderToggleRow = this.activeDocument.createDiv();
+                const renderToggleRow = createDetached(this.activeDocument, 'div');
                 renderToggleRow.className = 'code-exec-toggle-row';
 
-                const renderLabel = this.activeDocument.createSpan();
+                const renderLabel = createDetached(this.activeDocument, 'span');
                 renderLabel.className = 'code-exec-label';
                 renderLabel.textContent = 'Render visualization';
 
-                const renderToggle = this.activeDocument.createDiv();
+                const renderToggle = createDetached(this.activeDocument, 'div');
                 renderToggle.className = 'code-exec-toggle';
                 renderToggle.setAttribute('role', 'switch');
                 renderToggle.setAttribute('aria-checked', 'false');
                 renderToggle.setAttribute('aria-label', 'Render visualization');
 
-                const backBtn = this.activeDocument.createEl('button');
+                const backBtn = createDetached(this.activeDocument, 'button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
                 backBtn.addClass('nl-display-none');
@@ -6292,7 +6293,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             if (!executable) return;
 
             
-            const outputEl = this.activeDocument.createDiv();
+            const outputEl = createDetached(this.activeDocument, 'div');
             outputEl.className = 'code-exec-output hidden';
             
             wrapper.appendChild(outputEl);
@@ -6306,21 +6307,21 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 void this.runCode(pre, lang, outputEl, wrapper, true, question);
             } else {
                 
-                const runToggleRow = this.activeDocument.createDiv();
+                const runToggleRow = createDetached(this.activeDocument, 'div');
                 runToggleRow.className = 'code-exec-toggle-row';
 
-                const runLabel = this.activeDocument.createSpan();
+                const runLabel = createDetached(this.activeDocument, 'span');
                 runLabel.className = 'code-exec-label';
                 runLabel.textContent = 'Run code';
 
-                const runToggle = this.activeDocument.createDiv();
+                const runToggle = createDetached(this.activeDocument, 'div');
                 runToggle.className = 'code-exec-toggle';
                 runToggle.setAttribute('role', 'switch');
                 runToggle.setAttribute('aria-checked', 'false');
                 runToggle.setAttribute('aria-label', 'Run code');
 
                 
-                const backBtn = this.activeDocument.createEl('button');
+                const backBtn = createDetached(this.activeDocument, 'button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
                 backBtn.addClass('nl-display-none');
@@ -6375,7 +6376,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.classList.add('code-exec-running');
         outputEl.empty();
 
-        const spinner = this.activeDocument.createSpan();
+        const spinner = createDetached(this.activeDocument, 'span');
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         outputEl.appendChild(spinner);
@@ -6387,7 +6388,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         if (result.isHtml && result.htmlContent) {
             outputEl.classList.add('code-exec-success');
-            const iframe = this.activeDocument.createEl('iframe');
+            const iframe = createDetached(this.activeDocument, 'iframe');
             iframe.className = 'code-exec-iframe';
             iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-modals');
             iframe.srcdoc = result.htmlContent;
@@ -6408,13 +6409,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             void MarkdownRenderer.render(this.app, result.markdownContent, outputEl, '', this);
         } else if (result.success) {
             outputEl.classList.add('code-exec-success');
-            const outputPre = this.activeDocument.createEl('pre');
+            const outputPre = createDetached(this.activeDocument, 'pre');
             outputPre.className = 'code-exec-output-text';
             outputPre.textContent = result.output;
             outputEl.appendChild(outputPre);
         } else {
             outputEl.classList.add('code-exec-error');
-            const errorPre = this.activeDocument.createEl('pre');
+            const errorPre = createDetached(this.activeDocument, 'pre');
             errorPre.className = 'code-exec-output-text';
             errorPre.textContent = `Error: ${result.error}`;
             if (result.output) {
@@ -6446,14 +6447,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             if (wrapper.querySelector('.mermaid-repair-row')) return;
 
-            const repairRow = this.activeDocument.createDiv();
+            const repairRow = createDetached(this.activeDocument, 'div');
             repairRow.className = 'code-exec-toggle-row mermaid-repair-row';
 
-            const repairLabel = this.activeDocument.createSpan();
+            const repairLabel = createDetached(this.activeDocument, 'span');
             repairLabel.className = 'code-exec-label';
             repairLabel.textContent = 'Repair diagram';
 
-            const repairBtn = this.activeDocument.createEl('button');
+            const repairBtn = createDetached(this.activeDocument, 'button');
             repairBtn.className = 'code-block-btn';
             repairBtn.setAttribute('aria-label', 'Repair mermaid diagram');
             setIcon(repairBtn, 'wrench');
@@ -6517,13 +6518,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         question = ''
     ) {
         
-        const loadingEl = this.activeDocument.createDiv();
+        const loadingEl = createDetached(this.activeDocument, 'div');
         loadingEl.className = 'code-exec-output code-exec-running';
-        const spinner = this.activeDocument.createSpan();
+        const spinner = createDetached(this.activeDocument, 'span');
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         loadingEl.appendChild(spinner);
-        const loadingText = this.activeDocument.createSpan();
+        const loadingText = createDetached(this.activeDocument, 'span');
         loadingText.className = 'code-exec-label';
         loadingText.textContent = 'Repairing diagram…';
         loadingEl.appendChild(loadingText);
@@ -6553,7 +6554,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             this.saveCodeEdit(question, oldCode, fixedCode, 'mermaid');
 
             
-            const tempContainer = this.activeDocument.createDiv();
+            const tempContainer = createDetached(this.activeDocument, 'div');
             await MarkdownRenderer.render(
                 this.app,
                 '```mermaid\n' + fixedCode + '\n```',
@@ -6575,13 +6576,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         } catch (err: unknown) {
             loadingEl.remove();
 
-            const errRow = this.activeDocument.createDiv();
+            const errRow = createDetached(this.activeDocument, 'div');
             errRow.className = 'code-exec-toggle-row mermaid-repair-row';
-            const errLabel = this.activeDocument.createSpan();
+            const errLabel = createDetached(this.activeDocument, 'span');
             errLabel.className = 'code-exec-label';
             errLabel.addClass('nl-color-remaining-13');
             errLabel.textContent = `Repair failed: ${err instanceof Error ? err.message : String(err)}`;
-            const retryBtn = this.activeDocument.createEl('button');
+            const retryBtn = createDetached(this.activeDocument, 'button');
             retryBtn.className = 'code-block-btn';
             retryBtn.setAttribute('aria-label', 'Retry repair');
             setIcon(retryBtn, 'refresh-cw');
@@ -6608,14 +6609,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.querySelector('.code-repair-toggle-row')?.remove();
         wrapper.querySelector('.code-repair-toggle-row')?.remove();
 
-        const repairRow = this.activeDocument.createDiv();
+        const repairRow = createDetached(this.activeDocument, 'div');
         repairRow.className = 'code-exec-toggle-row code-repair-toggle-row';
 
-        const repairLabel = this.activeDocument.createSpan();
+        const repairLabel = createDetached(this.activeDocument, 'span');
         repairLabel.className = 'code-exec-label';
         repairLabel.textContent = 'Repair code';
 
-        const repairToggle = this.activeDocument.createDiv();
+        const repairToggle = createDetached(this.activeDocument, 'div');
         repairToggle.className = 'code-exec-toggle code-repair-toggle-switch';
         repairToggle.setAttribute('role', 'switch');
         repairToggle.setAttribute('aria-checked', 'false');
@@ -6648,7 +6649,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.classList.remove('hidden', 'code-exec-error', 'code-exec-success');
         outputEl.classList.add('code-exec-running');
         outputEl.empty();
-        const spinner = this.activeDocument.createSpan();
+        const spinner = createDetached(this.activeDocument, 'span');
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         outputEl.appendChild(spinner);
@@ -6684,7 +6685,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             outputEl.classList.remove('code-exec-running');
             outputEl.classList.add('code-exec-error');
             outputEl.empty();
-            const errPre = this.activeDocument.createEl('pre');
+            const errPre = createDetached(this.activeDocument, 'pre');
             errPre.className = 'code-exec-output-text';
             errPre.textContent = `Repair failed: ${err instanceof Error ? err.message : String(err)}`;
             outputEl.appendChild(errPre);
@@ -7447,7 +7448,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         this.closeContextMenu();
         this.contextMenuOpenFromMore = fromMore;
         
-        const menu = this.activeDocument.createDiv();
+        const menu = createDetached(this.activeDocument, 'div');
         menu.className = 'context-file-menu';
         
         const rect = anchorEl.getBoundingClientRect();
@@ -7456,14 +7457,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         menu.addClass('nl-z-index-9999');
         menu.addClass('nl-min-width-260px');
         
-        const searchInput = this.activeDocument.createEl('input');
+        const searchInput = createDetached(this.activeDocument, 'input');
         searchInput.type = 'text';
         searchInput.className = 'context-file-menu-search';
         searchInput.placeholder = 'Search files directly by name, use / for folders';
         menu.appendChild(searchInput);
         this.contextMenuInput = searchInput;
         
-        const listContainer = this.activeDocument.createDiv();
+        const listContainer = createDetached(this.activeDocument, 'div');
         listContainer.className = 'context-file-menu-list';
         menu.appendChild(listContainer);
         
@@ -7561,7 +7562,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         this.closeContextMenu();
         this.contextMenuOpenFromMore = fromMore;
 
-        const menu = this.activeDocument.createDiv();
+        const menu = createDetached(this.activeDocument, 'div');
         menu.className = 'context-file-menu';
 
         
@@ -7572,7 +7573,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         menu.addClass('nl-min-width-260px');
 
         
-        const listContainer = this.activeDocument.createDiv();
+        const listContainer = createDetached(this.activeDocument, 'div');
         listContainer.className = 'context-file-menu-list';
         menu.appendChild(listContainer);
 
@@ -7622,15 +7623,15 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         if (matchingPrefixes.length > 0) {
             matchingPrefixes.forEach((opt, index) => {
-                const item = this.activeDocument.createDiv();
+                const item = createDetached(this.activeDocument, 'div');
                 item.className = 'context-file-menu-item';
 
                 
                 if ('badge' in opt && opt.badge) {
-                    const labelSpan = this.activeDocument.createSpan();
+                    const labelSpan = createDetached(this.activeDocument, 'span');
                     labelSpan.textContent = opt.label;
 
-                    const badgeSpan = this.activeDocument.createSpan();
+                    const badgeSpan = createDetached(this.activeDocument, 'span');
                     badgeSpan.className = 'feature-badge beta-badge';
                     badgeSpan.textContent = opt.badge!;
                     badgeSpan.addClass('nl-css-text-remaining-14');
@@ -7672,13 +7673,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             ).slice(0, 10); 
 
             if (matchingFiles.length > 0) {
-                const fileHeader = this.activeDocument.createDiv();
+                const fileHeader = createDetached(this.activeDocument, 'div');
                 fileHeader.className = 'context-file-menu-section-header';
                 fileHeader.textContent = 'Files';
                 container.appendChild(fileHeader);
 
                 matchingFiles.forEach((file, index) => {
-                    const item = this.activeDocument.createDiv();
+                    const item = createDetached(this.activeDocument, 'div');
                     item.className = 'context-file-menu-item';
 
                     const iconSpan = item.createSpan();
@@ -7715,7 +7716,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     container.appendChild(item);
                 });
             } else {
-                const noResults = this.activeDocument.createDiv();
+                const noResults = createDetached(this.activeDocument, 'div');
                 noResults.className = 'context-file-menu-item';
                 noResults.textContent = 'No matches found';
                 noResults.addClass('nl-opacity-05');
@@ -8016,7 +8017,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             if (!this.contextMenuPreviewEl) {
-                this.contextMenuPreviewEl = this.activeDocument.createDiv();
+                this.contextMenuPreviewEl = createDetached(this.activeDocument, 'div');
                 this.contextMenuPreviewEl.className = 'context-file-preview';
                 this.activeDocument.body.appendChild(this.contextMenuPreviewEl);
             }
@@ -8082,12 +8083,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         if (this.contextMenuOpenFromMore && files.length > maxVisible) {
             const remaining = files.slice(maxVisible);
-            const remHeader = this.activeDocument.createDiv();
+            const remHeader = createDetached(this.activeDocument, 'div');
             remHeader.className = 'context-file-menu-section-header';
             remHeader.textContent = 'Added files';
             container.appendChild(remHeader);
             remaining.forEach(path => {
-                const item = this.activeDocument.createDiv();
+                const item = createDetached(this.activeDocument, 'div');
                 item.className = 'context-file-menu-item added';
 
                 
@@ -8127,7 +8128,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 container.appendChild(item);
             });
             
-            const divider = this.activeDocument.createDiv();
+            const divider = createDetached(this.activeDocument, 'div');
             divider.className = 'context-file-menu-divider';
             container.appendChild(divider);
         }
@@ -8140,14 +8141,14 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             .slice()
             .sort((a, b) => b.stat.mtime - a.stat.mtime)
             .slice(0, filter ? allFiles.length : 5); 
-        const recHeader = this.activeDocument.createDiv();
+        const recHeader = createDetached(this.activeDocument, 'div');
         recHeader.className = 'context-file-menu-section-header';
         recHeader.textContent = 'Recent files';
         container.appendChild(recHeader);
         recentFiles.forEach(file => {
             
             if (this.selectedFiles.has(file.path)) return;
-            const item = this.activeDocument.createDiv();
+            const item = createDetached(this.activeDocument, 'div');
             item.className = 'context-file-menu-item';
             const iconSpan = item.createSpan();
             setIcon(iconSpan, this.getFileTypeIcon(file.name));
@@ -8162,7 +8163,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             container.appendChild(item);
         });
         
-        const divider2 = this.activeDocument.createDiv();
+        const divider2 = createDetached(this.activeDocument, 'div');
         divider2.className = 'context-file-menu-divider';
         container.appendChild(divider2);
         
@@ -8178,25 +8179,25 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 { label: '@youtube', value: '@youtube', action: 'modal', modalType: 'youtube' }
             ];
             prefixOptions.forEach(opt => {
-                const item = this.activeDocument.createDiv();
+                const item = createDetached(this.activeDocument, 'div');
                 item.className = 'context-file-menu-item';
 
                 
                 if (opt.hasToggle && opt.value === '@vault ') {
-                    const labelSpan = this.activeDocument.createSpan();
+                    const labelSpan = createDetached(this.activeDocument, 'span');
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = this.activeDocument.createDiv();
+                    const toggleContainer = createDetached(this.activeDocument, 'div');
                     toggleContainer.className = 'vault-citation-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-13');
 
                     
-                    const toggleLabel = this.activeDocument.createSpan();
+                    const toggleLabel = createDetached(this.activeDocument, 'span');
                     toggleLabel.textContent = 'Citations';
                     toggleLabel.addClass('nl-css-text-rem-14');
 
-                    const toggleSwitch = this.activeDocument.createEl('input');
+                    const toggleSwitch = createDetached(this.activeDocument, 'input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'vault-citation-toggle';
                     toggleSwitch.checked = this.vaultInlineCitationsEnabled;
@@ -8216,19 +8217,19 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     item.addClass('nl-css-text-rem-15');
                 } else if (opt.hasToggle && opt.value === '@flash ') {
                     
-                    const labelSpan = this.activeDocument.createSpan();
+                    const labelSpan = createDetached(this.activeDocument, 'span');
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = this.activeDocument.createDiv();
+                    const toggleContainer = createDetached(this.activeDocument, 'div');
                     toggleContainer.className = 'flash-citation-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-16');
 
-                    const toggleLabel = this.activeDocument.createSpan();
+                    const toggleLabel = createDetached(this.activeDocument, 'span');
                     toggleLabel.textContent = 'Citations';
                     toggleLabel.addClass('nl-css-text-rem-17');
 
-                    const toggleSwitch = this.activeDocument.createEl('input');
+                    const toggleSwitch = createDetached(this.activeDocument, 'input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'flash-citation-toggle';
                     toggleSwitch.checked = this.flashInlineCitationsEnabled;
@@ -8296,19 +8297,19 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     */ 
                 } else if (opt.hasToggle && opt.value === '@mcp ') {
                     
-                    const labelSpan = this.activeDocument.createSpan();
+                    const labelSpan = createDetached(this.activeDocument, 'span');
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = this.activeDocument.createDiv();
+                    const toggleContainer = createDetached(this.activeDocument, 'div');
                     toggleContainer.className = 'mcp-ratelimit-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-24');
 
-                    const toggleLabel = this.activeDocument.createSpan();
+                    const toggleLabel = createDetached(this.activeDocument, 'span');
                     toggleLabel.textContent = 'Delay Limit';
                     toggleLabel.addClass('nl-css-text-rem-25');
 
-                    const toggleSwitch = this.activeDocument.createEl('input');
+                    const toggleSwitch = createDetached(this.activeDocument, 'input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'mcp-ratelimit-toggle';
                     toggleSwitch.checked = this.mcpRateLimitEnabled;
@@ -11162,7 +11163,7 @@ export class CodeCanvasModal extends Modal {
             if (lang === 'json') {
                 const result = await executeCode(code, 'json');
                 if (result.isHtml && result.htmlContent) {
-                    const iframe = this.activeDocument.createEl('iframe');
+                    const iframe = createDetached(this.activeDocument, 'iframe');
                     iframe.className = 'code-exec-iframe code-canvas-iframe';
                     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
                     iframe.srcdoc = result.htmlContent;
@@ -11288,7 +11289,7 @@ export class CodeCanvasModal extends Modal {
             outputArea.empty();
 
             if (result.isHtml && result.htmlContent) {
-                const iframe = this.activeDocument.createEl('iframe');
+                const iframe = createDetached(this.activeDocument, 'iframe');
                 iframe.className = 'code-exec-iframe code-canvas-iframe';
                 iframe.setAttribute('sandbox',
                     'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-modals allow-popups'

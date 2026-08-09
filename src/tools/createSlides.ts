@@ -6,6 +6,7 @@ import { OpenRouterService, ChatMessage as OpenRouterChatMessage } from '../serv
 import { OllamaService, ChatMessage as OllamaChatMessage } from '../services/ollamaService';
 import { NvidiaService, ChatMessage as NvidiaChatMessage } from '../services/nvidiaService';
 import { UnifiedProviderManager } from '../services/unifiedProviderManager';
+import { createDetached } from '../utils/domUtils';
 
 export interface SavedSlideshow {
   id: string;
@@ -711,7 +712,7 @@ export class SlideshowSettingsModal extends Modal {
     let defaultVoice = this.availableVoices.find(v => v.default) || this.availableVoices[0];
     
     for (const voice of this.availableVoices) {
-      const option = this.containerEl.ownerDocument.createEl('option');
+      const option = createDetached(this.containerEl.ownerDocument, 'option');
       option.value = voice.name;
       option.textContent = this.formatVoiceName(voice);
       if (voice.default) {
@@ -926,7 +927,7 @@ export class SlideshowVoiceSettingsModal extends Modal {
     }
     
     for (const voice of this.availableVoices) {
-      const option = this.containerEl.ownerDocument.createEl('option');
+      const option = createDetached(this.containerEl.ownerDocument, 'option');
       option.value = voice.name;
       option.textContent = this.formatVoiceName(voice);
       this.voiceSelectDropdown.appendChild(option);

@@ -7,6 +7,7 @@ import { NvidiaService, ChatMessage as NvidiaChatMessage } from '../services/nvi
 import { RateLimitManager } from '../utils/rateLimitManager';
 import { GeminiService } from '../services/geminiService';
 import { UnifiedProviderManager } from '../services/unifiedProviderManager';
+import { createDetached } from '../utils/domUtils';
 
 
 
@@ -393,7 +394,7 @@ export function triggerConfetti(element: HTMLElement) {
   const confettiCount = 30;
   
   for (let i = 0; i < confettiCount; i++) {
-    const confetti = doc.createDiv();
+    const confetti = createDetached(doc, 'div');
     confetti.className = 'quiz-confetti';
     confetti.setCssProps({
       '--confetti-bg': colors[Math.floor(Math.random() * colors.length)],

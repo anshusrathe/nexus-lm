@@ -11,6 +11,7 @@ import { SavedConceptMap } from './tools/createConceptMaps';
 import { SavedSlideshow } from './tools/createSlides';
 import { detectBinaryPath, clearBinaryCache } from './agent/cliExecutor';
 import type AIPlugin from './main';
+import { createDetached } from './utils/domUtils';
 
 // Move Provider type directly into settings.ts
 export type Provider = 'gemini' | 'groq' | 'openrouter' | 'opencode' | 'ollama' | 'nvidia' | 'lmstudio' | (string & {});
@@ -3477,7 +3478,7 @@ if (this.validatePath(normalizedPath)) {
 
   private openModelSettingsModal(model: CustomModel) {
     const doc = this.containerEl.ownerDocument;
-    const modal = doc.createDiv();
+    const modal = createDetached(doc, 'div');
     modal.className = 'model-settings-modal-container is-visible'; // Add is-visible class
     
     const modalBg = modal.createDiv({ cls: 'model-settings-modal-bg' });

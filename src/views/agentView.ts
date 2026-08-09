@@ -15,6 +15,7 @@ import { RateLimitManager } from '../utils/rateLimitManager';
 import { PartialStreamError } from '../utils/streamingUtils';
 import { extractTextFromFile, isExtractable } from '../utils/localFileExtractor';
 import { openSessionHistoryModal } from '../modals/sessionHistoryModal';
+import { createDetached } from '../utils/domUtils';
 
 export const VIEW_TYPE_AGENT = 'NEXUS_LM_AGENT';
 
@@ -369,7 +370,7 @@ export class AgentView extends ItemView {
   private openAgentFileMenu(anchorEl: HTMLElement): void {
     this.closeAgentFileMenu();
 
-    const menu = this.containerEl.ownerDocument.createDiv();
+    const menu = createDetached(this.containerEl.ownerDocument, 'div');
     menu.className = 'context-file-menu';
 
     const rect = anchorEl.getBoundingClientRect();

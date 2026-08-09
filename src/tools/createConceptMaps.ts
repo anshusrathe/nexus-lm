@@ -7,6 +7,7 @@ import { OllamaService, ChatMessage as OllamaChatMessage } from '../services/oll
 import { NvidiaService, ChatMessage as NvidiaChatMessage } from '../services/nvidiaService';
 import { MultimodalInput, processFileForMultimodal, isTextFile } from '../utils/multimodalUtils';
 import { UnifiedProviderManager } from '../services/unifiedProviderManager';
+import { createDetached, createSvgElement } from '../utils/domUtils';
 
 export interface ConceptMapData {
   noteName: string;
@@ -1101,14 +1102,14 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     const defaultNodeColor = '#7c3aed';
 
     // Create SVG element
-    const svg = this.doc.createSvg('svg');
+    const svg = createSvgElement(this.doc, 'svg');
     svg.setAttribute('width', width.toString());
     svg.setAttribute('height', height.toString());
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     svg.addClass('nl-background-var--background-primary');
 
     // Add styles
-    const style = this.doc.createSvg('style');
+    const style = createSvgElement(this.doc, 'style');
     style.textContent = `
       .concept-circle { fill: none; stroke: rgba(100, 100, 100, 0.5); stroke-width: 2.5; transition: opacity 0.3s; }
       .concept-node { cursor: pointer; transition: opacity 0.3s; }
@@ -1134,7 +1135,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     svg.appendChild(style);
 
     // Add defs
-    const defs = this.doc.createSvg('defs');
+    const defs = createSvgElement(this.doc, 'defs');
     svg.appendChild(defs);
 
     // Build theme map (node ID -> theme index)
@@ -1162,7 +1163,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     );
 
     // Draw inner circle
-    const innerCircle = this.doc.createSvg('circle');
+    const innerCircle = createSvgElement(this.doc, 'circle');
     innerCircle.setAttribute('class', 'concept-circle');
     innerCircle.setAttribute('cx', centerX.toString());
     innerCircle.setAttribute('cy', centerY.toString());
@@ -1170,7 +1171,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     svg.appendChild(innerCircle);
 
     // Draw outer circle
-    const outerCircle = this.doc.createSvg('circle');
+    const outerCircle = createSvgElement(this.doc, 'circle');
     outerCircle.setAttribute('class', 'concept-circle');
     outerCircle.setAttribute('cx', centerX.toString());
     outerCircle.setAttribute('cy', centerY.toString());
@@ -1210,7 +1211,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
         const controlX = midX + (centerToMidX / centerDist) * curveFactor;
         const controlY = midY + (centerToMidY / centerDist) * curveFactor;
         
-        const path = this.doc.createSvg('path');
+        const path = createSvgElement(this.doc, 'path');
         const d = `M ${fromNode.x} ${fromNode.y} Q ${controlX} ${controlY} ${toNode.x} ${toNode.y}`;
         path.setAttribute('class', 'concept-relation-line');
         path.setAttribute('d', d);
@@ -1227,7 +1228,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
         relationNodePositions.push({ x: curveX, y: curveY });
         
         // Draw relation node on the curve
-        const relNode = this.doc.createSvg('circle');
+        const relNode = createSvgElement(this.doc, 'circle');
         relNode.setAttribute('class', 'concept-relation-node');
         relNode.setAttribute('cx', curveX.toString());
         relNode.setAttribute('cy', curveY.toString());
@@ -1455,11 +1456,11 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     centerX: number,
     centerY: number
   ) {
-    const group = this.doc.createSvg('g');
+    const group = createSvgElement(this.doc, 'g');
     group.setAttribute('class', 'concept-node');
     
     // Draw circle with themed color
-    const circle = this.doc.createSvg('circle');
+    const circle = createSvgElement(this.doc, 'circle');
     circle.setAttribute('class', 'concept-node-circle');
     circle.setAttribute('cx', x.toString());
     circle.setAttribute('cy', y.toString());
@@ -1511,7 +1512,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     textPositions.push({ x: textX, y: textY, width: textWidth, height: textHeight, label });
     
     // Create text element
-    const text = this.doc.createSvg('text');
+    const text = createSvgElement(this.doc, 'text');
     text.setAttribute('class', 'concept-node-text');
     text.setAttribute('x', textX.toString());
     text.setAttribute('y', textY.toString());
@@ -1528,7 +1529,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
   private showTooltip(event: MouseEvent, text: string, svg: SVGElement) {
     this.hideTooltip();
     
-    const tooltip = this.doc.createDiv();
+    const tooltip = createDetached(this.doc, 'div');
     tooltip.className = 'concept-tooltip';
     tooltip.textContent = text;
     this.doc.body.appendChild(tooltip);
@@ -1590,12 +1591,12 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     themeColors: Array<{ glow: string; label: string }>,
     relations: Array<{ from: string; to: string; reason: string }>
   ) {
-    const group = this.doc.createSvg('g');
+    const group = createSvgElement(this.doc, 'g');
     group.setAttribute('class', 'concept-node');
     group.setAttribute('data-node-id', nodeId);
     
     // Draw circle with default color
-    const circle = this.doc.createSvg('circle');
+    const circle = createSvgElement(this.doc, 'circle');
     circle.setAttribute('class', 'concept-node-circle');
     circle.setAttribute('cx', x.toString());
     circle.setAttribute('cy', y.toString());
@@ -1687,7 +1688,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     textPositions.push({ x: textX, y: textY, width: textWidth, height: textHeight, label });
     
     // Create text element
-    const text = this.doc.createSvg('text');
+    const text = createSvgElement(this.doc, 'text');
     text.setAttribute('class', 'concept-node-text');
     text.setAttribute('x', textX.toString());
     text.setAttribute('y', textY.toString());
@@ -1948,7 +1949,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
   private showThemeInfo(text: string, borderColor: string, mouseX?: number, mouseY?: number, svg?: SVGElement) {
     this.hideThemeInfo();
     
-    const infoBox = this.doc.createDiv();
+    const infoBox = createDetached(this.doc, 'div');
     infoBox.className = 'concept-theme-info';
     
     // Render markdown content
@@ -2296,12 +2297,12 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     });
     
     // Create overlay container
-    const overlay = this.doc.createDiv();
+    const overlay = createDetached(this.doc, 'div');
     overlay.className = 'theme-overlay-container';
     overlay.addClass('theme-overlay-container-style');
     
     // Create theme box (left side)
-    const themeBox = this.doc.createDiv();
+    const themeBox = createDetached(this.doc, 'div');
     themeBox.className = 'theme-overlay-box';
     themeBox.addClass('theme-overlay-box-style');
     themeBox.setCssProps({ '--theme-glow': glowColor });
@@ -2310,23 +2311,23 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     this.renderMarkdownTooltip(themeReason, themeBox);
     
     // Create nodes column (right side)
-    const nodesColumn = this.doc.createDiv();
+    const nodesColumn = createDetached(this.doc, 'div');
     nodesColumn.className = 'theme-overlay-nodes';
     nodesColumn.addClass('theme-overlay-nodes-style');
     
     themeNodeLabels.forEach((node, index) => {
-      const nodeItem = this.doc.createDiv();
+      const nodeItem = createDetached(this.doc, 'div');
       nodeItem.addClass('theme-overlay-node-item');
       nodeItem.setCssProps({
         '--theme-glow': glowColor,
         '--animation-delay': `${0.15 + index * 0.05}s`
       });
       
-      const bullet = this.doc.createDiv();
+      const bullet = createDetached(this.doc, 'div');
       bullet.addClass('theme-overlay-bullet');
       bullet.setCssProps({ '--theme-glow': glowColor });
       
-      const label = this.doc.createSpan();
+      const label = createDetached(this.doc, 'span');
       label.textContent = node.label;
       
       nodeItem.appendChild(bullet);
@@ -2413,7 +2414,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
   ) {
     this.hideThemeInfo();
     
-    const infoBox = this.doc.createDiv();
+    const infoBox = createDetached(this.doc, 'div');
     infoBox.className = 'concept-theme-info';
     
     // Render markdown content
@@ -2520,7 +2521,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
   ) {
     this.hideThemeInfo();
     
-    const infoBox = this.doc.createDiv();
+    const infoBox = createDetached(this.doc, 'div');
     infoBox.className = 'concept-theme-info';
     
     // Render markdown content
@@ -2677,7 +2678,7 @@ Generate a comprehensive concept map with DEEP, MEANINGFUL connections now:`;
     
     // Draw each line
     displayLines.forEach((line, idx) => {
-      const textEl = this.doc.createSvg('text');
+      const textEl = createSvgElement(this.doc, 'text');
       textEl.setAttribute('class', 'concept-center-text');
       textEl.setAttribute('x', centerX.toString());
       textEl.setAttribute('y', (startY + idx * lineHeight).toString());
@@ -3279,7 +3280,7 @@ export class ConceptMapVisualizationModal extends Modal {
     if (!nodeText && !nodeId) return;
     
     // Create tooltip
-    const tooltip = this.containerEl.ownerDocument.createDiv();
+    const tooltip = createDetached(this.containerEl.ownerDocument, 'div');
     tooltip.className = 'mobile-node-tooltip';
     tooltip.addClass('mobile-node-tooltip-style');
     
@@ -3380,7 +3381,7 @@ export class ConceptMapVisualizationModal extends Modal {
     });
     
     // Add visual feedback overlay
-    const overlay = this.containerEl.ownerDocument.createDiv();
+    const overlay = createDetached(this.containerEl.ownerDocument, 'div');
     overlay.className = 'mobile-node-highlight-overlay';
     overlay.addClass('mobile-node-highlight-overlay-style');
     overlay.textContent = `Connections for: ${nodeId}`;
@@ -3441,21 +3442,21 @@ export class ConceptMapVisualizationModal extends Modal {
     }
     
     // Create thematic overlay
-    const overlay = this.containerEl.ownerDocument.createDiv();
+    const overlay = createDetached(this.containerEl.ownerDocument, 'div');
     overlay.className = 'mobile-thematic-overlay';
     overlay.addClass('mobile-thematic-overlay-style');
     overlay.setCssProps({ '--theme-glow': glowColor });
     
-    const title = this.containerEl.ownerDocument.createEl('h3');
+    const title = createDetached(this.containerEl.ownerDocument, 'h3');
     title.addClass('mobile-thematic-title');
     title.setCssProps({ '--theme-glow': glowColor });
     title.textContent = nodeId;
     
-    const content = this.containerEl.ownerDocument.createEl('p');
+    const content = createDetached(this.containerEl.ownerDocument, 'p');
     content.addClass('mobile-thematic-content');
     content.textContent = themeReason;
     
-    const closeButton = this.containerEl.ownerDocument.createEl('button');
+    const closeButton = createDetached(this.containerEl.ownerDocument, 'button');
     closeButton.addClass('mobile-thematic-close-btn');
     closeButton.textContent = '×';
     closeButton.addEventListener('click', () => overlay.remove());

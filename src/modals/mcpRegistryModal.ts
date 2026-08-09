@@ -1,5 +1,6 @@
 import { App, Modal } from 'obsidian';
 import { MCPRegistryEntry, MCPEnvVarSpec, MCPPathSpec, MCP_REGISTRY } from '../mcp/mcpRegistry';
+import { createDetached } from '../utils/domUtils';
 
 /**
  * Substitutes all pathSpec placeholders in an entry's args array.
@@ -360,7 +361,7 @@ class MCPEnvVarWizard extends Modal {
     input.classList.add('mcp-wizard-input-error');
     const existing = input.parentElement?.querySelector('.mcp-wizard-error');
     if (!existing) {
-      const err = this.containerEl.ownerDocument.createSpan();
+      const err = createDetached(this.containerEl.ownerDocument, 'span');
       err.className = 'mcp-wizard-error';
       err.textContent = message;
       input.insertAdjacentElement('afterend', err);

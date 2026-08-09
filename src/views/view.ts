@@ -14,6 +14,7 @@ import { ConceptMapManager, ConceptMapModal, SavedConceptMap, ConceptMapData } f
 import { SlideManager, SlideshowSettingsModal, SavedSlideshow, SlideshowVoiceSettingsModal } from '../tools/createSlides';
 import { isMultimodalSupported } from '../utils/multimodalUtils';
 import { showConfirm } from '../modals/confirmModal';
+import { createDetached } from '../utils/domUtils';
 
 interface Question {
   text: string;
@@ -1051,7 +1052,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = this.activeDocument.createDiv();
+      const progressContainer = createDetached(this.activeDocument, 'div');
       progressContainer.className = 'qna-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1247,7 +1248,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
 
-      const progressContainer = this.activeDocument.createDiv();
+      const progressContainer = createDetached(this.activeDocument, 'div');
       progressContainer.className = 'mcq-inline-progress';
 
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1489,7 +1490,7 @@ export class AITutorView extends ItemView {
     }
     
     
-    const dialog = this.activeDocument.createDiv();
+    const dialog = createDetached(this.activeDocument, 'div');
     dialog.className = 'mcq-progress-dialog mcq-progress-inline';
     
     
@@ -1557,11 +1558,11 @@ export class AITutorView extends ItemView {
     }
     
     
-    const overlay = this.activeDocument.createDiv();
+    const overlay = createDetached(this.activeDocument, 'div');
     overlay.className = 'mcq-error-overlay';
     
     
-    const dialog = this.activeDocument.createDiv();
+    const dialog = createDetached(this.activeDocument, 'div');
     dialog.className = 'mcq-error-dialog';
     
     
@@ -1694,7 +1695,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = this.activeDocument.createDiv();
+      const progressContainer = createDetached(this.activeDocument, 'div');
       progressContainer.className = 'concept-map-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1784,7 +1785,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = this.activeDocument.createDiv();
+      const progressContainer = createDetached(this.activeDocument, 'div');
       progressContainer.className = 'slideshow-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });

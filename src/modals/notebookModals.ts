@@ -2,6 +2,7 @@ import { App, Modal, Setting, ButtonComponent, Notice } from 'obsidian';
 import { Notebook, NotebookMode } from '../managers/notebookManager';
 import { NoteSuggester, FolderSuggester } from '../views/view'; // Import FolderSuggester
 import AIPlugin from '../main';
+import { createDetached } from '../utils/domUtils';
 
 interface NotebookFormSettings {
   name: string;
@@ -149,7 +150,7 @@ export class NotebookFormModal extends Modal {
         const row = webList.createDiv({ cls: 'web-context-row' });
         row.createSpan({ text: src.name, cls: 'web-context-name' });
         // --- MAKE URL CLICKABLE ---
-        const urlLink = this.containerEl.ownerDocument.createEl('a');
+        const urlLink = createDetached(this.containerEl.ownerDocument, 'a');
         urlLink.href = src.url;
         urlLink.textContent = src.url;
         urlLink.target = '_blank';

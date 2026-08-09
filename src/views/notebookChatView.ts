@@ -24,6 +24,7 @@ import {
   FlashcardState
 } from '../managers/notebookQuizFlashcards';
 import { NotebookBM25Manager, NotebookSourceStatus as BM25SourceStatus } from '../managers/notebookBM25Manager';
+import { createDetached } from '../utils/domUtils';
 
 export const VIEW_TYPE_NOTEBOOK_CHAT = 'notebook-chat-view';
 
@@ -1474,7 +1475,7 @@ Rules:
         const fileName = file instanceof TFile ? file.basename : path.split('/').pop();
         const row = list.createDiv({ cls: 'source-row' });
         const label = row.createEl('label', { cls: 'source-label' });
-        const checkbox = this.activeDocument.createEl('input');
+        const checkbox = createDetached(this.activeDocument, 'input');
         checkbox.type = 'checkbox';
         checkbox.checked = this.selectedSourcePaths.has(path);
         if (anyWebChecked) checkbox.disabled = true;
@@ -1489,7 +1490,7 @@ Rules:
           void this.updateContextBar();
         });
         label.appendChild(checkbox);
-        const nameSpan = this.activeDocument.createSpan();
+        const nameSpan = createDetached(this.activeDocument, 'span');
         nameSpan.textContent = ' ' + fileName;
         nameSpan.addClass('nl-font-weight-bold');
         label.appendChild(nameSpan);
@@ -1499,12 +1500,12 @@ Rules:
           const sourceStatus = this.sourceStatuses.find(s => s.path === path);
           if (sourceStatus) {
             if (sourceStatus.hasChanges) {
-              const glowDot = this.activeDocument.createSpan();
+              const glowDot = createDetached(this.activeDocument, 'span');
               glowDot.className = 'source-change-indicator';
               glowDot.title = 'Source has changed since last indexing';
               row.appendChild(glowDot);
             } else if (!sourceStatus.isIndexed) {
-              const notIndexedDot = this.activeDocument.createSpan();
+              const notIndexedDot = createDetached(this.activeDocument, 'span');
               notIndexedDot.className = 'source-not-indexed-indicator';
               notIndexedDot.title = 'Source not indexed yet';
               row.appendChild(notIndexedDot);
@@ -1521,7 +1522,7 @@ Rules:
           const webKey = `web:${web.url}`;
           const row = list.createDiv({ cls: 'source-row web-source-row' });
           const label = row.createEl('label', { cls: 'source-label web-source-label' });
-          const checkbox = this.activeDocument.createEl('input');
+          const checkbox = createDetached(this.activeDocument, 'input');
           checkbox.type = 'checkbox';
           checkbox.checked = this.selectedSourcePaths.has(webKey);
           if (anyNoteChecked) checkbox.disabled = true;
@@ -1536,7 +1537,7 @@ Rules:
             this.renderMobileSourcesPanel();
           });
           label.appendChild(checkbox);
-          const nameSpan = this.activeDocument.createSpan();
+          const nameSpan = createDetached(this.activeDocument, 'span');
           nameSpan.textContent = ' ' + web.name;
           nameSpan.className = 'web-source-name';
           label.appendChild(nameSpan);
@@ -1550,7 +1551,7 @@ Rules:
   private openPrefixMenu(anchorEl: HTMLElement) {
     this.closePrefixMenu();
 
-    const menu = this.activeDocument.createDiv();
+    const menu = createDetached(this.activeDocument, 'div');
     menu.className = 'context-file-menu notebook-prefix-menu';
 
     const rect = anchorEl.getBoundingClientRect();
@@ -1567,15 +1568,15 @@ Rules:
     ];
 
     prefixOptions.forEach(opt => {
-      const item = this.activeDocument.createDiv();
+      const item = createDetached(this.activeDocument, 'div');
       item.className = 'context-file-menu-item';
 
-      const labelSpan = this.activeDocument.createSpan();
+      const labelSpan = createDetached(this.activeDocument, 'span');
       labelSpan.textContent = opt.label;
       labelSpan.addClass('nl-font-weight-500');
       item.appendChild(labelSpan);
 
-      const descSpan = this.activeDocument.createSpan();
+      const descSpan = createDetached(this.activeDocument, 'span');
       descSpan.textContent = opt.description;
       descSpan.addClass('nl-css-text-remaining-7');
       item.appendChild(descSpan);
@@ -1876,7 +1877,7 @@ Rules:
         const fileName = file instanceof TFile ? file.basename : path.split('/').pop();
         const row = list.createDiv({ cls: 'source-row' });
         const label = row.createEl('label', { cls: 'source-label' });
-        const checkbox = this.activeDocument.createEl('input');
+        const checkbox = createDetached(this.activeDocument, 'input');
         checkbox.type = 'checkbox';
         checkbox.checked = this.selectedSourcePaths.has(path);
         if (anyWebChecked) checkbox.disabled = true;
@@ -1891,7 +1892,7 @@ Rules:
         });
         label.appendChild(checkbox);
         
-        const nameSpan = this.activeDocument.createSpan();
+        const nameSpan = createDetached(this.activeDocument, 'span');
         nameSpan.textContent = ' ' + fileName;
         nameSpan.addClass('nl-font-weight-bold');
         label.appendChild(nameSpan);
@@ -1901,13 +1902,13 @@ Rules:
           const sourceStatus = this.sourceStatuses.find(s => s.path === path);
           if (sourceStatus) {
             if (sourceStatus.hasChanges) {
-              const glowDot = this.activeDocument.createSpan();
+              const glowDot = createDetached(this.activeDocument, 'span');
               glowDot.className = 'source-change-indicator';
               glowDot.title = 'Source has changed since last indexing. Click to refresh.';
               glowDot.addEventListener('click', (e) => { e.stopPropagation(); void this.refreshSourceEmbedding(path); });
               row.appendChild(glowDot);
             } else if (!sourceStatus.isIndexed) {
-              const notIndexedDot = this.activeDocument.createSpan();
+              const notIndexedDot = createDetached(this.activeDocument, 'span');
               notIndexedDot.className = 'source-not-indexed-indicator';
               notIndexedDot.title = 'Source not indexed yet. Click to index.';
               notIndexedDot.addEventListener('click', (e) => { e.stopPropagation(); void this.refreshSourceEmbedding(path); });
@@ -1925,7 +1926,7 @@ Rules:
           const webKey = `web:${web.url}`;
           const row = list.createDiv({ cls: 'source-row web-source-row' });
           const label = row.createEl('label', { cls: 'source-label web-source-label' });
-          const checkbox = this.activeDocument.createEl('input');
+          const checkbox = createDetached(this.activeDocument, 'input');
           checkbox.type = 'checkbox';
           checkbox.checked = this.selectedSourcePaths.has(webKey);
           if (anyNoteChecked) checkbox.disabled = true;
@@ -1939,7 +1940,7 @@ Rules:
             void this.updateContextBar();
           });
           label.appendChild(checkbox);
-          const nameSpan = this.activeDocument.createSpan();
+          const nameSpan = createDetached(this.activeDocument, 'span');
           nameSpan.textContent = ' ' + web.name;
           nameSpan.className = 'web-source-name';
           label.appendChild(nameSpan);
@@ -3689,7 +3690,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         }
 
         if (targetEl) {
-          const tooltip = this.activeDocument.createDiv();
+          const tooltip = createDetached(this.activeDocument, 'div');
           tooltip.classList.add('footnote-tooltip');
           tooltip.addClass('footnote-tooltip-style');
 
@@ -3741,7 +3742,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         const id = itemEl.getAttribute('id');
 
         if (id) {
-          const backArrow = this.activeDocument.createEl('a');
+          const backArrow = createDetached(this.activeDocument, 'a');
           backArrow.classList.add('footnote-backref');
           backArrow.textContent = ' ↩';
           backArrow.setAttribute('aria-label', 'Back to content');
@@ -3777,14 +3778,14 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     }
     const modelBtn = this.modelSelectButton.buttonEl;
     if (!modelBtn) return;
-    const menuEl = this.activeDocument.createDiv();
+    const menuEl = createDetached(this.activeDocument, 'div');
     menuEl.className = 'model-select-menu';
 
     
-    const searchContainer = this.activeDocument.createDiv();
+    const searchContainer = createDetached(this.activeDocument, 'div');
     searchContainer.className = 'model-search-container';
 
-    const searchInput = this.activeDocument.createEl('input');
+    const searchInput = createDetached(this.activeDocument, 'input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Search models...';
     searchInput.className = 'model-search-input';
@@ -3805,7 +3806,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
 
       
       if (modelGroups.length === 0) {
-        const noticeEl = this.activeDocument.createDiv();
+        const noticeEl = createDetached(this.activeDocument, 'div');
         noticeEl.className = 'model-select-menu-notice';
         noticeEl.textContent = '⚠️ Web sources require Gemini, Ollama, or NVIDIA models. Please configure these models in settings.';
         menuEl.appendChild(noticeEl);
@@ -3833,7 +3834,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     
     modelGroups.forEach((group, groupIndex) => {
       
-      const headerEl = this.activeDocument.createDiv();
+      const headerEl = createDetached(this.activeDocument, 'div');
       headerEl.className = 'model-select-menu-header';
       headerEl.textContent = group.label;
       menuEl.appendChild(headerEl);
@@ -3844,13 +3845,13 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
 
       
       group.models.forEach(model => {
-        const menuItem = this.activeDocument.createDiv();
+        const menuItem = createDetached(this.activeDocument, 'div');
         menuItem.className = 'model-select-menu-item';
         groupItems.push(menuItem);
         itemsToFilter.push({ itemEl: menuItem, name: model.name.toLowerCase() });
         
         
-        const textSpan = this.activeDocument.createSpan();
+        const textSpan = createDetached(this.activeDocument, 'span');
         textSpan.textContent = model.name;
         menuItem.appendChild(textSpan);
         
@@ -3866,7 +3867,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         const isWebCapable = model.provider === 'ollama' || webCapableModels.includes(model.id);
         
         if (isWebCapable) {
-          const iconSpan = this.activeDocument.createSpan();
+          const iconSpan = createDetached(this.activeDocument, 'span');
           iconSpan.className = 'model-web-icon';
           setIcon(iconSpan, 'globe');
           menuItem.appendChild(iconSpan);
@@ -3888,7 +3889,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
 
       
       if (groupIndex < modelGroups.length - 1) {
-        const separator = this.activeDocument.createDiv();
+        const separator = createDetached(this.activeDocument, 'div');
         separator.className = 'model-select-menu-separator';
         menuEl.appendChild(separator);
         headerObj.separatorEl = separator;
