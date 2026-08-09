@@ -66,7 +66,7 @@ function parseYamlFrontmatter(yaml: string): SkillMetadata {
 function parseScalar(value: string): string {
   if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
     try {
-      const parsed = JSON.parse(value);
+      const parsed: unknown = JSON.parse(value);
       return typeof parsed === 'string' ? parsed : value;
     } catch {
       return value.slice(1, -1);

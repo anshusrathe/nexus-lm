@@ -5,6 +5,7 @@ import { ResponseView, VIEW_TYPE_NEXUS_CHAT } from './views/responseView';
 import { LandingView, VIEW_TYPE_LANDING } from './views/landingView';
 import { EmbeddingsManager } from './managers/embeddingsManager';
 import { PdfExtractOptionsModal, extractTextFromPdf, getPdfjsLib } from './utils/pdfExtractor';
+import type { PdfDocumentProxy } from './types/pdf';
 import { VIEW_TYPE_NEXUS_FEED, FeedView } from './views/feedView';
 import { FeedEntryView, VIEW_TYPE_NEXUS_FEED_ENTRIES } from './views/feedEntryView';
 import { ParsedFeedEntry } from './parsing/feedParsing';
@@ -230,7 +231,7 @@ export default class AIPlugin extends Plugin {
                         })
                     );
                 if (connectPromises.length > 0) {
-                    Promise.all(connectPromises).finally(() => {
+                    void Promise.all(connectPromises).finally(() => {
                         if (this.settings.agentEnableMCP) {
                             this.refreshAgentMCPTools();
                         }
@@ -411,7 +412,7 @@ export default class AIPlugin extends Plugin {
                                 const numPages = pdfDocument.numPages;
                                 
                                 const defaultDir = (this.settings.pdfOutputDirectory && this.settings.pdfOutputDirectory !== '/') ? this.settings.pdfOutputDirectory : 'PDF-Extracted-Text';
-                                new PdfExtractOptionsModal(this.app, numPages, defaultDir, pdfDocument as any, (opts) => {
+                                new PdfExtractOptionsModal(this.app, numPages, defaultDir, pdfDocument as unknown as PdfDocumentProxy, (opts) => {
                                     void (async () => {
                                         try {
                                             new Notice(`Extracting text from ${activeFile.name}...`);

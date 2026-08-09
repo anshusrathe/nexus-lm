@@ -634,7 +634,7 @@ export class AgentView extends ItemView {
         currentStartTime: this.state.startTime,
         currentContextItems: [...this.currentTurnContext],
         modelNames: this.turns.map(t =>
-          t.modelId ? getModelDisplayName(t.modelId, this.plugin.settings, t.modelProvider as any) : ''
+          t.modelId ? getModelDisplayName(t.modelId, this.plugin.settings, t.modelProvider) : ''
         ),
         turnElapsedTimes: this.turns.map(t => t.startedAt && t.completedAt ? this.formatElapsedMmSs(t.completedAt - t.startedAt) : ''),
         onRevertTurn: async (turnIndex: number, newTask: string) => {
@@ -1339,7 +1339,7 @@ export class AgentView extends ItemView {
     const taskPrompt = this.buildTaskPrompt(task);
     this.setRunning(true);
 
-    this.runAgentTask(taskPrompt, selectedEmbeddingIndexes, task, fileContext).finally(() => {
+    void this.runAgentTask(taskPrompt, selectedEmbeddingIndexes, task, fileContext).finally(() => {
       if (this.state.isRunning) {
         this.setRunning(false);
       }
@@ -1727,9 +1727,9 @@ export class AgentView extends ItemView {
       const paramsMatch = block.match(/<parameters>([\s\S]*?)<\/parameters>/);
       if (paramsMatch) {
         try {
-          const parsed = JSON.parse(paramsMatch[1].trim());
+          const parsed: unknown = JSON.parse(paramsMatch[1].trim());
           if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-            args = parsed;
+            args = parsed as Record<string, unknown>;
           }
         } catch { /* not JSON, try arg_key/arg_value */ }
       }
@@ -1810,7 +1810,6 @@ export class AgentView extends ItemView {
   }
 
   private streamFinalAnswerSmoothly(text: string): Promise<void> {
-    const self = this;
     if (!this.currentTurnId || !text) return Promise.resolve();
     const lastChunk = [...this.currentTurnEvents].reverse().find(e => e.type === 'answer_chunk');
     const streamed = lastChunk ? String((lastChunk.data as { text?: unknown })?.text ?? '') : '';
@@ -1823,23 +1822,23 @@ export class AgentView extends ItemView {
 
     return new Promise<void>((resolve) => {
       const tick = (): void => {
-        if (self.finalStreamTimer !== null) {
-          window.clearTimeout(self.finalStreamTimer);
-          self.finalStreamTimer = null;
+        if (this.finalStreamTimer !== null) {
+          window.clearTimeout(this.finalStreamTimer);
+          this.finalStreamTimer = null;
         }
-        if (!self.currentTurnId) { resolve(); return; }
+        if (!this.currentTurnId) { resolve(); return; }
         if (index >= plan.length) { resolve(); return; }
         const elapsed = Date.now() - start;
         if (elapsed > accumulated + 300) {
-          self.addEvent({ type: 'answer_chunk', data: { text }, timestamp: Date.now() });
+          this.addEvent({ type: 'answer_chunk', data: { text }, timestamp: Date.now() });
           resolve();
           return;
         }
-        self.addEvent({ type: 'answer_chunk', data: { text: plan[index].text }, timestamp: Date.now() });
+        this.addEvent({ type: 'answer_chunk', data: { text: plan[index].text }, timestamp: Date.now() });
         index++;
         if (index >= plan.length) { resolve(); return; }
         accumulated += plan[index].delay;
-        self.finalStreamTimer = window.setTimeout(tick, plan[index].delay);
+        this.finalStreamTimer = window.setTimeout(tick, plan[index].delay);
       };
       tick();
     });
@@ -1918,7 +1917,6 @@ export class AgentView extends ItemView {
     this.currentModelId = primaryModel;
     this.currentModelProvider = primaryProvider;
 
-    const self = this;
     let providerCalls = 0;
     const providerCall = async (messages: Array<Record<string, unknown>>, onToken?: (chunk: string) => void, onThinking?: (thinking: string) => void, tools?: ToolDefinition[]): Promise<{
       content?: string;
@@ -1939,19 +1937,19 @@ export class AgentView extends ItemView {
       for (let i = 0; i < allModels.length; i++) {
         const { provider, modelId } = allModels[i];
         try {
-          const estimatedTokens = self.estimateAgentTokens(messages);
+          const estimatedTokens = this.estimateAgentTokens(messages);
           if (modelChain) {
             await RateLimitManager.getInstance().waitForClearance(provider, modelId, estimatedTokens);
           }
 
-          const { content: text, finishReason, toolCalls: nativeToolCalls, thinking } = await self.callProvider(provider, modelId, messages, onToken, onThinking, tools);
+          const { content: text, finishReason, toolCalls: nativeToolCalls, thinking } = await this.callProvider(provider, modelId, messages, onToken, onThinking, tools);
 
           if (modelChain) {
             RateLimitManager.getInstance().recordApiCall(provider, modelId, estimatedTokens);
           }
 
-          self.currentModelId = modelId;
-          self.currentModelProvider = provider;
+          this.currentModelId = modelId;
+          this.currentModelProvider = provider;
 
           const resolvedContent = text || '';
           const hasContent = resolvedContent.trim().length > 0;
@@ -1959,14 +1957,14 @@ export class AgentView extends ItemView {
           const toolCalls = usingNative
             ? (nativeToolCalls && nativeToolCalls.length > 0
                 ? nativeToolCalls
-                : (/ACTION:\s*[\w-]+\s*\(/.test(resolvedContent) ? self.parseToolCalls(resolvedContent) : []))
-            : self.parseToolCalls(resolvedContent);
+                : (/ACTION:\s*[\w-]+\s*\(/.test(resolvedContent) ? this.parseToolCalls(resolvedContent) : []))
+            : this.parseToolCalls(resolvedContent);
 
           if (!hasContent && toolCalls.length === 0) {
             throw new Error('Model ' + provider + '/' + modelId + ' returned empty content');
           }
 
-          self.addEvent({
+          this.addEvent({
             type: 'model_status',
             data: { status: '', isMidway, autoModelEnabled: Boolean(modelChain) },
             timestamp: Date.now(),
@@ -1977,14 +1975,14 @@ export class AgentView extends ItemView {
           if (error instanceof PartialStreamError) throw error;
           lastError = error instanceof Error ? error : new Error(String(error));
 
-          const autoModelEnabled = Boolean(self.plugin.settings.agentAutoModelChain);
+          const autoModelEnabled = Boolean(this.plugin.settings.agentAutoModelChain);
           const hasNextModel = i < allModels.length - 1;
 
           const statusMsg = (autoModelEnabled && hasNextModel)
             ? 'your selected model failed, trying the next model'
             : 'your selected model failed, try with a better one';
 
-          self.addEvent({
+          this.addEvent({
             type: 'model_status',
             data: {
               status: statusMsg,
@@ -2001,9 +1999,9 @@ export class AgentView extends ItemView {
     };
 
     const onToken = (chunk: string) => {
-      if (self.currentTurnId) {
+      if (this.currentTurnId) {
         let cleanText = String(chunk || '');
-        self.addEvent({ type: 'answer_chunk', data: { text: cleanText }, timestamp: Date.now() });
+        this.addEvent({ type: 'answer_chunk', data: { text: cleanText }, timestamp: Date.now() });
       }
     };
 
@@ -2072,7 +2070,7 @@ export class AgentView extends ItemView {
       await this.saveCurrentAgentSession();
     }
     if (this.traceComponent) {
-      unmount(this.traceComponent);
+      void unmount(this.traceComponent);
       this.traceComponent = null;
     }
     this.contentEl.empty();

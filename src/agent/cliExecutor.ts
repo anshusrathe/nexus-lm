@@ -1,9 +1,16 @@
-import type { ExecException } from 'child_process';
+import { Platform } from 'obsidian';
 
 export interface CliResult {
   stdout: string;
   stderr: string;
   exitCode: number | null;
+}
+
+interface ExecException extends Error {
+  code?: number | string;
+  killed?: boolean;
+  stdout?: string;
+  stderr?: string;
 }
 
 /** Cache of the resolved binary path. null = attempted and not found. undefined = not yet attempted. */
@@ -57,9 +64,11 @@ interface ExecProxy {
   };
 }
 
-function loadExec(): ExecProxy | null {
+async function loadExec(): Promise<ExecProxy | null> {
+  if (!Platform.isDesktop) return null;
   try {
-    return require('child_process') as ExecProxy;
+    const cp = await import('child_process');
+    return cp;
   } catch {
     return null;
   }
@@ -70,17 +79,16 @@ function loadExec(): ExecProxy | null {
  * When encoding is 'utf-8' (as we always pass), stdout and stderr are strings.
  * On error, the rejection includes attached stdout/stderr properties.
  */
-function execAsync(command: string, options: Record<string, unknown>, onProgress?: (chunk: string) => void): Promise<{stdout: string; stderr: string}> {
+async function execAsync(command: string, options: Record<string, unknown>, onProgress?: (chunk: string) => void): Promise<{stdout: string; stderr: string}> {
+  const cp = await loadExec();
+  if (!cp) {
+    throw new Error('child_process not available');
+  }
   return new Promise((resolve, reject) => {
-    const cp = loadExec();
-    if (!cp) {
-      reject(new Error('child_process not available'));
-      return;
-    }
     const child = cp.exec(command, options, (err: ExecException | null, stdout: string, stderr: string) => {
       if (err) {
-        (err as ExecException & { stdout?: string; stderr?: string }).stdout = stdout;
-        (err as ExecException & { stdout?: string; stderr?: string }).stderr = stderr;
+        err.stdout = stdout;
+        err.stderr = stderr;
         reject(err);
       } else {
         resolve({ stdout, stderr });
@@ -89,10 +97,10 @@ function execAsync(command: string, options: Record<string, unknown>, onProgress
 
     if (onProgress) {
       if (child.stdout) {
-        child.stdout.on('data', (data: any) => onProgress(String(data)));
+        child.stdout.on('data', (data: unknown) => onProgress(String(data)));
       }
       if (child.stderr) {
-        child.stderr.on('data', (data: any) => onProgress(String(data)));
+        child.stderr.on('data', (data: unknown) => onProgress(String(data)));
       }
     }
   });
@@ -235,9 +243,9 @@ async function ensurePipeInitialized(binary: string): Promise<void> {
       encoding: 'utf-8',
       windowsHide: false,
     });
-    
   } catch (error: unknown) {
-    
+    // The warm-up is best-effort: a failure here only means the pipe may be
+    // established lazily on a later retry with a visible console window.
   } finally {
     pipeInitialized = true;
   }

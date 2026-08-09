@@ -61,8 +61,8 @@ export async function simulatedStream(
     let errorData: { error?: { message?: string } } = {};
     let rawText = '';
     try {
-      const j = response.json;
-      if (j && typeof j === 'object') errorData = j as { error?: { message?: string } };
+      const j: unknown = response.json;
+      if (j && typeof j === 'object') errorData = j;
     } catch {
       rawText = typeof response.text === 'string' ? response.text : '';
     }
@@ -72,9 +72,9 @@ export async function simulatedStream(
 
   let data: StreamingResponseData;
   try {
-    const j = response.json;
+    const j: unknown = response.json;
     if (!j || typeof j !== 'object') throw new Error('not an object');
-    data = j as StreamingResponseData;
+    data = j;
   } catch {
     throw new Error(`API error (${response.status}): Non-JSON response: ${(typeof response.text === 'string' ? response.text : '').slice(0, 500) || 'empty body'}`);
   }

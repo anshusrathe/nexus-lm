@@ -14,7 +14,7 @@ export default {
     sourcemap: true,
     inlineDynamicImports: true
   },
-  external: ['obsidian', 'child_process', 'fs', 'http', 'https'],
+  external: ['obsidian', 'child_process', 'fs', 'http', 'https', 'mammoth'],
   plugins: [
     webWorkerLoader({
       targetPlatform: 'browser',

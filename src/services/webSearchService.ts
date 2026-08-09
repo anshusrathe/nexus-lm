@@ -138,14 +138,9 @@ export class WebSearchService {
         author: r.author,
       }));
     } else {
-      
       const mcpResults = await this.mcpProvider.search(query, {
         numResults: effectiveOptions.numResults,
       });
-      
-      if (mcpResults.length > 0) {
-        
-      }
       results = mcpResults.map((r: MCPResult) => ({
         title: r.title,
         url: r.url,

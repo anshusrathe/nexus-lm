@@ -160,7 +160,7 @@ export class AgentOrchestrator {
       if (op.isCreate) {
         const file = this.deps.app.vault.getAbstractFileByPath(op.filePath);
         if (file) {
-          await this.deps.app.vault.delete(file);
+          await this.deps.app.fileManager.trashFile(file);
         }
       } else {
         const file = this.deps.app.vault.getAbstractFileByPath(op.filePath);
@@ -267,9 +267,6 @@ export class AgentOrchestrator {
     if (this.agentMemory) {
       try {
         learnedMemoryContent = await this.agentMemory.readLearned();
-        if (learnedMemoryContent) {
-          
-        }
       } catch {
         learnedMemoryContent = null;
       }
@@ -464,7 +461,7 @@ ${experiences}
         artifacts: uniquePaths,
       });
     } catch (err) {
-      
+      // Best-effort memory save: failures must never break the agent run.
     }
   }
 
@@ -541,7 +538,6 @@ ${experiences}
   }
 
   private registerDelegateTool(): void {
-    const self = this;
     const defs = this.subAgentManager.getDelegateToolDefinitions();
 
     for (const def of defs) {
@@ -552,11 +548,11 @@ ${experiences}
       this.registry.register({
         definition: def,
         execute: async (args: Record<string, unknown>): Promise<string> => {
-          const task = String(args.task ?? '').trim() || `Analyze or investigate: ${self.currentSession?.task ?? 'current task'}`;
+          const task = String(args.task ?? '').trim() || `Analyze or investigate: ${this.currentSession?.task ?? 'current task'}`;
           const context = String(args.context ?? '');
           const expectedDeliverable = String(args.expected_deliverable ?? '');
 
-          if (!self.currentProviderCall) {
+          if (!this.currentProviderCall) {
             return JSON.stringify({ success: false, summary: 'Provider call not available.', stepsTaken: 0, error: 'No provider call available.' });
           }
 
@@ -566,13 +562,13 @@ ${experiences}
 ${context || 'No additional context provided.'}
           `.trim();
 
-          const { jobId, promise } = self.subAgentManager.spawnJob(
+          const { jobId, promise } = this.subAgentManager.spawnJob(
             agentType,
             task,
             enrichedContext,
-            self.currentProviderCall,
+            this.currentProviderCall,
             (step: SubAgentStep) => {
-              self.deps.onEvent({
+              this.deps.onEvent({
                 type: 'subagent_step',
                 data: {
                   jobId,
@@ -587,7 +583,7 @@ ${context || 'No additional context provided.'}
               });
             },
             (session: SubAgentSession) => {
-              self.deps.onEvent({
+              this.deps.onEvent({
                 type: 'subagent_started',
                 data: {
                   jobId: session.id,
@@ -600,7 +596,7 @@ ${context || 'No additional context provided.'}
           );
 
           promise.then((result: SubAgentResult) => {
-            self.deps.onEvent({
+            this.deps.onEvent({
               type: 'subagent_result',
               data: {
                 jobId,
@@ -617,7 +613,7 @@ ${context || 'No additional context provided.'}
             });
           }).catch((error: unknown) => {
             const msg = error instanceof Error ? error.message : String(error);
-            self.deps.onEvent({
+            this.deps.onEvent({
               type: 'subagent_result',
               data: {
                 jobId,
@@ -703,7 +699,6 @@ ${context || 'No additional context provided.'}
     const existing = this.registry.get('learned_memory');
     if (existing) return;
 
-    const self = this;
     this.registry.register({
       definition: {
         name: 'learned_memory',
@@ -721,18 +716,18 @@ ${context || 'No additional context provided.'}
       },
       execute: async (args: Record<string, unknown>): Promise<string> => {
         const action = String(args.action ?? '');
-        if (!self.agentMemory) return 'Agent memory not available.';
+        if (!this.agentMemory) return 'Agent memory not available.';
 
         if (action === 'read') {
-          const content = await self.agentMemory.readLearned();
+          const content = await this.agentMemory.readLearned();
           return content || 'Learned memory is empty.';
         } else if (action === 'append') {
           const content = String(args.content ?? '').trim();
           if (!content) return 'Content is required for append.';
-          const ok = await self.agentMemory.appendLearned(content);
+          const ok = await this.agentMemory.appendLearned(content);
           return ok ? 'Entry appended to learned memory.' : 'Failed to append to learned memory.';
         } else if (action === 'clear') {
-          const ok = await self.agentMemory.clearLearned();
+          const ok = await this.agentMemory.clearLearned();
           return ok ? 'Learned memory cleared.' : 'Failed to clear learned memory.';
         }
         return 'Invalid action. Must be read, append, or clear.';
@@ -1547,10 +1542,6 @@ ${context || 'No additional context provided.'}
       success: result.success,
       contentPreview: result.content.substring(0, 200),
     });
-
-    if (toolCall.name === 'search_vault') {
-      
-    }
 
     if (nativeMode && nativeBuffer) {
       nativeBuffer.results.push(buildToolResultMessage(toolCall, result));

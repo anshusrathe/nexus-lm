@@ -2,7 +2,7 @@
     "id": "nexus-lm",
     "name": "Nexus-LM",
     "version": "1.0.5",
-    "minAppVersion": "0.15.0",
+    "minAppVersion": "1.7.2",
     "description": "AI powered concept maps, slideshow, notebooks, vault chat, web search, MCP and to have a personal feed all inside your vault.",
     "author": "Ansh Usrathe",
     "authorUrl": "https://github.com/anshusrathe",

@@ -156,13 +156,9 @@ export class ExaMCPProvider {
       return this.parseSSE(response.text || '', id);
     }
 
-    if (contentType.includes('application/json')) {
-      
-    }
-
     let json: Record<string, unknown>;
     try {
-      json = typeof response.json === 'object' ? response.json as Record<string, unknown> : JSON.parse(response.text || '{}');
+      json = typeof response.json === 'object' ? response.json as Record<string, unknown> : JSON.parse(response.text || '{}') as Record<string, unknown>;
     } catch (e) {
       
       throw new Error('Exa MCP: Invalid JSON response: ' + response.text?.slice(0, 200));
@@ -202,9 +198,7 @@ export class ExaMCPProvider {
               
             }
           } catch (e) {
-            if (e instanceof SyntaxError) {
-              
-            } else {
+            if (!(e instanceof SyntaxError)) {
               throw e;
             }
           }

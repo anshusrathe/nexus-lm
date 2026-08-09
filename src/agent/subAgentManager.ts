@@ -69,7 +69,7 @@ export class SubAgentManager {
 
       this.activeSessions.set(sessionId, session);
       this.jobQueue.push(job);
-      this.processQueue();
+      void this.processQueue();
 
       if (onStarted) {
         onStarted(session);
@@ -131,7 +131,7 @@ export class SubAgentManager {
     session.cancel();
     this.jobQueue = this.jobQueue.filter(j => j.id !== jobId);
     this.activeCount = Math.max(0, this.activeCount - 1);
-    this.processQueue();
+    void this.processQueue();
     return true;
   }
 
@@ -204,7 +204,7 @@ export class SubAgentManager {
         })
         .finally(() => {
           this.activeCount = Math.max(0, this.activeCount - 1);
-          this.processQueue();
+          void this.processQueue();
         });
     }
   }

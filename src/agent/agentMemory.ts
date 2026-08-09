@@ -95,7 +95,7 @@ export class AgentMemory {
       const headingRegex = /^#{1,4}\s+(.+)$/gm;
       let match: RegExpExecArray | null;
       while ((match = headingRegex.exec(answer)) !== null) {
-        const headingText = match[1].replace(/^\d+[\.\)]\s*/, '').trim();
+        const headingText = match[1].replace(/^\d+[.)]\s*/, '').trim();
         if (headingText && headingText.length <= 60) {
           addTopic(headingText, 5);
         }

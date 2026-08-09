@@ -187,13 +187,13 @@ async function grepVault(deps: AgentDependencies, query: string, targetPath?: st
   return JSON.stringify({ query, matchCount: matches.length, matches });
 }
 
-function createNote(app: App, path: string, content: string): Promise<string> {
+async function createNote(app: App, path: string, content: string): Promise<string> {
   const normalized = normalizePath(path);
   const folder = normalized.substring(0, normalized.lastIndexOf('/'));
   if (folder) {
     const existing = app.vault.getAbstractFileByPath(folder);
     if (!existing) {
-      app.vault.createFolder(folder);
+      await app.vault.createFolder(folder).catch(() => undefined);
     }
   }
   return app.vault.create(normalized, content).then((file) => file.path);
@@ -450,11 +450,11 @@ export function createVaultNativeTools(): ToolHandler[] {
 
       const rawEdits = args.edits;
       if (Array.isArray(rawEdits)) {
-        edits = rawEdits;
+        edits = rawEdits as MultiEditOp[];
       } else {
         try {
-          const parsed = JSON.parse(String(rawEdits ?? '[]'));
-          edits = Array.isArray(parsed) ? parsed : [parsed];
+          const parsed: unknown = JSON.parse(String(rawEdits ?? '[]'));
+          edits = Array.isArray(parsed) ? parsed as MultiEditOp[] : [parsed as MultiEditOp];
         } catch {
           return JSON.stringify({ path, error: 'Invalid edits. Must be a JSON string or native array of edit operations.' });
         }

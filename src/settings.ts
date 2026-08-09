@@ -1770,14 +1770,14 @@ await this.plugin.saveSettings();
       mdCheckbox.addEventListener('change', () => {
         if (mdCheckbox.checked) {
           this.plugin.settings.indexAllFileTypes = false;
-          this.plugin.saveSettings();
+          void this.plugin.saveSettings();
         }
       });
 
       allCheckbox.addEventListener('change', () => {
         if (allCheckbox.checked) {
           this.plugin.settings.indexAllFileTypes = true;
-          this.plugin.saveSettings();
+          void this.plugin.saveSettings();
         }
       });
     }
@@ -2947,10 +2947,11 @@ await this.plugin.saveSettings();
             }))
           .addButton(btn => btn
             .setButtonText('Open skills folder')
-            .onClick(() => {
+            .onClick(async () => {
+              if (!Platform.isDesktop) return;
               const vaultDir = (this.app.vault.adapter as unknown as { getBasePath?: () => string })?.getBasePath?.();
               if (vaultDir) {
-                const { exec } = require('child_process');
+                const { exec } = await import('child_process');
                 const skillsPath = `${vaultDir}/.Nexus-LM-data/skills`;
                 const platform = (typeof process !== 'undefined' && process.platform) || '';
                 if (platform === 'win32') {

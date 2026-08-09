@@ -8,10 +8,10 @@ interface MammothModule {
   extractRawText(input: { arrayBuffer: ArrayBuffer }): Promise<{ value: string }>;
 }
 
-function getMammoth(): MammothModule | null {
+async function getMammoth(): Promise<MammothModule | null> {
   try {
-     
-    return require('mammoth') as MammothModule;
+    const mod = await import('mammoth');
+    return mod;
   } catch (err) {
     console.warn('[NexusLM] mammoth module could not be loaded:', err);
     return null;
@@ -40,7 +40,7 @@ export async function extractTextFromFile(app: App, file: TFile): Promise<string
 
     // 3. Word Documents (DOCX)
     if (ext === 'docx') {
-      const mammothLib = getMammoth();
+      const mammothLib = await getMammoth();
       if (!mammothLib) {
         return '[DOCX text extraction unavailable: mammoth library is not loaded.]';
       }

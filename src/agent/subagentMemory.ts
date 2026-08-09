@@ -99,7 +99,7 @@ ${parts.join('\n')}
       const exists = await adapter.exists(filePath);
       if (!exists) return [];
       const content = await adapter.read(filePath);
-      const parsed = JSON.parse(content);
+      const parsed: unknown = JSON.parse(content);
       if (!Array.isArray(parsed)) return [];
       return parsed as SubagentEpisodicRecord[];
     } catch {
