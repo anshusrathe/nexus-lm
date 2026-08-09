@@ -55,7 +55,7 @@ export class ExecutionCoordinator {
     const runNext = async (): Promise<void> => {
       while (queued.length > 0) {
         if (this.activeCount >= this.options.maxConcurrent) {
-          await new Promise(r => setTimeout(r, 50));
+          await new Promise(r => window.setTimeout(r, 50));
           continue;
         }
 
@@ -93,7 +93,7 @@ export class ExecutionCoordinator {
     const lastCall = this.providerLastCall.get(providerKey) ?? 0;
     const elapsed = Date.now() - lastCall;
     if (elapsed < this.options.providerCooldownMs) {
-      await new Promise(r => setTimeout(r, this.options.providerCooldownMs - elapsed));
+      await new Promise(r => window.setTimeout(r, this.options.providerCooldownMs - elapsed));
     }
 
     this.providerLastCall.set(providerKey, Date.now());
@@ -119,10 +119,10 @@ export class ExecutionCoordinator {
 
   private withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`Task timed out after ${ms}ms`)), ms);
+      const timer = window.setTimeout(() => reject(new Error(`Task timed out after ${ms}ms`)), ms);
       promise.then(
-        (v) => { clearTimeout(timer); resolve(v); },
-        (e) => { clearTimeout(timer); reject(e); },
+        (v) => { window.clearTimeout(timer); resolve(v); },
+        (e) => { window.clearTimeout(timer); reject(e instanceof Error ? e : new Error(String(e))); },
       );
     });
   }

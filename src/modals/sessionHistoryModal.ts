@@ -116,15 +116,17 @@ export function openSessionHistoryModal(options: SessionHistoryModalOptions): HT
           text: new Date(meta.updatedAt).toLocaleString() 
         });
 
-        card.addEventListener('click', async () => {
-          const isAgentSession = meta.sessionType === 'agent';
+        card.addEventListener('click', () => {
+          void (async () => {
+            const isAgentSession = meta.sessionType === 'agent';
 
-          modal.remove();
-          if (isAgentSession) {
-            await options.onLoadAgentSession(meta.id);
-          } else {
-            await options.onLoadChatSession(meta.id);
-          }
+            modal.remove();
+            if (isAgentSession) {
+              await options.onLoadAgentSession(meta.id);
+            } else {
+              await options.onLoadChatSession(meta.id);
+            }
+          })();
         });
 
         const deleteBtn = createDetached(activeDoc, 'button');

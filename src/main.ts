@@ -1,5 +1,5 @@
 import { Plugin, Notice, TFile, WorkspaceLeaf, Editor, Platform, Modal, requestUrl, normalizePath } from 'obsidian';
-import { AISettingTab, AISettings, DEFAULT_SETTINGS, Provider, migrateSettings } from './settings';
+import { AISettingTab, AISettings, DEFAULT_SETTINGS, Provider, migrateSettings, getDefaultAgentDenyList } from './settings';
 import { AITutorView, VIEW_TYPE_NEXUS_TUTOR } from './views/view';
 import { ResponseView, VIEW_TYPE_NEXUS_CHAT } from './views/responseView';
 import { LandingView, VIEW_TYPE_LANDING } from './views/landingView';
@@ -149,14 +149,14 @@ export default class AIPlugin extends Plugin {
 
         this.agentSafety = new SafetyLayer(
           this.app,
-          this.settings.agentDenyList ?? ['.obsidian', '.trash', 'backups'],
+          this.settings.agentDenyList ?? getDefaultAgentDenyList(this.app.vault.configDir),
           this.settings.agentApprovalMode ?? 'writes-only'
         );
 
         const agentConfig: AgentConfig = {
           maxSteps: this.settings.agentMaxSteps ?? 25,
           approvalMode: this.settings.agentApprovalMode ?? 'writes-only',
-          denyList: this.settings.agentDenyList ?? ['.obsidian', '.trash', 'backups'],
+          denyList: this.settings.agentDenyList ?? getDefaultAgentDenyList(this.app.vault.configDir),
           enableCLI: this.settings.agentEnableCLI ?? true,
           enablePluginDiscovery: this.settings.agentEnablePluginDiscovery ?? false,
           enableMCP: this.settings.agentEnableMCP ?? false,
@@ -717,7 +717,8 @@ export default class AIPlugin extends Plugin {
         void this.notebookManager.saveNotebooks();
     }
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<AISettings>);
+        const rawData = await this.loadData() as Partial<AISettings> | null;
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, rawData);
         
         
         const { settings: migratedSettings, migrated } = migrateSettings(this.settings);
@@ -728,6 +729,11 @@ export default class AIPlugin extends Plugin {
             
             this.saveData(this.settings).catch(err => {
                             });
+        }
+        
+        
+        if (!rawData || rawData.agentDenyList === undefined) {
+            this.settings.agentDenyList = getDefaultAgentDenyList(this.app.vault.configDir);
         }
         
         

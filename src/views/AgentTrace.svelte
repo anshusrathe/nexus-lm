@@ -14,7 +14,7 @@
     modelNames?: string[];
     turnElapsedTimes?: string[];
     currentStartTime?: number;
-    onRevertTurn?: (turnIndex: number, newTask: string) => void;
+    onRevertTurn?: (turnIndex: number, newTask: string) => void | Promise<void>;
     currentContextItems?: AgentContextItem[];
     onApprove?: (approvalId: string) => void;
     onRevert?: (approvalId: string) => void;
@@ -27,7 +27,7 @@
   let modelNames = $state<string[]>([]);
   let turnElapsedTimes = $state<string[]>([]);
   let currentStartTime = $state(0);
-  let onRevertTurn = $state<((turnIndex: number, newTask: string) => void) | undefined>(undefined);
+  let onRevertTurn = $state<((turnIndex: number, newTask: string) => void | Promise<void>) | undefined>(undefined);
   let currentContextItems = $state<AgentContextItem[]>([]);
 
   export function updateTrace(next: {
@@ -38,7 +38,7 @@
     modelNames: string[];
     turnElapsedTimes: string[];
     currentStartTime?: number;
-    onRevertTurn?: (turnIndex: number, newTask: string) => void;
+    onRevertTurn?: (turnIndex: number, newTask: string) => void | Promise<void>;
     currentContextItems?: AgentContextItem[];
   }): void {
     completedTurns = next.completedTurns;
@@ -63,7 +63,7 @@
   {/if}
 
   {#each completedTurns as turn, index (turn.task + '-' + index)}
-    <AgentTurn {app} {turn} turnIndex={index} modelName={modelNames[index] || ''} elapsed={turnElapsedTimes[index] || ''} onResend={(task) => onRevertTurn?.(index, task)} {onApprove} {onRevert} />
+    <AgentTurn {app} {turn} turnIndex={index} modelName={modelNames[index] || ''} elapsed={turnElapsedTimes[index] || ''} onResend={(task) => { onRevertTurn?.(index, task); }} {onApprove} {onRevert} />
     {#if index < completedTurns.length - 1 || currentTask}<div class="agent-turn-separator"></div>{/if}
   {/each}
 

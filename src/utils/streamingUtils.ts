@@ -228,7 +228,7 @@ async function desktopNodeStream(
       settled = true;
       abortSignal?.removeEventListener('abort', abort);
       callOnFinish();
-      error ? reject(error) : resolve();
+      error ? reject(error instanceof Error ? error : new Error(String(error))) : resolve();
     };
     const request = transport.request(target, {
       method: 'POST',

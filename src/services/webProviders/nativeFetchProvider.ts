@@ -174,7 +174,7 @@ export class NativeFetchProvider {
           case 'ol':
             result += `\n\n${this.parseList(el, true)}\n\n`;
             break;
-          case 'a':
+          case 'a': {
             const href = el.getAttribute('href');
             const linkText = this.elementToMarkdown(el).trim();
             if (href && linkText && !href.startsWith('javascript:')) {
@@ -183,13 +183,15 @@ export class NativeFetchProvider {
               result += linkText;
             }
             break;
-          case 'img':
+          }
+          case 'img': {
             const alt = el.getAttribute('alt') || 'image';
             const src = el.getAttribute('src');
             if (src) {
               result += `![${alt}](${src})`;
             }
             break;
+          }
           case 'hr':
             result += '\n\n---\n\n';
             break;

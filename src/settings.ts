@@ -220,6 +220,15 @@ export interface AISettings {
   agentWebSearchTokenBudget: 'low' | 'medium' | 'high';
 }
 
+/**
+ * Default deny-list used to keep the agent away from Obsidian's config folder,
+ * the vault trash and backups. The config folder name is user-configurable, so
+ * it must be resolved via Vault#configDir at runtime rather than hard-coded.
+ */
+export function getDefaultAgentDenyList(configDir: string): string[] {
+  return [configDir, '.trash', 'backups'];
+}
+
 export const DEFAULT_SETTINGS: AISettings = {
   apiKey: '',              // Deprecated, kept for backward compatibility
   geminiApiKey: '',        // Google Gemini API key
@@ -366,7 +375,7 @@ customModels: [
   // Agent defaults
   agentMaxSteps: 25,
   agentApprovalMode: 'writes-only',
-  agentDenyList: ['.obsidian', '.trash', 'backups'],
+  agentDenyList: [],
   agentEnableCLI: true,
   agentEnablePluginDiscovery: false,
   agentEnableMCP: false,
@@ -1131,6 +1140,15 @@ export class AISettingTab extends PluginSettingTab {
     private plugin: AIPlugin
   ) {
     super(app, plugin);
+  }
+
+  /**
+   * Obsidian 1.13.0+ settings search integration. The tab keeps its imperative
+   * display() UI (it is only bypassed when this returns a non-empty array), so
+   * an empty list preserves the existing rendering across all versions.
+   */
+  getSettingDefinitions() {
+    return [];
   }
 
   validateApiKey(key: string, provider: Provider): boolean {
@@ -2631,7 +2649,7 @@ await this.plugin.saveSettings();
     this.plugin.agentOrchestrator?.updateConfig({
       maxSteps: this.plugin.settings.agentMaxSteps ?? 25,
       approvalMode: this.plugin.settings.agentApprovalMode ?? 'writes-only',
-      denyList: this.plugin.settings.agentDenyList ?? ['.obsidian', '.trash', 'backups'],
+      denyList: this.plugin.settings.agentDenyList ?? getDefaultAgentDenyList(this.plugin.app.vault.configDir),
       enableCLI: this.plugin.settings.agentEnableCLI ?? true,
       enablePluginDiscovery: this.plugin.settings.agentEnablePluginDiscovery ?? false,
       enableMCP: this.plugin.settings.agentEnableMCP ?? false,
@@ -2769,7 +2787,7 @@ await this.plugin.saveSettings();
       .setName('Deny list')
       .setDesc('Comma-separated paths the agent is not allowed to modify.')
       .addText(text => text
-        .setValue((this.plugin.settings.agentDenyList ?? ['.obsidian', '.trash', 'backups']).join(', '))
+        .setValue((this.plugin.settings.agentDenyList ?? getDefaultAgentDenyList(this.plugin.app.vault.configDir)).join(', '))
         .onChange(async (value) => {
           this.plugin.settings.agentDenyList = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
           await this.plugin.saveSettings();

@@ -12,7 +12,7 @@ const BASE_DELAY_MS = 1000;
 const MAX_DELAY_MS = 8000;
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function classifyError(error: string): 'transient' | 'permanent' | 'unknown' {

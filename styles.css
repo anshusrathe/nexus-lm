@@ -19218,7 +19218,6 @@ svg.theme-active-no-pointer {
   max-width: none;
 }
 .agent-view .agent-response-footer {
-  display: flex;
   align-items: center;
   gap: 6px;
   margin-top: 8px;
@@ -19595,53 +19594,53 @@ svg.theme-active-no-pointer {
 
 /* Flush Header & Wide Cards Overrides */
 .workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .view-content {
-  padding: 0 !important;
+  padding: 0;
 }
 
-.agent-view {
-  padding: 0 !important;
-  margin: 0 !important;
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view {
+  padding: 0;
+  margin: 0;
 }
 
-.agent-view .agent-view-header {
-  margin: 0 !important;
-  border-top: none !important;
-  border-left: none !important;
-  border-right: none !important;
-  border-radius: 0 !important;
-  width: 100% !important;
-  padding: 8px 12px !important;
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-view-header {
+  margin: 0;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  width: 100%;
+  padding: 8px 12px;
 }
 
-.agent-view .agent-view-trace {
-  padding: 10px 6px 24px !important;
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-view-trace {
+  padding: 10px 6px 24px;
 }
 
-.agent-view .agent-query-card,
-.agent-view .agent-response-card {
-  width: 100% !important;
-  max-width: none !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  box-sizing: border-box !important;
-  padding: 10px 10px !important;
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-query-card,
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-response-card {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
+  padding: 10px 10px;
 }
 
-.agent-view > .chat-input-container {
-  width: calc(100% - 12px) !important;
-  max-width: none !important;
-  margin: 0 auto 10px !important;
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view > .chat-input-container {
+  width: calc(100% - 12px);
+  max-width: none;
+  margin: 0 auto 10px;
 }
 
-.agent-view .agent-response-footer {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  width: 100% !important;
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-response-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
 }
 
-.agent-view .agent-response-action-btn {
-  margin-left: auto !important;
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-response-action-btn {
+  margin-left: auto;
 }
 
 /* Agent view: session question navigation rail */

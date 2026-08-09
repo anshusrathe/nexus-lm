@@ -47,7 +47,7 @@ interface AgentTraceHandle {
     modelNames: string[];
     turnElapsedTimes: string[];
     currentStartTime?: number;
-    onRevertTurn?: (turnIndex: number, newTask: string) => void;
+    onRevertTurn?: (turnIndex: number, newTask: string) => void | Promise<void>;
     currentContextItems?: AgentContextItem[];
   }) => void;
 }
@@ -823,16 +823,18 @@ export class AgentView extends ItemView {
       const item = menuEl.createDiv({ cls: 'ollama-thinking-menu-item' });
       item.textContent = level.charAt(0).toUpperCase() + level.slice(1);
       if ((current || 'medium') === level) item.addClass('selected');
-      item.addEventListener('click', async (e) => {
+      item.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (target === 'groq') {
-          this.plugin.settings.groqThinkingLevel = level;
-        } else {
-          this.plugin.settings.ollamaGptOssThinkingLevel = level;
-        }
-        await this.plugin.saveSettings();
-        menuEl.remove();
-        this.updateThinkingButtonLabel();
+        void (async () => {
+          if (target === 'groq') {
+            this.plugin.settings.groqThinkingLevel = level;
+          } else {
+            this.plugin.settings.ollamaGptOssThinkingLevel = level;
+          }
+          await this.plugin.saveSettings();
+          menuEl.remove();
+          this.updateThinkingButtonLabel();
+        })();
       });
     });
 
@@ -870,17 +872,19 @@ export class AgentView extends ItemView {
       const item = menuEl.createDiv({ cls: 'ollama-thinking-menu-item' });
       item.textContent = option.label;
       if (selected === option.id) item.addClass('selected');
-      item.addEventListener('click', async (e) => {
+      item.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (option.id === 'off') {
-          this.plugin.settings.enableThinkingMode = false;
-        } else {
-          this.plugin.settings.enableThinkingMode = true;
-          this.plugin.settings.gemini25ThinkingMode = option.id;
-        }
-        await this.plugin.saveSettings();
-        menuEl.remove();
-        this.updateThinkingButtonLabel();
+        void (async () => {
+          if (option.id === 'off') {
+            this.plugin.settings.enableThinkingMode = false;
+          } else {
+            this.plugin.settings.enableThinkingMode = true;
+            this.plugin.settings.gemini25ThinkingMode = option.id;
+          }
+          await this.plugin.saveSettings();
+          menuEl.remove();
+          this.updateThinkingButtonLabel();
+        })();
       });
     });
 
@@ -916,13 +920,15 @@ export class AgentView extends ItemView {
       const item = menuEl.createDiv({ cls: 'ollama-thinking-menu-item' });
       item.textContent = option.label;
       if (selected === option.id) item.addClass('selected');
-      item.addEventListener('click', async (e) => {
+      item.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.plugin.settings.enableThinkingMode = true;
-        this.plugin.settings.gemini3ThinkingLevel = option.id;
-        await this.plugin.saveSettings();
-        menuEl.remove();
-        this.updateThinkingButtonLabel();
+        void (async () => {
+          this.plugin.settings.enableThinkingMode = true;
+          this.plugin.settings.gemini3ThinkingLevel = option.id;
+          await this.plugin.saveSettings();
+          menuEl.remove();
+          this.updateThinkingButtonLabel();
+        })();
       });
     });
 
@@ -1073,23 +1079,25 @@ export class AgentView extends ItemView {
 
         item.createSpan({ text: server.name });
 
-        checkbox.addEventListener('change', async (e) => {
+        checkbox.addEventListener('change', (e) => {
           e.stopPropagation();
-          if (this.plugin.settings.agentEnabledMCPs === undefined) {
-            this.plugin.settings.agentEnabledMCPs = enabledSettingsMcps.map(s => s.id);
-          }
-
-          if (checkbox.checked) {
-            if (!this.plugin.settings.agentEnabledMCPs.includes(server.id)) {
-              this.plugin.settings.agentEnabledMCPs.push(server.id);
+          void (async () => {
+            if (this.plugin.settings.agentEnabledMCPs === undefined) {
+              this.plugin.settings.agentEnabledMCPs = enabledSettingsMcps.map(s => s.id);
             }
-          } else {
-            this.plugin.settings.agentEnabledMCPs = this.plugin.settings.agentEnabledMCPs.filter(id => id !== server.id);
-          }
 
-          this.plugin.settings.agentEnableMCP = true;
-          await this.plugin.saveSettings();
-          this.plugin.refreshAgentMCPTools();
+            if (checkbox.checked) {
+              if (!this.plugin.settings.agentEnabledMCPs.includes(server.id)) {
+                this.plugin.settings.agentEnabledMCPs.push(server.id);
+              }
+            } else {
+              this.plugin.settings.agentEnabledMCPs = this.plugin.settings.agentEnabledMCPs.filter(id => id !== server.id);
+            }
+
+            this.plugin.settings.agentEnableMCP = true;
+            await this.plugin.saveSettings();
+            this.plugin.refreshAgentMCPTools();
+          })();
         });
       }
     }
