@@ -13,7 +13,7 @@ export class AgentRulesModal extends Modal {
     super(app);
   }
 
-  async onOpen() {
+  onOpen() {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('agent-rules-modal');
@@ -34,25 +34,18 @@ export class AgentRulesModal extends Modal {
         rows: '15'
       }
     });
-    this.textareaEl.style.width = '100%';
-    this.textareaEl.style.minHeight = '300px';
-    this.textareaEl.style.resize = 'vertical';
-    this.textareaEl.style.fontFamily = 'var(--font-monospace)';
-    this.textareaEl.style.padding = '10px';
-    this.textareaEl.style.boxSizing = 'border-box';
 
-    // Load initial rules content
-    const initialContent = await this.readRulesFile();
-    this.textareaEl.value = initialContent;
-
-    // Save changes in real time on input
-    this.textareaEl.addEventListener('input', () => {
-      void this.saveRulesFile(this.textareaEl?.value || '');
+    // Load initial rules content, then wire up real-time saving once loaded
+    void this.readRulesFile().then((initialContent) => {
+      if (!this.textareaEl) return;
+      this.textareaEl.value = initialContent;
+      this.textareaEl.addEventListener('input', () => {
+        void this.saveRulesFile(this.textareaEl?.value || '');
+      });
     });
 
     // Close button
     const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
-    buttonContainer.style.marginTop = '15px';
     const closeBtn = buttonContainer.createEl('button', { text: 'Close', cls: 'mod-cta' });
     closeBtn.addEventListener('click', () => this.close());
   }

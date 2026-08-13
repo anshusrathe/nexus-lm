@@ -3044,7 +3044,7 @@ await this.plugin.saveSettings();
             skillSetting.addButton(btn => btn
               .setButtonText('Delete')
               .onClick(async () => {
-                const confirmed = window.confirm(`Delete skill "${skill.metadata.name}"? This cannot be undone.`);
+                const confirmed = await showConfirm(this.app, `Delete skill "${skill.metadata.name}"? This cannot be undone.`);
                 if (!confirmed) return;
                 await reg.deleteSkill(skill.metadata.name);
                 this.plugin.settings.agentEnabledSkills = allSkills

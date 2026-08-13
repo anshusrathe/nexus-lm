@@ -20,7 +20,7 @@ export class SkillRegistry {
   private skills: Map<string, Skill> = new Map();
   private enabledSet: Set<string> = new Set();
   private watcherRefs: EventRef[] = [];
-  private watcherTimer: ReturnType<typeof setTimeout> | null = null;
+  private watcherTimer: number | null = null;
 
   constructor(app: App, pluginDir: string) {
     this.app = app;
@@ -376,16 +376,16 @@ export class SkillRegistry {
     }
     this.watcherRefs = [];
     if (this.watcherTimer !== null) {
-      clearTimeout(this.watcherTimer);
+      window.clearTimeout(this.watcherTimer);
       this.watcherTimer = null;
     }
   }
 
   private scheduleDiscover(): void {
     if (this.watcherTimer !== null) {
-      clearTimeout(this.watcherTimer);
+      window.clearTimeout(this.watcherTimer);
     }
-    this.watcherTimer = setTimeout(() => {
+    this.watcherTimer = window.setTimeout(() => {
       this.watcherTimer = null;
       const enabled = Array.from(this.enabledSet);
       void this.discover().then(() => {

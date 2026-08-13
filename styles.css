@@ -13847,7 +13847,7 @@
 .index-table.custom-providers-table th:first-child,
 .index-table.custom-providers-table td.custom-provider-name-cell {
   width: 30%;
-  text-align: left !important;
+  text-align: left;
   font-weight: 500;
   word-break: break-word;
   white-space: normal;
@@ -13857,7 +13857,7 @@
 .index-table.custom-providers-table th:nth-child(2),
 .index-table.custom-providers-table td.custom-provider-url-cell {
   width: 55%;
-  text-align: left !important;
+  text-align: left;
   word-break: break-all;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -13868,7 +13868,7 @@
 .index-table.custom-providers-table th:nth-child(3),
 .index-table.custom-providers-table td.index-actions-cell {
   width: 15%;
-  text-align: right !important;
+  text-align: right;
   vertical-align: middle;
 }
 
@@ -20116,15 +20116,15 @@ svg.theme-active-no-pointer {
   width: 100%;
 }
 
-.agent-view .agent-quick-prompt-card {
-  display: flex !important;
+.agent-view .agent-quick-prompts .agent-quick-prompt-card {
+  display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
-  width: 100% !important;
-  height: auto !important;
-  min-height: fit-content !important;
-  max-height: none !important;
+  width: 100%;
+  height: auto;
+  min-height: fit-content;
+  max-height: none;
   box-sizing: border-box;
   padding: 12px 14px 12px 16px;
   margin: 0;
@@ -20135,7 +20135,7 @@ svg.theme-active-no-pointer {
   font: inherit;
   font-size: var(--font-ui-small);
   text-align: left;
-  white-space: normal !important;
+  white-space: normal;
   overflow: hidden;
   box-shadow: none;
   cursor: pointer;
@@ -20144,69 +20144,69 @@ svg.theme-active-no-pointer {
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
-.agent-view .agent-quick-prompt-card:hover {
+.agent-view .agent-quick-prompts .agent-quick-prompt-card:hover {
   background: color-mix(in srgb, var(--background-secondary) 82%, var(--interactive-accent) 18%);
   border-color: color-mix(in srgb, var(--interactive-accent) 40%, transparent);
 }
 
-.agent-view .agent-quick-prompt-card:active {
+.agent-view .agent-quick-prompts .agent-quick-prompt-card:active {
   transform: translateY(1px);
 }
 
-.agent-view .agent-quick-prompt-card-text {
+.agent-view .agent-quick-prompts .agent-quick-prompt-card-text {
   display: block;
   flex: 1 1 auto;
   min-width: 0;
   line-height: 1.5;
-  white-space: normal !important;
+  white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
   hyphens: auto;
 }
 
-.agent-view .agent-quick-prompt-remove-btn {
+.agent-view .agent-quick-prompts .agent-quick-prompt-remove-btn {
   flex: 0 0 auto;
-  display: inline-flex !important;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px !important;
-  height: 24px !important;
-  min-height: 24px !important;
-  padding: 0 !important;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
   margin: -2px -4px 0 0;
-  border: none !important;
+  border: none;
   border-radius: 4px;
-  background: transparent !important;
+  background: transparent;
   color: var(--text-muted);
-  box-shadow: none !important;
+  box-shadow: none;
   cursor: pointer;
   opacity: 0.5;
   transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.agent-view .agent-quick-prompt-card:hover .agent-quick-prompt-remove-btn {
+.agent-view .agent-quick-prompts .agent-quick-prompt-card:hover .agent-quick-prompt-remove-btn {
   opacity: 0.8;
 }
 
-.agent-view .agent-quick-prompt-remove-btn:hover {
-  opacity: 1 !important;
-  color: var(--text-error, var(--interactive-accent)) !important;
-  background: var(--background-modifier-hover) !important;
+.agent-view .agent-quick-prompts .agent-quick-prompt-remove-btn:hover {
+  opacity: 1;
+  color: var(--text-error, var(--interactive-accent));
+  background: var(--background-modifier-hover);
 }
 
-.agent-view .agent-quick-prompt-remove-btn svg {
+.agent-view .agent-quick-prompts .agent-quick-prompt-remove-btn svg {
   width: 14px;
   height: 14px;
 }
 
-.agent-view .agent-quick-prompts-add {
-  display: flex !important;
+.agent-view .agent-quick-prompts .agent-quick-prompts-add {
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 100% !important;
-  height: auto !important;
-  min-height: 40px !important;
+  width: 100%;
+  height: auto;
+  min-height: 40px;
   margin-top: 10px;
   padding: 10px 14px;
   border: 1px dashed var(--background-modifier-border);
@@ -20215,7 +20215,7 @@ svg.theme-active-no-pointer {
   color: var(--text-muted);
   font: inherit;
   font-size: var(--font-ui-small);
-  white-space: normal !important;
+  white-space: normal;
   box-shadow: none;
   cursor: pointer;
   appearance: none;
@@ -20223,28 +20223,28 @@ svg.theme-active-no-pointer {
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.agent-view .agent-quick-prompts-add:hover {
+.agent-view .agent-quick-prompts .agent-quick-prompts-add:hover {
   border-color: color-mix(in srgb, var(--interactive-accent) 55%, transparent);
   color: var(--interactive-accent);
   background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
 }
 
-.agent-view .agent-quick-prompts-add.is-editing {
-  display: none !important;
+.agent-view .agent-quick-prompts .agent-quick-prompts-add.is-editing {
+  display: none;
 }
 
-.agent-view .agent-quick-prompts-add-icon {
+.agent-view .agent-quick-prompts .agent-quick-prompts-add-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.agent-view .agent-quick-prompts-add-icon svg {
+.agent-view .agent-quick-prompts .agent-quick-prompts-add-icon svg {
   width: 1.05em;
   height: 1.05em;
 }
 
-.agent-view .agent-quick-prompt-editor {
+.agent-view .agent-quick-prompts .agent-quick-prompt-editor {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -20255,7 +20255,7 @@ svg.theme-active-no-pointer {
   background: var(--background-secondary);
 }
 
-.agent-view .agent-quick-prompt-editor-input {
+.agent-view .agent-quick-prompts .agent-quick-prompt-editor-input {
   width: 100%;
   min-height: 80px;
   resize: vertical;
@@ -20270,21 +20270,21 @@ svg.theme-active-no-pointer {
   box-sizing: border-box;
 }
 
-.agent-view .agent-quick-prompt-editor-input:focus {
+.agent-view .agent-quick-prompts .agent-quick-prompt-editor-input:focus {
   border-color: var(--interactive-accent);
   box-shadow: none;
   outline: none;
 }
 
-.agent-view .agent-quick-prompt-editor-actions {
+.agent-view .agent-quick-prompts .agent-quick-prompt-editor-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
-.agent-view .agent-quick-prompt-editor-btn {
-  height: auto !important;
-  min-height: 30px !important;
+.agent-view .agent-quick-prompts .agent-quick-prompt-editor-btn {
+  height: auto;
+  min-height: 30px;
   padding: 5px 14px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
@@ -20298,17 +20298,17 @@ svg.theme-active-no-pointer {
   transition: background 0.15s ease;
 }
 
-.agent-view .agent-quick-prompt-editor-btn:hover {
+.agent-view .agent-quick-prompts .agent-quick-prompt-editor-btn:hover {
   background: var(--background-modifier-hover);
 }
 
-.agent-view .agent-quick-prompt-editor-btn-primary {
+.agent-view .agent-quick-prompts .agent-quick-prompt-editor-btn-primary {
   border-color: var(--interactive-accent);
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.agent-view .agent-quick-prompt-editor-btn-primary:hover {
+.agent-view .agent-quick-prompts .agent-quick-prompt-editor-btn-primary:hover {
   background: var(--interactive-accent-hover);
 }
 
@@ -20328,5 +20328,19 @@ body.is-mobile .notebook-chat-container .mobile-notebook-input-container {
   padding-bottom: calc(12px + var(--nexus-keyboard-offset, 0px));
   box-sizing: border-box;
   transition: padding-bottom 0.1s ease-out;
+}
+
+/* ─── Agent Rules Modal ─── */
+.agent-rules-modal .agent-rules-textarea {
+  width: 100%;
+  min-height: 300px;
+  resize: vertical;
+  font-family: var(--font-monospace);
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.agent-rules-modal .modal-button-container {
+  margin-top: 15px;
 }
 

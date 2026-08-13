@@ -148,7 +148,7 @@ export class NativeFetchProvider {
     }
 
     const opts: { from?: number; to?: number } | undefined =
-      options?.from || options?.to ? { from: options!.from, to: options!.to } : undefined;
+      options && (options.from || options.to) ? { from: options.from, to: options.to } : undefined;
 
     let text = await extractTextFromPdfData(arrayBuffer, opts);
 

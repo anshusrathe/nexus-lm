@@ -67,8 +67,8 @@ interface ExecProxy {
 function loadExec(): ExecProxy | null {
   if (!Platform.isDesktop) return null;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('child_process') as ExecProxy;
+    const nodeRequire = module.require;
+    return nodeRequire('child_process') as ExecProxy;
   } catch {
     return null;
   }
