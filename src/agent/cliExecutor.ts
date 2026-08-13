@@ -67,8 +67,12 @@ interface ExecProxy {
 function loadExec(): ExecProxy | null {
   if (!Platform.isDesktop) return null;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('child_process') as ExecProxy;
+    const nodeRequire = (window as unknown as { require?: (module: string) => ExecProxy }).require
+      ?? (globalThis as unknown as { require?: (module: string) => ExecProxy }).require;
+    if (typeof nodeRequire === 'function') {
+      return nodeRequire('child_process');
+    }
+    return null;
   } catch {
     return null;
   }
@@ -175,10 +179,10 @@ function knownInstallPaths(): string[] {
 async function verifyBinary(binaryPath: string): Promise<boolean> {
   if (!binaryPath) return false;
   try {
-    const { stdout } = await execAsync(`"${binaryPath}" version`, { timeout: 5000, encoding: 'utf-8', windowsHide: true });
+    await execAsync(`"${binaryPath}" version`, { timeout: 5000, encoding: 'utf-8', windowsHide: true });
     
     return true;
-  } catch (error: unknown) {
+  } catch {
     
     return false;
   }
@@ -268,7 +272,7 @@ async function ensurePipeInitialized(binary: string): Promise<void> {
       encoding: 'utf-8',
       windowsHide: false,
     });
-  } catch (error: unknown) {
+  } catch {
     // The warm-up is best-effort: a failure here only means the pipe may be
     // established lazily on a later retry with a visible console window.
   } finally {
