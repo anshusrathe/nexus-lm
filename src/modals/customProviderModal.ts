@@ -24,20 +24,6 @@ export class CustomProviderModal extends Modal {
         
         contentEl.createEl('h2', { text: this.isEdit ? 'Edit Custom Provider' : 'Add Custom Provider' });
 
-        if (!this.isEdit) {
-            new Setting(contentEl)
-                .setName('Using LM Studio?')
-                .setDesc('LM Studio is natively supported — no custom provider needed. Set it up under Settings → AI Assistant → Basic Settings → AI provider → LM Studio.')
-                .addButton(btn => {
-                    btn.setButtonText('Open Basic Settings')
-                        .setWarning()
-                        .onClick(() => {
-                            this.close();
-                            (this.app as unknown as { setting: { open: (tabId: string) => void } }).setting.open('nexus-lm');
-                        });
-                });
-        }
-
         new Setting(contentEl)
             .setName('Provider Name')
             .setDesc('A friendly name for this provider (e.g., Together AI)')

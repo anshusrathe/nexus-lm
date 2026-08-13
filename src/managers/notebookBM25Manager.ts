@@ -1,7 +1,11 @@
-import { App, TFile, Notice, Platform } from 'obsidian';
+import { App, TFile, Notice } from 'obsidian';
 import { AISettings } from '../settings';
 import { OramaWorkerManager } from '../utils/oramaWorkerManager';
-import { extractTextFromPdf } from '../utils/pdfExtractor';
+import { extractTextFromFile, isExtractable } from '../utils/localFileExtractor';
+
+function isSupportedSource(file: TFile): boolean {
+    return isExtractable(file.name);
+}
 
 interface NotebookDocumentChunk {
     path: string;
@@ -453,8 +457,7 @@ export class NotebookBM25Manager {
             // First pass: Calculate total chunks
             for (const path of pathsToIndex) {
                 const file = this.app.vault.getAbstractFileByPath(path);
-                const isSupported = file instanceof TFile && (file.extension === 'md' || (!Platform.isMobile && file.extension === 'pdf'));
-                if (!isSupported || !(file instanceof TFile)) {
+                if (!(file instanceof TFile) || !isSupportedSource(file)) {
                     continue;
                 }
 
@@ -469,7 +472,7 @@ export class NotebookBM25Manager {
                     continue;
                 }
 
-                const content = file.extension === 'pdf' ? await extractTextFromPdf(file, this.app.vault) : await this.app.vault.read(file);
+                const content = await extractTextFromFile(this.app, file);
                 if (!content) continue;
 
                 const estimatedChunks = this.splitIntoChunks(content);
@@ -484,8 +487,7 @@ export class NotebookBM25Manager {
             
             for (const path of pathsToIndex) {
                 const file = this.app.vault.getAbstractFileByPath(path);
-                const isSupported = file instanceof TFile && (file.extension === 'md' || (!Platform.isMobile && file.extension === 'pdf'));
-                if (!isSupported || !(file instanceof TFile)) {
+                if (!(file instanceof TFile) || !isSupportedSource(file)) {
                     continue;
                 }
 
@@ -506,7 +508,7 @@ export class NotebookBM25Manager {
                 // Yield to event loop between files to prevent UI freeze
                 await new Promise(resolve => window.setTimeout(resolve, 5));
 
-                const content = file.extension === 'pdf' ? await extractTextFromPdf(file, this.app.vault) : await this.app.vault.read(file);
+                const content = await extractTextFromFile(this.app, file);
 
                 // Skip empty files - they have no searchable content
                 if (!content || content.trim().length === 0) {

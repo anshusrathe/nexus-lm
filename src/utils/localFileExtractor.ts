@@ -18,7 +18,26 @@ async function getMammoth(): Promise<MammothModule | null> {
   }
 }
 
-export const SUPPORTED_EXTRACTABLE_EXTENSIONS = ['md', 'txt', 'csv', 'json', 'pdf', 'docx', 'xlsx', 'pptx'];
+/** Canonical list of binary (non-text) file extensions this plugin can extract text from. */
+export const SUPPORTED_BINARY_EXTRACTABLE_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'xls', 'pptx'];
+
+/** Canonical list of every file extension this plugin supports for local text extraction (text + binary). */
+export const SUPPORTED_EXTRACTABLE_EXTENSIONS = [
+  'md', 'txt', 'json', 'xml', 'csv', 'html', 'css', 'js', 'ts', 'tsx', 'jsx',
+  'py', 'java', 'c', 'cpp', 'h', 'hpp', 'yaml', 'yml',
+  ...SUPPORTED_BINARY_EXTRACTABLE_EXTENSIONS,
+];
+
+/**
+ * Canonical list of file extensions this plugin supports for local text extraction:
+ * all plain-text types (see isTextFile) plus the binary types above.
+ * Used to keep file pickers and context readers consistent across views.
+ */
+export function isExtractable(fileName: string): boolean {
+  if (isTextFile(fileName)) return true;
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  return ext ? SUPPORTED_BINARY_EXTRACTABLE_EXTENSIONS.includes(ext) : false;
+}
 
 /**
  * Extracts raw text from a variety of file formats locally.
@@ -96,13 +115,4 @@ export async function extractTextFromFile(app: App, file: TFile): Promise<string
     console.error(`Failed to extract text from ${file.name}:`, error);
     return `[Failed to extract text from ${file.name}. Ensure the file is not corrupted.]`;
   }
-}
-
-/**
- * Checks if a file is supported for local text extraction.
- */
-export function isExtractable(fileName: string): boolean {
-  if (isTextFile(fileName)) return true;
-  const ext = fileName.split('.').pop()?.toLowerCase();
-  return ext ? ['pdf', 'docx', 'xlsx', 'xls', 'pptx'].includes(ext) : false;
 }

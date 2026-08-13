@@ -149,11 +149,16 @@ export class ExaMCPProvider {
       throw new Error('Exa MCP error: HTTP ' + response.status);
     }
 
-    const contentType = (response.headers['content-type'] || '').toLowerCase();
+    const rawContentType = (
+      (response.headers && (response.headers['content-type'] || response.headers['Content-Type'])) ||
+      ''
+    ).toLowerCase();
+    const bodyText = response.text || '';
+    const looksLikeSSE = /^\s*event:/m.test(bodyText) || /^\s*data:/m.test(bodyText);
 
-    if (contentType.includes('text/event-stream')) {
+    if (rawContentType.includes('text/event-stream') || looksLikeSSE) {
       
-      return this.parseSSE(response.text || '', id);
+      return this.parseSSE(bodyText, id);
     }
 
     let json: Record<string, unknown>;

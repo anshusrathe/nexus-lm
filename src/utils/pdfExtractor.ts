@@ -1,6 +1,6 @@
 // This file will contain functionality for extracting text from PDF files using PDF.js.
 
-import { TFile, Vault, Notice, Platform, App, Modal, ButtonComponent } from 'obsidian';
+import { TFile, Vault, App, Modal, ButtonComponent } from 'obsidian';
 import { DirectorySuggester } from './directorySuggester';
 import type { PdfDocumentProxy, PdfTextItem, PdfOutlineItem } from '../types/pdf';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -17,21 +17,16 @@ export function getPdfjsLib(): typeof pdfjsLib {
 }
 
 /**
- * Extracts text content from a PDF file using PDF.js.
+ * Extracts text content from raw PDF bytes (ArrayBuffer) using PDF.js.
+ * Works with both local files (read via vault.readBinary) and remote PDFs
+ * (fetched via requestUrl) — the bytes are parsed entirely in memory.
  * Attempts to preserve basic formatting (lines, paragraphs, columns) using heuristics.
- * @param file The TFile object representing the PDF file in the Obsidian vault.
- * @param vault The Obsidian Vault object to read the file.
+ * @param arrayBuffer The raw PDF bytes.
+ * @param opts Optional page range to extract (1-based, inclusive).
  * @returns A promise that resolves with the extracted text as a single string.
  */
-export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { from?: number, to?: number }): Promise<string> {
-  if (Platform.isMobile) {
-    new Notice('PDF text extraction is not supported on mobile devices due to performance and compatibility issues.');
-        return '';
-  }
+export async function extractTextFromPdfData(arrayBuffer: ArrayBuffer, opts?: { from?: number, to?: number }): Promise<string> {
   try {
-    // Read the PDF file as an ArrayBuffer using Obsidian's API
-    const arrayBuffer = await vault.readBinary(file);
-
     // Load the PDF document using PDF.js
     const pdfjs = getPdfjsLib();
 
@@ -40,9 +35,13 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
     let fullText = '';
     const numPages = pdfDocument.numPages;
     let start = 1, end = numPages;
-    if (opts && opts.from && opts.to) {
-      start = Math.max(1, opts.from);
-      end = Math.min(numPages, opts.to);
+    if (opts) {
+      if (opts.from && opts.from >= 1) {
+        start = Math.max(1, opts.from);
+      }
+      if (opts.to && opts.to >= 1) {
+        end = Math.min(numPages, opts.to);
+      }
     }
 
     // Heuristic thresholds (values might need tuning based on typical PDF layouts)
@@ -205,6 +204,19 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
     }
     throw new Error(`Failed to extract text from PDF: ${message}`);
   }
+}
+
+/**
+ * Extracts text content from a PDF file in the Obsidian vault using PDF.js.
+ * @param file The TFile object representing the PDF file in the Obsidian vault.
+ * @param vault The Obsidian Vault object to read the file.
+ * @param opts Optional page range to extract (1-based, inclusive).
+ * @returns A promise that resolves with the extracted text as a single string.
+ */
+export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { from?: number, to?: number }): Promise<string> {
+  // Read the PDF file as an ArrayBuffer using Obsidian's API
+  const arrayBuffer = await vault.readBinary(file);
+  return await extractTextFromPdfData(arrayBuffer, opts);
 }
 
 /**

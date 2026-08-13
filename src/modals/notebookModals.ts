@@ -97,6 +97,12 @@ export class NotebookFormModal extends Modal {
       this.customInstruction = (e.target as HTMLTextAreaElement).value;
     });
 
+    // Supported file types note
+    scrollableContainer.createEl('p', {
+      cls: 'notebook-supported-types-note',
+      text: 'Supported file types: Markdown, TXT, JSON, XML, CSV, HTML, CSS, JS, TS, TSX, JSX, Python, Java, C, C++, YAML, YML, PDF, DOCX, XLSX, XLS, and PPTX.'
+    });
+
     scrollableContainer.createEl('h3', { text: 'Select Source Notes' });
     const noteSuggesterContainer = scrollableContainer.createDiv({ cls: 'notebook-note-suggester-container' });
 
@@ -114,7 +120,8 @@ export class NotebookFormModal extends Modal {
       noteSuggesterContainer,
       (paths: string[]) => {
         this.selectedSourcePaths = paths;
-      }
+      },
+      true 
     );
     this.noteSuggester.setInitialSelectedPaths(initialPaths);
 

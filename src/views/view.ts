@@ -1,5 +1,5 @@
 import { App, TAbstractFile, ItemView, WorkspaceLeaf, TFile, ButtonComponent, Notice, MarkdownRenderer, Component, Modal, Setting, setIcon, normalizePath, Platform } from 'obsidian';
-import { AISettings, getModelsGroupedByProvider, getModelDisplayName, getProviderForModel } from '../settings';
+import { AISettings, getModelsGroupedByProvider, getModelDisplayName, getProviderForModel, getModelZapColor } from '../settings';
 import { DirectorySuggester } from '../utils/directorySuggester';
 import { NotebookManager, Notebook } from '../managers/notebookManager'; 
 import { NotebookFormModal } from '../modals/notebookModals'; 
@@ -13,6 +13,7 @@ import { MCQManager } from '../tools/createMCQs';
 import { ConceptMapManager, ConceptMapModal, SavedConceptMap, ConceptMapData } from '../tools/createConceptMaps';
 import { SlideManager, SlideshowSettingsModal, SavedSlideshow, SlideshowVoiceSettingsModal } from '../tools/createSlides';
 import { isMultimodalSupported } from '../utils/multimodalUtils';
+import { isExtractable, extractTextFromFile } from '../utils/localFileExtractor';
 import { showConfirm } from '../modals/confirmModal';
 import { createDetached } from '../utils/domUtils';
 
@@ -88,8 +89,8 @@ export class NoteSuggester {
   private getAvailableFiles(): TFile[] {
     if (this.multimodalEnabled) {
       
-      return this.app.vault.getFiles().filter((file: TFile) => 
-        file.extension === 'md' || isMultimodalSupported(file.name)
+      return this.app.vault.getFiles().filter((file: TFile) =>
+        isExtractable(file.name) || isMultimodalSupported(file.name)
       );
     }
     return this.app.vault.getMarkdownFiles();
@@ -560,7 +561,6 @@ export class AITutorView extends ItemView {
       (selectedPaths) => {
         
         this.state.selectedFiles = new Set(selectedPaths);
-
         const startQAButton = this.container.querySelector('.start-qa-button') as HTMLElement;
         const startMCQButton = this.container.querySelector('.start-mcq-button') as HTMLElement;
         const startConceptMapButton = this.container.querySelector('.start-conceptmap-button') as HTMLElement;
@@ -586,7 +586,7 @@ export class AITutorView extends ItemView {
         
         void this.updateContextBar();
       },
-      false 
+      true 
     );
 
     const buttonContainer = this.container.createDiv({ cls: 'button-container' });
@@ -758,7 +758,6 @@ export class AITutorView extends ItemView {
         .setClass('notebook-action-button')
         .onClick(() => this.handleEditNotebook(notebook));
 
-      
       new ButtonComponent(actions)
         .setIcon('trash')
         .setTooltip('Delete Notebook')
@@ -787,7 +786,6 @@ export class AITutorView extends ItemView {
   }
 
   private async handleEditNotebook(notebook: Notebook) {
-    
     const notebooks = this.notebookManager.getNotebooks();
     const latestNotebook = notebooks.find(nb => nb.id === notebook.id);
     
@@ -809,7 +807,6 @@ export class AITutorView extends ItemView {
 
   private async handleDeleteNotebook(notebookId: string) {
     if (await showConfirm(this.app, 'Are you sure you want to delete this notebook?')) {
-      
       (this.activeDocument.activeElement as HTMLElement)?.blur();
       this.notebookManager.deleteNotebook(notebookId);
       void this.invalidateNotebookCache(notebookId);
@@ -818,7 +815,6 @@ export class AITutorView extends ItemView {
   }
 
   private handleLoadNotebook(notebook: Notebook) {
-    
     const notebooks = this.notebookManager.getNotebooks();
     const latestNotebook = notebooks.find(nb => nb.id === notebook.id);
     
@@ -829,7 +825,6 @@ export class AITutorView extends ItemView {
     
     const sourceCount = (latestNotebook.sourcePaths?.length || 0) + (latestNotebook.sourceFolders?.length || 0);
     
-    
     const existingLeaf = this.findLeafWithNotebook(latestNotebook.id);
     if (existingLeaf) {
       this.app.workspace.setActiveLeaf(existingLeaf, { focus: true });
@@ -838,7 +833,12 @@ export class AITutorView extends ItemView {
     }
 
     new Notice(`Loading notebook: ${latestNotebook.name} with ${sourceCount} source(s).`);
-    void this.app.workspace.getLeaf(true).setViewState({
+    // Notebooks always open in main tab on mobile (not sidebar), even if mobileOpenInSidebar is enabled
+    const isMobile = Platform.isMobile;
+    const targetLeaf = isMobile
+      ? this.app.workspace.getLeaf(true)
+      : (this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getLeaf(true));
+    void targetLeaf?.setViewState({
       type: VIEW_TYPE_NOTEBOOK_CHAT,
       active: true,
       state: { notebook: latestNotebook },
@@ -872,7 +872,7 @@ export class AITutorView extends ItemView {
 
     const menuEl = this.containerEl.createDiv({ cls: 'model-select-menu' });
     
-    
+    // Search input for models
     const searchContainer = menuEl.createDiv({ 
       cls: 'model-search-container'
     });
@@ -887,12 +887,12 @@ export class AITutorView extends ItemView {
     const itemsToFilter: { itemEl: HTMLElement, name: string }[] = [];
     const headersToFilter: { headerEl: HTMLElement, items: HTMLElement[], separatorEl?: HTMLElement }[] = [];
 
-    
+    // Model options
     const modelGroups = getModelsGroupedByProvider(this.settings);
 
-    
+    // Populate menu items
     modelGroups.forEach((group, groupIndex) => {
-      
+      // Group header
       const headerEl = menuEl.createDiv({ cls: 'model-select-menu-header' });
       headerEl.textContent = group.label;
 
@@ -900,16 +900,19 @@ export class AITutorView extends ItemView {
       const headerObj = { headerEl, items: groupItems, separatorEl: undefined as HTMLElement | undefined };
       headersToFilter.push(headerObj);
 
-      
+      // Add group options
       group.models.forEach(model => {
         const option = menuEl.createDiv({ cls: 'model-select-menu-item' });
         groupItems.push(option);
         itemsToFilter.push({ itemEl: option, name: model.name.toLowerCase() });
+        
+        const textSpan = option.createSpan();
+        textSpan.textContent = model.name;
 
-        if ((this.settings.aiTutorModel || this.settings.model) === model.id) {
-          option.classList.add('selected');
-        }
-        option.textContent = model.name;
+        const iconsContainer = option.createSpan({ cls: 'model-icons-container' });
+        const zapSpan = iconsContainer.createSpan({ cls: 'model-zap-icon' });
+        setIcon(zapSpan, 'zap');
+        zapSpan.style.color = getModelZapColor(this.settings, model.provider, model.id);
         option.addEventListener('click', () => {
           void (async () => {
             this.settings.aiTutorModel = model.id;
@@ -1003,7 +1006,7 @@ export class AITutorView extends ItemView {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (file instanceof TFile) {
         try {
-          const content = await this.app.vault.read(file);
+          const content = await extractTextFromFile(this.app, file);
           currentTokens += tokenEstimator['countTokens'](content);
         } catch {
           // File may not exist or be accessible - safe to ignore

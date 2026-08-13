@@ -2,6 +2,18 @@ import { Platform } from 'obsidian';
 import type { ToolHandler } from './toolRegistry';
 import type { AgentDependencies } from './types';
 import { executeCliCommand } from './cliExecutor';
+import { isPathDenied } from './safetyLayer';
+
+function extractCliPathArgs(command: string): string[] {
+  const found: string[] = [];
+  const re = /(?:^|\s)(?:file|path|folder)\s*=\s*"([^"]*)"|(?:^|\s)(?:file|path|folder)\s*=\s*([^\s"']+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(command)) !== null) {
+    const val = m[1] ?? m[2] ?? '';
+    if (val) found.push(val);
+  }
+  return found;
+}
 
 const CLI_DISABLED_TOOL: ToolHandler = {
   definition: {
@@ -46,6 +58,13 @@ const CLI_TOOL: ToolHandler = {
 
     const settings = deps.settings as Record<string, unknown>;
     const explicitPath = String(settings.agentCliBinaryPath ?? '') || undefined;
+
+    const denyList = Array.isArray(settings.denyList) ? settings.denyList as string[] : [];
+    for (const p of extractCliPathArgs(command)) {
+      if (isPathDenied(p, denyList)) {
+        return `Error: Path "${p}" is in the deny list and cannot be accessed via CLI.`;
+      }
+    }
 
     const result = await executeCliCommand(command, 60000, explicitPath, (chunk) => {
       deps.onEvent({

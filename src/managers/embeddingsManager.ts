@@ -1217,18 +1217,24 @@ export class EmbeddingsManager {
      */
     async getEmbeddedFileCount(indexId?: string): Promise<number> {
         try {
-            // Load the specific index
             await this.loadIndex(indexId);
 
-            const uniqueFilesWithEmbeddings = new Set(
-                this.index.documents.map(doc => doc.path)
-            );
-
-            // Include empty/no-content files so the count matches total eligible files
             const indexConfig = this.settings.indexConfigurations.find(c => c.id === indexId);
             const includeAllFileTypes = indexConfig?.indexAllFileTypes === true;
+
+            const uniqueFilesWithEmbeddings = new Set<string>();
+            for (const doc of this.index.documents) {
+                if (doc.path && !this.isFileExcluded(doc.path, indexId)) {
+                    const ext = doc.path.split('.').pop()?.toLowerCase() || '';
+                    if (ext === 'md' || (includeAllFileTypes && !Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(ext))) {
+                        uniqueFilesWithEmbeddings.add(doc.path);
+                    }
+                }
+            }
+
+            // Include empty/no-content files so the count matches total eligible files
             const allEligibleFiles = (includeAllFileTypes && !Platform.isMobile)
-                ? this.app.vault.getFiles().filter(f => SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(f.extension))
+                ? this.app.vault.getFiles().filter(f => SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(f.extension.toLowerCase()))
                 : this.app.vault.getMarkdownFiles();
             for (const f of allEligibleFiles) {
                 if (!uniqueFilesWithEmbeddings.has(f.path) && !this.isFileExcluded(f.path, indexId) && (f.stat?.size || 0) === 0) {
@@ -1238,7 +1244,7 @@ export class EmbeddingsManager {
 
             return uniqueFilesWithEmbeddings.size;
         } catch {
-                        return 0;
+            return 0;
         }
     }
     /**
@@ -1251,20 +1257,33 @@ export class EmbeddingsManager {
             const targetId = indexId || this.loadedIndexId || 'default-bm25';
             const metadata = await OramaWorkerManager.getInstance().getMetadata(targetId) as { documents?: Array<{ path: string }> } | undefined;
             const docs = metadata?.documents || [];
-            const uniquePaths = new Set(docs.map((d: { path: string }) => d.path));
+
+            const indexConfig = this.settings.indexConfigurations.find(c => c.id === indexId);
+            const includeAllFileTypes = indexConfig?.indexAllFileTypes === true;
+
+            const uniquePaths = new Set<string>();
+            for (const d of docs) {
+                if (d.path && !this.isFileExcluded(d.path, indexId)) {
+                    const ext = d.path.split('.').pop()?.toLowerCase() || '';
+                    if (ext === 'md' || (includeAllFileTypes && !Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(ext))) {
+                        uniquePaths.add(d.path);
+                    }
+                }
+            }
 
             // Include empty/no-content files so the count matches total eligible files
-            const allEligibleFiles = this.app.vault.getFiles().filter(f => f.extension === 'md' || (!Platform.isMobile && f.extension === 'pdf'));
+            const allEligibleFiles = (includeAllFileTypes && !Platform.isMobile)
+                ? this.app.vault.getFiles().filter(f => SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(f.extension.toLowerCase()))
+                : this.app.vault.getMarkdownFiles();
             for (const f of allEligibleFiles) {
-                // BM25 uses global exclusions
-                if (!uniquePaths.has(f.path) && !this.isFileExcluded(f.path, undefined) && (f.stat?.size || 0) === 0) {
+                if (!uniquePaths.has(f.path) && !this.isFileExcluded(f.path, indexId) && (f.stat?.size || 0) === 0) {
                     uniquePaths.add(f.path);
                 }
             }
 
             return uniquePaths.size;
         } catch {
-                        return 0;
+            return 0;
         }
     }
 
@@ -1866,7 +1885,7 @@ export class EmbeddingsManager {
             const allFiles = this.app.vault.getFiles();
             const filesToProcess = allFiles.filter(file => {
                 if (file.extension === 'md') return true;
-                if (!Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(file.extension)) return true;
+                if (file.extension === 'pdf' || (!Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(file.extension))) return true;
                 return false;
             });
 
@@ -2064,7 +2083,7 @@ export class EmbeddingsManager {
             if (this.loadedIndexId === indexId && this.index && this.index.documents) {
                 for (const doc of this.index.documents) {
                     const ext = doc.path.split('.').pop()?.toLowerCase() || '';
-                    const isIndexedExt = ext === 'md' || (!Platform.isMobile && isBM25 && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(ext));
+                    const isIndexedExt = ext === 'md' || (isBM25 && (ext === 'pdf' || (!Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(ext))));
                     if (!isIndexedExt) continue;
                     if (!indexedFilesMap.has(doc.path) || doc.lastModified > indexedFilesMap.get(doc.path)!) {
                         indexedFilesMap.set(doc.path, doc.lastModified);
@@ -2077,7 +2096,7 @@ export class EmbeddingsManager {
                     await this.loadIndex(indexId);
                     for (const doc of this.index.documents) {
                         const ext = doc.path.split('.').pop()?.toLowerCase() || '';
-                        const isIndexedExt = ext === 'md' || (!Platform.isMobile && isBM25 && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(ext));
+                        const isIndexedExt = ext === 'md' || (isBM25 && (ext === 'pdf' || (!Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(ext))));
                         if (!isIndexedExt) continue;
                         if (!indexedFilesMap.has(doc.path) || doc.lastModified > indexedFilesMap.get(doc.path)!) {
                             indexedFilesMap.set(doc.path, doc.lastModified);
@@ -2103,7 +2122,7 @@ export class EmbeddingsManager {
                 const embIndexConfig = this.settings.indexConfigurations.find(c => c.id === indexId);
                 const embIncludeAll = embIndexConfig?.indexAllFileTypes === true;
                 const isFileExt = file.extension === 'md' 
-                    || (!Platform.isMobile && isBM25 && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(file.extension))
+                    || (isBM25 && (file.extension === 'pdf' || (!Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(file.extension))))
                     || (!Platform.isMobile && !isBM25 && embIncludeAll && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(file.extension));
                 if (!isFileExt) continue;
                 // BM25 indexes everything; embedding respects per-index exclusions

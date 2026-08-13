@@ -1,16 +1,22 @@
 import { requestUrl } from 'obsidian';
+import { extractTextFromPdfData } from '../../utils/pdfExtractor';
+
+const MAX_PDF_BYTES = 50 * 1024 * 1024; // 50 MB
+const HIGHLIGHTS_MAX_PAGES = 5;
+const HIGHLIGHTS_MAX_CHARS = 12000;
+const FULL_MAX_CHARS = 50000;
 
 export class NativeFetchProvider {
   private userAgent =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
-  async fetchUrl(url: string): Promise<{ title: string; content: string }> {
+  async fetchUrl(url: string, options?: { mode?: 'highlights' | 'text' }): Promise<{ title: string; content: string }> {
     const response = await requestUrl({
       url,
       method: 'GET',
       headers: {
         'User-Agent': this.userAgent,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
       throw: false,
@@ -25,6 +31,14 @@ export class NativeFetchProvider {
       response.headers['Content-Type'] ||
       ''
     ).toLowerCase();
+
+    // PDFs must be parsed as binary via PDF.js — never fed to the HTML parser.
+    if (contentType.includes('application/pdf') || /\.pdf($|\?|#)/i.test(url)) {
+      if (options?.mode === 'highlights' || options?.mode === undefined) {
+        return await this.fetchPdf(url, { from: 1, to: HIGHLIGHTS_MAX_PAGES, maxChars: HIGHLIGHTS_MAX_CHARS });
+      }
+      return await this.fetchPdf(url);
+    }
 
     const bodyText = response.text || '';
 
@@ -99,6 +113,61 @@ export class NativeFetchProvider {
     return {
       title,
       content: cleanedContent,
+    };
+  }
+
+  /**
+   * Fetches a remote PDF into memory (never saved to disk) and extracts its text
+   * using the plugin's PDF.js pipeline. Only text-layer (non-OCR) PDFs yield content.
+   */
+  async fetchPdf(
+    url: string,
+    options?: { from?: number; to?: number; maxChars?: number }
+  ): Promise<{ title: string; content: string }> {
+    const response = await requestUrl({
+      url,
+      method: 'GET',
+      headers: {
+        'User-Agent': this.userAgent,
+        'Accept': 'application/pdf,application/octet-stream,*/*;q=0.8',
+      },
+      throw: false,
+    });
+
+    if (response.status >= 400) {
+      throw new Error(`HTTP status ${response.status} when fetching PDF ${url}`);
+    }
+
+    const arrayBuffer = response.arrayBuffer;
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      throw new Error(`No binary data received for PDF ${url}`);
+    }
+    if (arrayBuffer.byteLength > MAX_PDF_BYTES) {
+      const mb = (arrayBuffer.byteLength / (1024 * 1024)).toFixed(1);
+      throw new Error(`PDF too large (${mb} MB). Maximum supported size is ${MAX_PDF_BYTES / (1024 * 1024)} MB.`);
+    }
+
+    const opts: { from?: number; to?: number } | undefined =
+      options?.from || options?.to ? { from: options!.from, to: options!.to } : undefined;
+
+    let text = await extractTextFromPdfData(arrayBuffer, opts);
+
+    const maxChars = options?.maxChars ?? FULL_MAX_CHARS;
+    if (text.length > maxChars) {
+      text =
+        text.slice(0, maxChars) +
+        '\n\n...[TRUNCATED: full PDF is longer. Use fetch_pdf with pageFrom/pageTo to read specific pages].';
+    }
+
+    if (!text.trim()) {
+      throw new Error(
+        'No extractable text found in PDF. The document may be a scanned/image-based (non-OCR) PDF, which PDF.js cannot read.'
+      );
+    }
+
+    return {
+      title: this.extractTitleFromUrl(url),
+      content: text,
     };
   }
 

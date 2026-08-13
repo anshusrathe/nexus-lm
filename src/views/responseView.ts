@@ -1,6 +1,6 @@
 import { App, ItemView, WorkspaceLeaf, ButtonComponent, Notice, MarkdownRenderer, TFile, Component, SuggestModal, TFolder, Modal, Setting, setIcon, normalizePath, requestUrl, Platform } from 'obsidian';
 import { OramaWorkerManager } from '../utils/oramaWorkerManager';
-import { AISettings, Provider, getModelsGroupedByProvider, getModelDisplayName as getModelDisplayNameFromSettings, getProviderForEmbeddingModel, getGeminiThinkingConfig, getModelTemperature, getModelTopP } from '../settings';
+import { AISettings, Provider, getModelsGroupedByProvider, getModelDisplayName as getModelDisplayNameFromSettings, getProviderForEmbeddingModel, getGeminiThinkingConfig, getModelTemperature, getModelTopP, getModelZapColor, isThinkingButtonVisible } from '../settings';
 import { TokenEstimator, TaskType } from '../utils/tokenEstimator';
 import { ModelSelector, ModelSelection } from '../modelSelector';
 import AIPlugin from '../main';
@@ -14,6 +14,7 @@ import { YouTubeChatService } from '../services/youtubeChatService';
 import { YouTubeTranscriptModal } from '../modals/youtubeTranscriptModal';
 import { processDiagramContent } from '../tools/fileCreateTool';
 import { MultimodalInput, processFileForMultimodal, isTextFile, isImageFile, isPDFFile, isAudioFile, isVideoFile, isMultimodalSupported, getFileIcon, extractImagesFromMarkdown } from '../utils/multimodalUtils';
+import { extractTextFromFile, isExtractable } from '../utils/localFileExtractor';
 import { RateLimitManager } from '../utils/rateLimitManager';
 import { GeminiService } from '../services/geminiService';
 import { GeminiFileAPIService } from '../services/geminiFileAPI';
@@ -23,6 +24,7 @@ import { executeCode, detectLanguage, isExecutable, isRenderable, wrapInMarkdown
 import { SaveNoteModal } from '../modals/saveNoteModal';
 import { openSessionHistoryModal } from '../modals/sessionHistoryModal';
 import { createDetached } from '../utils/domUtils';
+import { isGeminiOrOllama, buildWebpageContext } from '../utils/webpageContext';
 
 interface MCPResourceReadResult {
     contents: Array<{
@@ -407,7 +409,7 @@ class YouTubeURLModal extends Modal {
                     new Notice('Please enter a YouTube URL');
                     return;
                 }
-                if (!/^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)/.test(url)) {
+                if (!/^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(url)) {
                     new Notice('Invalid YouTube URL. Please enter a valid YouTube video link.');
                     return;
                 }
@@ -1458,7 +1460,7 @@ export class ResponseView extends ItemView {
         
         const prompts = [
             'Ask anything... Give it a moment to generate...',
-            'Use prefix @webpage (with Gemini & Ollama)...',
+            'Use prefix @webpage to read web pages and online PDFs...',
             'Use prefix @vault for semantic vault search...',
             'Use prefix @flash for faster vault search via keyword...',
             'Use prefix @web for web searched answers...',
@@ -1634,7 +1636,7 @@ export class ResponseView extends ItemView {
                 return;
             }
 
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !Platform.isMobile) {
                 e.preventDefault();
                 const query = this.queryInput.value;
                 if (query.trim()) {
@@ -1756,26 +1758,12 @@ export class ResponseView extends ItemView {
     }
 
     private renderOllamaThinkingButton(container: HTMLElement): void {
-        
-        if (this.settings.autoModeEnabled) return;
-
         const activeProvider = this.getActiveChatProvider();
-        if (activeProvider !== 'ollama' && activeProvider !== 'gemini' && activeProvider !== 'groq') return;
         const currentModelId = this.getActiveChatModelId();
-        
-        
+        if (!isThinkingButtonVisible(activeProvider, currentModelId, this.settings)) return;
+
         const groqGptOssRegex = /^openai\/gpt-oss(-safeguard)?-(20b|120b)$/i;
         const isGroqGptOss = activeProvider === 'groq' && groqGptOssRegex.test(currentModelId);
-        
-        
-        if (activeProvider === 'groq' && !isGroqGptOss) return;
-        
-        
-        if (activeProvider === 'ollama') {
-            const ollamaModel = this.settings.customModels.find(m => m.provider === 'ollama' && m.id === currentModelId);
-            if (!ollamaModel?.capabilities?.includes('thinking')) return;
-        }
-
         const isOllamaGptOss = activeProvider === 'ollama' && this.isOllamaGptOssModel(currentModelId);
         const isGptOss = isOllamaGptOss || isGroqGptOss;
         
@@ -2280,6 +2268,10 @@ export class ResponseView extends ItemView {
                 iconsContainer.addClass('nl-align-items-center');
 
                 
+                const zapSpan = iconsContainer.createSpan({ cls: 'model-zap-icon' });
+                setIcon(zapSpan, 'zap');
+                zapSpan.style.color = getModelZapColor(this.settings, model.provider, model.id);
+
                 if ((isOllama || isGemini) && model.capabilities?.includes('thinking')) {
                     const iconSpan = iconsContainer.createSpan({ cls: 'model-web-icon' });
                     setIcon(iconSpan, 'brain');
@@ -2412,7 +2404,7 @@ export class ResponseView extends ItemView {
             }
 
             
-            const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+            const youtubeRegex = /https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i;
             const isYoutubeQuery = youtubeRegex.test(query) || 
                 Array.from(this.selectedFiles).some(path => youtubeRegex.test(path));
 
@@ -3091,7 +3083,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             const tag = container.createDiv({ cls: 'capsule-file-tag' });
 
             
-            const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)/.test(path);
+            const isYouTubeUrl = /^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(path);
             const isWebUrl = /^https?:\/\//.test(path) && !isYouTubeUrl;
 
             if (isYouTubeUrl) {
@@ -3231,7 +3223,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
     private getAllFilesInFolder(folder: TFolder): TFile[] {
         let files: TFile[] = [];
         for (const child of folder.children) {
-            if (child instanceof TFile && child.extension === 'md') {
+            if (child instanceof TFile && (isExtractable(child.name) || isMultimodalSupported(child.name))) {
                 files.push(child);
             } else if (child instanceof TFolder) {
                 files = files.concat(this.getAllFilesInFolder(child));
@@ -3598,10 +3590,6 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         if (query.trim().startsWith('@mcp')) {
-            if (Platform.isMobile) {
-                new Notice('MCP is not available on mobile devices');
-                return;
-            }
             query = query.replace(/^@mcp\s*/, '').trim();
             if (!query) {
                 new Notice('Please provide a query after @mcp');
@@ -3615,9 +3603,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             }
 
             
-            const availableServers = (this.settings.mcpServers || []).filter(s => !s.disabled);
+            const availableServers = (this.settings.mcpServers || []).filter(s => !s.disabled && (!Platform.isMobile || s.transport === 'sse'));
             if (availableServers.length === 0) {
-                new Notice('No MCP servers configured. Please add servers in settings.');
+                new Notice(Platform.isMobile ? 'No active HTTPS (SSE) MCP servers found. Add or enable HTTPS servers in settings.' : 'No MCP servers configured. Please add servers in settings.');
                 return;
             }
 
@@ -3648,10 +3636,6 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         if (this.pendingMCPSelection) {
-            if (Platform.isMobile) {
-                this.pendingMCPSelection = null;
-                return;
-            }
             const mcpSelection = this.pendingMCPSelection;
 
             
@@ -3703,7 +3687,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                             }
                         } else if (fileOrFolder instanceof TFile) {
                             try {
-                                const content = await this.app.vault.read(fileOrFolder);
+                                const content = isExtractable(fileOrFolder.name)
+                                    ? await extractTextFromFile(this.app, fileOrFolder)
+                                    : await this.app.vault.read(fileOrFolder);
                                 fileContents.push(`--- File: ${fileOrFolder.basename} ---\n${content}\n`);
                             } catch {
                                 // File may not exist or be accessible - safe to ignore
@@ -3748,7 +3734,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         const fileOrFolder = this.app.vault.getAbstractFileByPath(path);
                         if (fileOrFolder instanceof TFile) {
                             try {
-                                const content = await this.app.vault.read(fileOrFolder);
+                                const content = isExtractable(fileOrFolder.name)
+                                    ? await extractTextFromFile(this.app, fileOrFolder)
+                                    : await this.app.vault.read(fileOrFolder);
                                 contextFiles.push({
                                     path: fileOrFolder.path,
                                     content: content,
@@ -3833,14 +3821,15 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             }
 
             
-            const youtubeUrlMatch = query.match(/https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)[^\s]+/);
-            const youtubeUrlFromCapsule = contextUrls.find(url => /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)/.test(url));
+            const youtubeUrlMatch = query.match(/https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\/[^\s]+/i);
+            const youtubeUrlFromCapsule = contextUrls.find(url => /^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(url));
 
             if (youtubeUrlMatch || youtubeUrlFromCapsule) {
-                const youtubeUrl = youtubeUrlMatch ? youtubeUrlMatch[0] : youtubeUrlFromCapsule!;
+                const rawYoutubeUrl = youtubeUrlMatch ? youtubeUrlMatch[0] : youtubeUrlFromCapsule!;
+                const youtubeUrl = rawYoutubeUrl.replace(/[),.;:!?]+$/, '');
                 const isFromCapsule = !!youtubeUrlFromCapsule;
                 const promptText = youtubeUrlMatch
-                    ? query.replace(youtubeUrl, '').trim()
+                    ? query.replace(rawYoutubeUrl, '').trim()
                     : query.trim();
                 const finalPrompt = promptText || 'Summarize the main points of this YouTube video.';
 
@@ -4099,7 +4088,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 const fileContents = await Promise.all(
                     Array.from(this.selectedFiles).map(async path => {
                         
-                        if (/^https?:\/\/(www\.)?(youtube\.com(\/live\/|\/watch\?v=)?|youtu\.be)/.test(path)) {
+                        if (/^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(path)) {
                             const shouldSaveTranscript = this.settings.saveYoutubeTranscripts ?? true;
 
                             if (!shouldSaveTranscript) {
@@ -4167,6 +4156,10 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                                         }
                                         
                                         folderFiles.push({ path: file.path, content, similarity: 1.0 });
+                                    } else if (isExtractable(file.name)) {
+                                        
+                                        const content = await extractTextFromFile(this.app, file);
+                                        folderFiles.push({ path: file.path, content, similarity: 1.0 });
                                     }
                                 } catch {
                                     // File may not exist or be accessible - safe to ignore
@@ -4214,6 +4207,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                                         }
                                     }
                                     
+                                    return { path: fileOrFolder.path, content, similarity: 1.0 };
+                                }
+
+                                
+                                if (isExtractable(fileOrFolder.name)) {
+                                    const content = await extractTextFromFile(this.app, fileOrFolder);
                                     return { path: fileOrFolder.path, content, similarity: 1.0 };
                                 }
 
@@ -4272,59 +4271,88 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             let enhancedQuery = query;
             if (contextUrls.length > 0) {
-                if (this.settings.provider === 'ollama' && this.settings.ollamaApiKey) {
-                    
-                    this.updateProcessingUI(0.3, 1, `Fetching ${contextUrls.length} webpage(s) with Ollama...`);
+                const provider = this.settings.provider;
+                if (isGeminiOrOllama(provider)) {
+                    if (provider === 'ollama') {
+                        // Primary: Ollama's web fetch API. Fallback: requestUrl mechanism for failed/keyless fetches.
+                        this.updateProcessingUI(0.3, 1, `Fetching ${contextUrls.length} webpage(s) with Ollama...`);
 
-                    try {
-                        const ollamaService = new OllamaService(
-                            this.settings.ollamaBaseUrl || 'http://localhost:11434',
-                            this.settings.ollamaApiKey || '',
-                            (headers) => this.rateLimitManager.updateFromHeaders('ollama', this.settings.model, headers)
-                        );
+                        const ollamaPages: Array<{ url: string; title: string; content: string }> = [];
 
-                        const fetchedPages: Array<{ url: string; title: string; content: string }> = [];
-
-                        for (const url of contextUrls) {
+                        if (this.settings.ollamaApiKey) {
                             try {
-                                const pageData = await ollamaService.webFetch(url);
-                                fetchedPages.push({
-                                    url: url,
-                                    title: pageData.title,
-                                    content: pageData.content
-                                });
-                                                            } catch (fetchError) {
-                                                                const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown error';
-                                new Notice(`Failed to fetch ${url}: ${errorMsg}`);
+                                const ollamaService = new OllamaService(
+                                    this.settings.ollamaBaseUrl || 'http://localhost:11434',
+                                    this.settings.ollamaApiKey || '',
+                                    (headers) => this.rateLimitManager.updateFromHeaders('ollama', this.settings.model, headers)
+                                );
+
+                                for (const url of contextUrls) {
+                                    try {
+                                        const pageData = await ollamaService.webFetch(url);
+                                        ollamaPages.push({
+                                            url: url,
+                                            title: pageData.title,
+                                            content: pageData.content
+                                        });
+                                    } catch (fetchError) {
+                                        const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+                                        console.warn(`[NexusLM] Ollama webFetch failed for ${url}: ${errorMsg}`);
+                                    }
+                                }
+                            } catch (error) {
+                                const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+                                console.warn(`[NexusLM] Ollama web fetch service error: ${errorMsg}`);
                             }
                         }
 
-                        if (fetchedPages.length > 0) {
-                            
-                            let webpageContext = '\n\n--- Web Pages ---\n\n';
-                            fetchedPages.forEach((page, index) => {
-                                webpageContext += `--- Web Page [${index + 1}]: ${page.title} (${page.url}) ---\n`;
-                                webpageContext += `${page.content.substring(0, 5000)}\n\n`; 
-                            });
+                        const fetchedUrlSet = new Set(ollamaPages.map(p => p.url));
+                        const failedUrls = contextUrls.filter(u => !fetchedUrlSet.has(u));
 
-                            vaultContext += webpageContext;
-                            this.updateProcessingUI(0.4, 1, `Fetched ${fetchedPages.length} webpage(s). Processing...`);
-                        } else {
-                            new Notice('Failed to fetch any webpages. Continuing without webpage content.');
+                        let webpageContext = '';
+                        if (ollamaPages.length > 0) {
+                            webpageContext += '\n\n--- Web Pages ---\n\n';
+                            ollamaPages.forEach((page, index) => {
+                                webpageContext += `--- Web Page [${index + 1}]: ${page.title} (${page.url}) ---\n`;
+                                webpageContext += `${page.content.substring(0, 5000)}\n\n`;
+                            });
                         }
-                    } catch (error) {
-                                                const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-                        new Notice(`Webpage fetch failed: ${errorMsg}. Continuing without webpage content.`);
+
+                        let totalFetched = ollamaPages.length;
+                        if (failedUrls.length > 0) {
+                            this.updateProcessingUI(0.35, 1, `Fetching ${failedUrls.length} webpage(s) via fallback...`);
+                            const fallback = await buildWebpageContext(this.plugin.webSearchService, failedUrls);
+                            webpageContext += fallback.context;
+                            totalFetched += fallback.fetched;
+                        }
+
+                        if (webpageContext.trim()) {
+                            vaultContext += webpageContext;
+                            this.updateProcessingUI(0.4, 1, `Fetched ${totalFetched} webpage(s). Processing...`);
+                        }
+                    } else {
+                        // Gemini: Google Search grounding (URLs in query) is the primary mechanism when enabled.
+                        const groundingEnabled = this.webEnabled || useWebForThisQuery;
+                        if (groundingEnabled) {
+                            enhancedQuery = query + ' ' + contextUrls.join(' ');
+                            cleanQuery = cleanQuery + ' ' + contextUrls.join(' ');
+                        } else {
+                            // Fallback: fetch via requestUrl when grounding is not active.
+                            this.updateProcessingUI(0.3, 1, `Fetching ${contextUrls.length} webpage(s)...`);
+                            const result = await buildWebpageContext(this.plugin.webSearchService, contextUrls);
+                            if (result.context) {
+                                vaultContext += result.context;
+                                this.updateProcessingUI(0.4, 1, `Fetched ${result.fetched} webpage(s). Processing...`);
+                            }
+                        }
                     }
-                } else if (this.settings.provider === 'ollama' && !this.settings.ollamaApiKey) {
-                    
-                    new Notice('Ollama webpage fetch requires an API key. Please add your Ollama API key in settings. URLs will be included in the query instead.');
-                    enhancedQuery = query + ' ' + contextUrls.join(' ');
-                    cleanQuery = cleanQuery + ' ' + contextUrls.join(' ');
                 } else {
-                    
-                    enhancedQuery = query + ' ' + contextUrls.join(' ');
-                    cleanQuery = cleanQuery + ' ' + contextUrls.join(' '); 
+                    this.updateProcessingUI(0.3, 1, `Fetching ${contextUrls.length} webpage(s)...`);
+                    const result = await buildWebpageContext(this.plugin.webSearchService, contextUrls);
+                    if (result.context) {
+                        vaultContext += result.context;
+                        this.updateProcessingUI(0.4, 1, `Fetched ${result.fetched} webpage(s). Processing...`);
+                    }
                 }
             }
 
@@ -5190,9 +5218,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             const extractYouTubeId = (url: string): string | null => {
                 const patterns = [
-                    /(?:youtube\.com\/(?:watch\?v=|live\/)|youtu\.be\/)([^&\s]+)/,
-                    /youtube\.com\/embed\/([^&\s]+)/,
-                    /youtube\.com\/v\/([^&\s]+)/
+                    /[?&]v=([^&#]+)/,
+                    /youtu\.be\/([^?#]+)/,
+                    /(?:youtube\.com|youtu\.be)\/(?:live|shorts|embed|v)\/([^/?&]+)/,
                 ];
                 for (const pattern of patterns) {
                     const match = url.match(pattern);
@@ -6964,7 +6992,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                             bm25Config.buildProgress = 0;
                         }
 
-                        const allFiles = this.app.vault.getFiles().filter(f => f.extension === 'md' || (!Platform.isMobile && f.extension === 'pdf'));
+                        const allFiles = this.app.vault.getFiles().filter(f => f.extension === 'md' || f.extension === 'pdf');
                         const bm25Count = bm25Config ? bm25Config.fileCount : 0;
                         this.settings.bm25IndexedFiles = allFiles.length > 0
                             ? Math.round((bm25Count / allFiles.length) * 100) : 0;
@@ -7109,7 +7137,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     const docs = loadResponse?.documents || loadResponse?.metadata?.documents || [];
                     for (const doc of docs) {
                         const docPath = String(doc.path || '');
-                        if (docPath && (docPath.endsWith('.md') || (!Platform.isMobile && isBM25 && docPath.endsWith('.pdf')))) {
+                        if (docPath && (docPath.endsWith('.md') || (isBM25 && docPath.endsWith('.pdf')))) {
                             indexedFilePaths.add(docPath);
                         }
                     }
@@ -7119,7 +7147,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             
             const allFiles = isBM25
-                ? this.app.vault.getFiles().filter(f => f.extension === 'md' || (!Platform.isMobile && f.extension === 'pdf'))
+                ? this.app.vault.getFiles().filter(f => f.extension === 'md' || f.extension === 'pdf')
                 : this.app.vault.getMarkdownFiles();
             const includedFiles = isBM25
                 ? allFiles
@@ -7608,7 +7636,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             { label: '@flash', value: '@flash ', action: 'prefix', description: 'Fast BM25 keyword search', hasToggle: true },
             { label: '@vault', value: '@vault ', action: 'prefix', hasToggle: true },
             { label: '@web', value: '@web ', action: 'prefix' },
-            ...(!Platform.isMobile ? [{ label: '@mcp', value: '@mcp ', action: 'prefix', description: 'Use MCP servers and tools' }] : []),
+            { label: '@mcp', value: '@mcp ', action: 'prefix', description: 'Use MCP servers and tools' },
             { label: '@create', value: '@create ', action: 'prefix', description: 'Create files (canvas/excalidraw/markdown)' },
             
             { label: '@webpage', value: '@webpage', action: 'modal', modalType: 'webpage' },
@@ -7666,7 +7694,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         if (matchingPrefixes.length === 0 && searchTerm.length > 0) {
-            const files = this.app.vault.getMarkdownFiles();
+            const files = this.app.vault.getFiles().filter(file =>
+                isExtractable(file.name) || isMultimodalSupported(file.name)
+            );
             const matchingFiles = files.filter(file =>
                 file.basename.toLowerCase().includes(lowerSearch) ||
                 file.path.toLowerCase().includes(lowerSearch)
@@ -7806,7 +7836,6 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         if (opt.action === 'prefix' && opt.value === '@mcp ') {
-            if (Platform.isMobile) return;
             
             if (this.queryInput && atIndex !== -1) {
                 const value = this.queryInput.value;
@@ -8013,7 +8042,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         try {
             
-            const content = await this.app.vault.read(file);
+            const content = isExtractable(file.name)
+                ? await extractTextFromFile(this.app, file)
+                : await this.app.vault.read(file);
 
             
             if (!this.contextMenuPreviewEl) {
@@ -8092,7 +8123,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 item.className = 'context-file-menu-item added';
 
                 
-const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)/.test(path);
+                const isYouTubeUrl = /^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(path);
                 const isWebUrl = /^https?:\/\//.test(path) && !isYouTubeUrl;
 
                 if (isYouTubeUrl) {
@@ -8172,7 +8203,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 { label: '@flash', value: '@flash ', action: 'prefix', description: 'Fast BM25 keyword search', hasToggle: true },
                 { label: '@vault', value: '@vault ', action: 'prefix', hasToggle: true },
                 { label: '@web', value: '@web ', action: 'prefix' },
-                ...(!Platform.isMobile ? [{ label: '@mcp', value: '@mcp ', action: 'prefix', description: 'Use MCP servers and tools', hasToggle: true }] : []),
+                { label: '@mcp', value: '@mcp ', action: 'prefix', description: 'Use MCP servers and tools', hasToggle: true },
                 { label: '@create', value: '@create ', action: 'prefix', description: 'Create files (canvas/excalidraw/markdown)' },
                 
                 { label: '@webpage', value: '@webpage', action: 'modal', modalType: 'webpage' },
@@ -8357,7 +8388,6 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     
                     if (opt.action === 'prefix' && opt.value === '@mcp ') {
-                        if (Platform.isMobile) return;
                         if (!this.settings.mcpEnabled) {
                             new Notice('MCP support is disabled. Enable it in settings.');
                             return;
@@ -10570,7 +10600,6 @@ ${jsonContent}
         autoSelectedModel: ModelSelection | null = null,
         enableRateLimit: boolean = true
     ): Promise<void> {
-        if (Platform.isMobile) return;
         this.isProcessing = true;
         this.setSendButtonState(this.stopKnowDeepBtn, 'stop');
         const startTime = Date.now();

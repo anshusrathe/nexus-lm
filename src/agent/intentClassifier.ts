@@ -4,6 +4,7 @@ export type IntentType =
   | 'search_vault'
   | 'search_web'
   | 'search_feeds'
+  | 'youtube'
   | 'research'
   | 'write'
   | 'edit'
@@ -56,6 +57,11 @@ const SEARCH_FEED_PATTERNS = [
   /\b(feed|feeds|rss|atom|saved_feeds|search_feeds)\b/i,
   /\b(saved|my|check|fetch|search|read)\b.*\b(feed|feeds|rss|atom|subscriptions)\b/i,
   /\b(articles|posts|entries)\b.*\b(from|in|on)\b.*\b(feed|rss|atom)\b/i,
+];
+
+const YOUTUBE_PATTERNS = [
+  /https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i,
+  /\b(youtube|video)\b.*\b(transcript|summary|summarize|summarise|watch|video)\b/i,
 ];
 
 const RESEARCH_PATTERNS = [
@@ -112,6 +118,7 @@ function detectIntents(task: string): IntentType[] {
   const lower = task.toLowerCase();
 
   if (SEARCH_FEED_PATTERNS.some(p => p.test(task))) intents.push('search_feeds');
+  if (YOUTUBE_PATTERNS.some(p => p.test(task))) intents.push('youtube');
   if (SEARCH_VAULT_PATTERNS.some(p => p.test(task))) intents.push('search_vault');
   if (SEARCH_WEB_PATTERNS.some(p => p.test(task))) intents.push('search_web');
   if (RESEARCH_PATTERNS.some(p => p.test(task))) intents.push('research');
@@ -136,7 +143,7 @@ function detectIntents(task: string): IntentType[] {
 
 function pickPrimaryIntent(intents: IntentType[]): IntentType {
   const priority: IntentType[] = [
-    'search_feeds', 'search_web', 'research', 'compare', 'search_vault', 'analyze',
+    'youtube', 'search_feeds', 'search_web', 'research', 'compare', 'search_vault', 'analyze',
     'code', 'write', 'edit', 'manage', 'general',
   ];
   for (const p of priority) {
@@ -149,6 +156,18 @@ function buildStrategy(primaryIntent: IntentType, intents: IntentType[], task: s
   const lower = task.toLowerCase();
 
   switch (primaryIntent) {
+    case 'youtube': {
+      return {
+        primaryTool: 'youtube_transcript',
+        fallbackTools: ['web_search', 'webfetch'],
+        needsSubagent: false,
+        subagentCount: 0,
+        parallelBranches: 1,
+        readBeforeWrite: false,
+        verifyAfterWrite: false,
+      };
+    }
+
     case 'search_feeds': {
       return {
         primaryTool: 'saved_feeds',
@@ -183,7 +202,7 @@ function buildStrategy(primaryIntent: IntentType, intents: IntentType[], task: s
       const needsParallel = needsVaultContext;
       return {
         primaryTool: 'web_search',
-        fallbackTools: ['search_vault', 'grep_vault', 'get_outline', 'webfetch'],
+        fallbackTools: ['search_vault', 'grep_vault', 'get_outline', 'webfetch', 'fetch_pdf'],
         needsSubagent: needsParallel,
         subagentType: 'researcher',
         subagentCount: 1,
@@ -197,7 +216,7 @@ function buildStrategy(primaryIntent: IntentType, intents: IntentType[], task: s
       // Research always benefits from parallel vault + web exploration
       return {
         primaryTool: hasAttachedIndexes ? 'search_attached_indexes' : 'search_vault',
-        fallbackTools: hasAttachedIndexes ? ['search_vault', 'grep_vault', 'get_outline', 'web_search', 'webfetch'] : ['grep_vault', 'get_outline', 'web_search', 'search_attached_indexes', 'webfetch'],
+        fallbackTools: hasAttachedIndexes ? ['search_vault', 'grep_vault', 'get_outline', 'web_search', 'webfetch', 'fetch_pdf'] : ['grep_vault', 'get_outline', 'web_search', 'search_attached_indexes', 'webfetch', 'fetch_pdf'],
         needsSubagent: true,
         subagentType: 'researcher',
         subagentCount: 1,

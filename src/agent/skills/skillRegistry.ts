@@ -1,14 +1,26 @@
-import { normalizePath, type App } from 'obsidian';
+import { normalizePath, type App, type TAbstractFile, type EventRef } from 'obsidian';
 import type { Skill } from './skillTypes';
 import { parseSkillFile } from './skillParser';
 
 const SKILLS_DIR = '.Nexus-LM-data/skills';
+
+function buildSkillMd(name: string, description: string, instructions: string): string {
+  return `---
+name: ${JSON.stringify(name)}
+description: ${JSON.stringify(description)}
+---
+
+${instructions.trim()}
+`;
+}
 
 export class SkillRegistry {
   private app: App;
   private pluginDir: string;
   private skills: Map<string, Skill> = new Map();
   private enabledSet: Set<string> = new Set();
+  private watcherRefs: EventRef[] = [];
+  private watcherTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(app: App, pluginDir: string) {
     this.app = app;
@@ -234,14 +246,7 @@ export class SkillRegistry {
     await adapter.mkdir(normalizePath(SKILLS_DIR));
     await adapter.mkdir(skillDir);
 
-    const skillMdContent = `---
-name: ${JSON.stringify(name)}
-description: ${JSON.stringify(description)}
----
-
-${instructions.trim()}
-`;
-    await adapter.write(normalizePath(`${skillDir}/SKILL.md`), skillMdContent);
+    await adapter.write(normalizePath(`${skillDir}/SKILL.md`), buildSkillMd(name, description, instructions));
 
     if (scripts) {
       const scriptsDir = normalizePath(`${skillDir}/scripts`);
@@ -261,5 +266,131 @@ ${instructions.trim()}
     }
 
     return created || this.skills.get(name)!;
+  }
+
+  async updateSkill(name: string, updates: { description?: string; instructions?: string }): Promise<Skill> {
+    const skill = this.skills.get(name);
+    if (!skill) {
+      throw new Error(`Skill "${name}" not found. Use get_available_skills to list existing skills.`);
+    }
+    if (!/^[a-z0-9-]+$/.test(name) || name.length > 64) {
+      throw new Error(`Invalid skill name "${name}". Must be lowercase alphanumeric with hyphens, max 64 chars.`);
+    }
+
+    const description = updates.description !== undefined && updates.description !== null
+      ? updates.description
+      : skill.metadata.description;
+    const existingInstructions = skill.instructions !== undefined
+      ? skill.instructions
+      : (await this.loadInstructions(name)) ?? '';
+    const instructions = updates.instructions !== undefined && updates.instructions !== null
+      ? updates.instructions
+      : existingInstructions;
+
+    if (!description || description.length > 1024) {
+      throw new Error('Invalid skill description. Must be 1-1024 characters.');
+    }
+    if (!instructions.trim()) {
+      throw new Error('Skill instructions must not be empty.');
+    }
+
+    const adapter = this.app.vault.adapter;
+    const skillMdPath = normalizePath(`${skill.directory}/SKILL.md`);
+    await adapter.write(skillMdPath, buildSkillMd(name, description, instructions));
+
+    skill.metadata.description = description;
+    skill.instructions = undefined;
+
+    return skill;
+  }
+
+  async readSkill(name: string): Promise<{
+    name: string;
+    description: string;
+    instructions: string;
+    path: string;
+    files: Array<{ path: string; type: 'file' | 'folder' }>;
+  } | null> {
+    const skill = this.skills.get(name);
+    if (!skill) return null;
+
+    const adapter = this.app.vault.adapter;
+    const instructions = (await this.loadInstructions(name)) ?? '';
+    const files: Array<{ path: string; type: 'file' | 'folder' }> = [];
+
+    const collect = async (dir: string): Promise<void> => {
+      if (!(await adapter.exists(dir))) return;
+      const entries = await adapter.list(dir);
+      for (const folder of entries.folders) {
+        files.push({ path: folder, type: 'folder' });
+        await collect(folder);
+      }
+      for (const file of entries.files) {
+        files.push({ path: file, type: 'file' });
+      }
+    };
+    await collect(skill.directory);
+
+    return {
+      name: skill.metadata.name,
+      description: skill.metadata.description,
+      instructions,
+      path: skill.directory,
+      files,
+    };
+  }
+
+  async deleteSkill(name: string): Promise<void> {
+    const skill = this.skills.get(name);
+    if (!skill) {
+      throw new Error(`Skill "${name}" not found.`);
+    }
+    if (skill.builtin) {
+      throw new Error(`Skill "${name}" is a built-in skill and cannot be deleted.`);
+    }
+
+    const adapter = this.app.vault.adapter;
+    await adapter.remove(skill.directory);
+
+    this.skills.delete(name);
+    this.enabledSet.delete(name);
+  }
+
+  startWatcher(): void {
+    if (this.watcherRefs.length > 0) return;
+
+    const handler = (file: TAbstractFile): void => {
+      if (file.path.startsWith(`${SKILLS_DIR}/`)) {
+        this.scheduleDiscover();
+      }
+    };
+
+    this.watcherRefs.push(this.app.vault.on('create', handler));
+    this.watcherRefs.push(this.app.vault.on('modify', handler));
+    this.watcherRefs.push(this.app.vault.on('delete', handler));
+  }
+
+  stopWatcher(): void {
+    for (const ref of this.watcherRefs) {
+      this.app.vault.offref(ref);
+    }
+    this.watcherRefs = [];
+    if (this.watcherTimer !== null) {
+      clearTimeout(this.watcherTimer);
+      this.watcherTimer = null;
+    }
+  }
+
+  private scheduleDiscover(): void {
+    if (this.watcherTimer !== null) {
+      clearTimeout(this.watcherTimer);
+    }
+    this.watcherTimer = setTimeout(() => {
+      this.watcherTimer = null;
+      const enabled = Array.from(this.enabledSet);
+      void this.discover().then(() => {
+        this.setEnabledList(enabled);
+      });
+    }, 400);
   }
 }

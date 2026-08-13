@@ -31,6 +31,11 @@ export interface FetchOptions {
   mode?: 'highlights' | 'text';
 }
 
+export interface PdfFetchOptions {
+  from?: number;
+  to?: number;
+}
+
 const TOKEN_BUDGETS: Record<string, { maxSnippetChars: number; maxTotalChars: number }> = {
   low: { maxSnippetChars: 2000, maxTotalChars: 4000 },
   medium: { maxSnippetChars: 8000, maxTotalChars: 16000 },
@@ -159,13 +164,21 @@ export class WebSearchService {
   }
 
   async fetchUrl(url: string, options?: FetchOptions): Promise<{ title: string; content: string }> {
+    const isPdfUrl = /\.pdf($|\?|#)/i.test(url);
     try {
-      const nativeResult = await this.nativeProvider.fetchUrl(url);
+      const nativeResult = await this.nativeProvider.fetchUrl(url, options);
       if (nativeResult.content && nativeResult.content.length >= 20) {
         return nativeResult;
       }
+      if (isPdfUrl) {
+        throw new Error('No extractable text found in PDF. The document may be a scanned/image-based (non-OCR) PDF, which PDF.js cannot read.');
+      }
       console.warn(`[WebSearch] Native fetch returned minimal content for ${url}. Attempting Exa fallback.`);
     } catch (nativeErr: unknown) {
+      // PDFs are parsed locally via PDF.js — Exa cannot read raw PDFs, so skip the fallback.
+      if (isPdfUrl) {
+        throw nativeErr;
+      }
       console.warn(
         `[WebSearch] Native fetch failed for ${url}: ${nativeErr instanceof Error ? nativeErr.message : String(nativeErr)}. Attempting Exa fallback.`
       );
@@ -186,6 +199,10 @@ export class WebSearchService {
         }`
       );
     }
+  }
+
+  async fetchPdf(url: string, options?: PdfFetchOptions): Promise<{ title: string; content: string }> {
+    return this.nativeProvider.fetchPdf(url, options);
   }
 
   private filterByTokenBudget(results: SearchResult[], budget: 'low' | 'medium' | 'high'): SearchResult[] {

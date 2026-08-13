@@ -64,11 +64,11 @@ interface ExecProxy {
   };
 }
 
-async function loadExec(): Promise<ExecProxy | null> {
+function loadExec(): ExecProxy | null {
   if (!Platform.isDesktop) return null;
   try {
-    const cp = await import('child_process');
-    return cp;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('child_process') as ExecProxy;
   } catch {
     return null;
   }
@@ -80,7 +80,7 @@ async function loadExec(): Promise<ExecProxy | null> {
  * On error, the rejection includes attached stdout/stderr properties.
  */
 async function execAsync(command: string, options: Record<string, unknown>, onProgress?: (chunk: string) => void): Promise<{stdout: string; stderr: string}> {
-  const cp = await loadExec();
+  const cp = loadExec();
   if (!cp) {
     throw new Error('child_process not available');
   }
@@ -110,12 +110,35 @@ function binaryName(): string {
   return process.platform === 'win32' ? 'Obsidian.com' : 'obsidian';
 }
 
+/**
+ * The Obsidian CLI companion binary lives next to the running Obsidian app.
+ * Derive that directory from the current process so detection succeeds even
+ * when the install folder is not (or not yet) present on PATH.
+ */
+function runningBinaryCandidates(): string[] {
+  try {
+    const execPath = process.execPath;
+    if (!execPath) return [];
+    const sep = execPath.includes('\\') ? '\\' : '/';
+    const dir = execPath.substring(0, execPath.lastIndexOf(sep));
+    if (!dir) return [];
+    if (process.platform === 'win32') return [`${dir}\\Obsidian.com`];
+    if (process.platform === 'darwin') return [`${dir}/obsidian-cli`];
+    return [`${dir}/obsidian`];
+  } catch {
+    return [];
+  }
+}
+
 function knownInstallPaths(): string[] {
+  const running = runningBinaryCandidates();
+
   if (process.platform === 'win32') {
     const localAppData = process.env.LOCALAPPDATA || '';
     const progFiles = process.env.PROGRAMFILES || 'C:\\Program Files';
     const progFilesX86 = process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)';
     return [
+      ...running,
       localAppData ? `${localAppData}\\Programs\\Obsidian\\Obsidian.com` : '',
       localAppData ? `${localAppData}\\Obsidian\\Obsidian.com` : '',
       `${progFiles}\\Obsidian\\Obsidian.com`,
@@ -125,6 +148,7 @@ function knownInstallPaths(): string[] {
 
   if (process.platform === 'darwin') {
     return [
+      ...running,
       '/usr/local/bin/obsidian',
       '/Applications/Obsidian.app/Contents/MacOS/obsidian-cli',
     ];
@@ -133,6 +157,7 @@ function knownInstallPaths(): string[] {
   if (process.platform === 'linux') {
     const home = process.env.HOME || '';
     return [
+      ...running,
       home ? `${home}/.local/bin/obsidian` : '',
       '/snap/bin/obsidian',
       '/opt/Obsidian/obsidian-cli',
@@ -140,7 +165,7 @@ function knownInstallPaths(): string[] {
     ].filter(Boolean);
   }
 
-  return [];
+  return running;
 }
 
 /**

@@ -37,9 +37,11 @@ import type { AgentConfig, AgentEvent } from './agent/types';
 import { registerMCPTools } from './agent/mcpToolBridge';
 import { SkillRegistry } from './agent/skills/skillRegistry';
 import { WebSearchService, type WebSearchConfig } from './services/webSearchService';
-import { createWebSearchTool, createWebFetchTool } from './agent/webTools';
+import { createWebSearchTool, createWebFetchTool, createPdfFetchTool } from './agent/webTools';
 import { createFeedTools, syncSavedFeedsJson } from './agent/feedTools';
 import { StaticRules } from './agent/staticRules';
+import { YouTubeTranscriptService } from './services/youtubeTranscriptService';
+import { createYouTubeTranscriptTool } from './agent/youtubeTools';
 
 
 
@@ -60,6 +62,7 @@ export default class AIPlugin extends Plugin {
     public agentMemory!: AgentMemory;
     public skillRegistry!: SkillRegistry;
     public webSearchService!: WebSearchService;
+    public youtubeTranscriptService!: YouTubeTranscriptService;
 
     async onload() {
         await this.loadSettings();
@@ -122,6 +125,7 @@ export default class AIPlugin extends Plugin {
 
         this.skillRegistry = new SkillRegistry(this.app, this.manifest?.dir || '');
         void this.skillRegistry.discover();
+        this.skillRegistry.startWatcher();
         if (this.settings.agentSkillsEnabled ?? false) {
             this.skillRegistry.setEnabledList(this.settings.agentEnabledSkills ?? []);
         }
@@ -139,9 +143,15 @@ export default class AIPlugin extends Plugin {
         if (this.settings.agentWebSearchEnabled ?? true) {
             this.agentRegistry.registerBatch([
                 createWebSearchTool(this.webSearchService),
-                createWebFetchTool(this.webSearchService)
+                createWebFetchTool(this.webSearchService),
+                createPdfFetchTool(this.webSearchService)
             ]);
         }
+
+        this.youtubeTranscriptService = new YouTubeTranscriptService();
+        this.agentRegistry.registerBatch([
+            createYouTubeTranscriptTool(this.youtubeTranscriptService)
+        ]);
 
         this.agentRegistry.registerBatch(
           createFeedTools(this.app, this)
@@ -158,7 +168,6 @@ export default class AIPlugin extends Plugin {
           approvalMode: this.settings.agentApprovalMode ?? 'writes-only',
           denyList: this.settings.agentDenyList ?? getDefaultAgentDenyList(this.app.vault.configDir),
           enableCLI: this.settings.agentEnableCLI ?? true,
-          enablePluginDiscovery: this.settings.agentEnablePluginDiscovery ?? false,
           enableMCP: this.settings.agentEnableMCP ?? false,
           enableSkills: this.settings.agentSkillsEnabled ?? false,
           enabledSkills: this.settings.agentSkillsEnabled ? (this.settings.agentEnabledSkills ?? []) : [],
@@ -224,7 +233,7 @@ export default class AIPlugin extends Plugin {
             
             if (this.settings.mcpEnabled && this.settings.mcpServers && (this.settings.mcpAutoConnect ?? true)) {
                 const connectPromises = this.settings.mcpServers
-                    .filter(server => !server.disabled)
+                    .filter(server => !server.disabled && (!Platform.isMobile || server.transport === 'sse'))
                     .map(server =>
                         this.mcpService.connectServer(server).catch(err => {
                                                         new Notice(`Failed to connect to MCP server ${server.name}`);
@@ -277,6 +286,17 @@ export default class AIPlugin extends Plugin {
 
         
         this.addSettingTab(new AISettingTab(this.app, this));
+
+        // Mobile keyboard handling: track virtual keyboard height via CSS custom property
+        if (Platform.isMobile && window.visualViewport) {
+            const vv = window.visualViewport;
+            const updateKeyboardOffset = () => {
+                const offset = window.innerHeight - vv.height;
+                document.body.style.setProperty('--nexus-keyboard-offset', `${offset}px`);
+            };
+            vv.addEventListener('resize', updateKeyboardOffset);
+            this.register(() => vv.removeEventListener('resize', updateKeyboardOffset));
+        }
 
         
         this.registerView(
@@ -670,10 +690,14 @@ export default class AIPlugin extends Plugin {
         let leaf: WorkspaceLeaf | null = null;
         const existingLeaves = this.app.workspace.getLeavesOfType(viewType);
 
+        const openInSidebar = isMobile && (this.settings.mobileOpenInSidebar ?? false);
+
         if (existingLeaves.length > 0) {
             leaf = existingLeaves[0];
         } else {
-            leaf = isMobile ? this.app.workspace.getLeaf(true) : this.app.workspace.getRightLeaf(false);
+            leaf = (!isMobile || openInSidebar)
+                ? this.app.workspace.getRightLeaf(false)
+                : this.app.workspace.getLeaf(true);
         }
 
         if (leaf) {
@@ -707,6 +731,11 @@ export default class AIPlugin extends Plugin {
             this.mcpService.disconnectAll().catch(err => {
                 console.error('MCP disconnect failed during unload:', err);
             });
+        }
+
+        
+        if (this.skillRegistry) {
+            this.skillRegistry.stopWatcher();
         }
 
         
@@ -812,7 +841,11 @@ export default class AIPlugin extends Plugin {
         let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_NEXUS_CHAT)[0];
         
         if (!leaf) {
-            const newLeaf = this.app.workspace.getRightLeaf(false);
+            const isMobile = Platform.isMobile;
+            const openInSidebar = isMobile && (this.settings.mobileOpenInSidebar ?? false);
+            const newLeaf = (!isMobile || openInSidebar)
+                ? this.app.workspace.getRightLeaf(false)
+                : this.app.workspace.getLeaf(true);
             if (!newLeaf) {
                 new Notice('Could not create new leaf');
                 return null;
@@ -1197,9 +1230,32 @@ export default class AIPlugin extends Plugin {
                 }
             }
             if (unresponsiveCount > 0) {
-                await this.saveSettings();
                 new Notice(`${unresponsiveCount} model(s) are unverified due to unresponsiveness, please verify availability manually for these models`, 8000);
             }
+
+            // Rearrange models for this provider in ascending order of verification latency
+            const providerModels = this.settings.customModels.filter(m => m.provider === provider);
+            providerModels.sort((a, b) => {
+              const latA = (a.verificationStatus === 'verified' && a.verificationLatency !== undefined) ? a.verificationLatency : Infinity;
+              const latB = (b.verificationStatus === 'verified' && b.verificationLatency !== undefined) ? b.verificationLatency : Infinity;
+              return latA - latB;
+            });
+
+            const newCustomModels: typeof this.settings.customModels = [];
+            let inserted = false;
+            for (const m of this.settings.customModels) {
+              if (m.provider === provider) {
+                if (!inserted) {
+                  newCustomModels.push(...providerModels);
+                  inserted = true;
+                }
+              } else {
+                newCustomModels.push(m);
+              }
+            }
+            this.settings.customModels = newCustomModels;
+            await this.saveSettings();
+
             this.verifyingProviders.delete(provider);
             if (onComplete) onComplete();
         }

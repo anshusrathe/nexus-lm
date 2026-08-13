@@ -3,6 +3,7 @@ import type { AgentDependencies } from './types';
 import type { ToolHandler } from './toolRegistry';
 import { replaceContent, applyMultiEdit, type MultiEditOp } from './editEngine';
 import { extractTextFromFile } from '../utils/localFileExtractor';
+import { isPathDenied } from './safetyLayer';
 
 interface FileReadResult {
   path: string;
@@ -25,11 +26,12 @@ function readFileContent(app: App, path: string): Promise<string> {
   return extractTextFromFile(app, file);
 }
 
-function listVaultFiles(app: App, folderPath: string): FileListEntry[] {
+function listVaultFiles(app: App, folderPath: string, denyList: string[]): FileListEntry[] {
   const folder = app.vault.getAbstractFileByPath(normalizePath(folderPath));
   const children = folder instanceof TFolder ? folder.children : app.vault.getRoot().children;
   const results: FileListEntry[] = [];
   for (const child of children) {
+    if (isPathDenied(child.path, denyList)) continue;
     results.push({
       path: child.path,
       basename: child instanceof TFile ? child.basename : child.name,
@@ -50,7 +52,7 @@ interface RecentFileEntry {
   sizeBytes: number;
 }
 
-function listRecentFiles(app: App, days: number, folderPath: string, limit: number): RecentFileEntry[] {
+function listRecentFiles(app: App, days: number, folderPath: string, limit: number, denyList: string[]): RecentFileEntry[] {
   const effectiveDays = Math.max(1, days);
   const cutoffMs = Date.now() - (effectiveDays * 24 * 60 * 60 * 1000);
   const normalizedFolder = folderPath && folderPath !== '/' ? normalizePath(folderPath) : '';
@@ -59,6 +61,9 @@ function listRecentFiles(app: App, days: number, folderPath: string, limit: numb
 
   for (const file of allFiles) {
     if (normalizedFolder && !file.path.startsWith(normalizedFolder)) {
+      continue;
+    }
+    if (isPathDenied(file.path, denyList)) {
       continue;
     }
     const mtime = file.stat.mtime;
@@ -83,7 +88,10 @@ function listRecentFiles(app: App, days: number, folderPath: string, limit: numb
 async function searchContent(deps: AgentDependencies, query: string, limit: number): Promise<string> {
   const effectiveLimit = Math.min(15, Math.max(1, limit));
   const results = await deps.searchVaultBM25(query, effectiveLimit);
-  const matched = results.map(r => {
+  const denyList = deps.settings.denyList ?? [];
+  const matched = results
+    .filter(r => !isPathDenied(r.path, denyList))
+    .map(r => {
     let rawText = r.content;
     if (rawText.length > 1500) {
       rawText = rawText.substring(0, 1500) + '\n... [snippet truncated]';
@@ -148,16 +156,17 @@ async function grepVault(deps: AgentDependencies, query: string, targetPath?: st
   }
 
   let filesToSearch: TFile[] = [];
+  const denyList = deps.settings.denyList ?? [];
   if (targetPath && targetPath !== '/' && targetPath !== '') {
     const normalized = normalizePath(targetPath);
     const item = deps.app.vault.getAbstractFileByPath(normalized);
     if (item instanceof TFile) {
       filesToSearch = [item];
     } else {
-      filesToSearch = deps.app.vault.getMarkdownFiles().filter(f => f.path.startsWith(normalized));
+      filesToSearch = deps.app.vault.getMarkdownFiles().filter(f => f.path.startsWith(normalized) && !isPathDenied(f.path, denyList));
     }
   } else {
-    filesToSearch = deps.app.vault.getMarkdownFiles();
+    filesToSearch = deps.app.vault.getMarkdownFiles().filter(f => !isPathDenied(f.path, denyList));
   }
 
   const matches: Array<{ path: string; line: number; content: string }> = [];
@@ -353,7 +362,7 @@ export function createVaultNativeTools(): ToolHandler[] {
     },
     execute: async (args: Record<string, unknown>, deps: AgentDependencies): Promise<string> => {
       const folderPath = String(args.path ?? '/');
-      const entries = listVaultFiles(deps.app, folderPath);
+      const entries = listVaultFiles(deps.app, folderPath, deps.settings.denyList ?? []);
       return JSON.stringify(entries);
     },
   };
@@ -527,7 +536,7 @@ export function createVaultNativeTools(): ToolHandler[] {
       const days = Number(args.days ?? 7);
       const folderPath = String(args.folderPath ?? '/');
       const limit = Number(args.limit ?? 20);
-      const results = listRecentFiles(deps.app, days, folderPath, limit);
+      const results = listRecentFiles(deps.app, days, folderPath, limit, deps.settings.denyList ?? []);
       return JSON.stringify(results);
     },
   };

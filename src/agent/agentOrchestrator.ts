@@ -238,6 +238,7 @@ export class AgentOrchestrator {
     // Register skill tools if skills are enabled
     this.registerSkillTool();
     this.registerSkillActivationTools();
+    this.registerSkillManagementTools();
     // Register delegate_to_* tools only if this agent is allowed to delegate
     if (this.config.canDelegate) {
       this.registerDelegateTool();
@@ -326,6 +327,16 @@ export class AgentOrchestrator {
         role: 'system',
         content: runContext.fileContext,
       });
+    }
+    if (!isContinue) {
+      const youtubeUrlMatch = (rawQuery || task).match(/https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\/[^\s]+/i);
+      if (youtubeUrlMatch) {
+        const youtubeUrl = youtubeUrlMatch[0].replace(/[),.;:!?]+$/, '');
+        messages.push({
+          role: 'system',
+          content: `YOUTUBE VIDEO DETECTED: The user provided a YouTube video URL (${youtubeUrl}). You MUST use the \`youtube_transcript\` tool with this exact URL to fetch the video transcript and answer the question from it. Do NOT use \`webfetch\` or \`web_search\` to read YouTube pages — they do not return the video transcript.`,
+        });
+      }
     }
     messages.push({ role: 'user', content: task });
 
@@ -842,6 +853,102 @@ ${context || 'No additional context provided.'}
     }
   }
 
+  private registerSkillManagementTools(): void {
+    if (!this.skillRegistry || !this.config.enableSkills) {
+      for (const toolName of ['edit_skill', 'read_skill', 'delete_skill']) {
+        if (this.registry.get(toolName)) this.registry.removeTool(toolName);
+      }
+      return;
+    }
+
+    if (!this.registry.get('edit_skill')) {
+      this.registry.register({
+        definition: {
+          name: 'edit_skill',
+          description: 'Update an existing skill\'s description or instructions (SKILL.md content). Use when the user asks to modify, update, improve, or fix a skill, or to revise a workflow that a skill captures. Call read_skill first to see the current content.',
+          category: 'plugin',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Skill name (kebab-case, lowercase, max 64 chars)' },
+              description: { type: 'string', description: 'Optional new description — what the skill does and when to use it (max 1024 chars). Omit to keep the current description.' },
+              instructions: { type: 'string', description: 'Optional new markdown instructions. Omit to keep the current instructions.' },
+            },
+            required: ['name'],
+          },
+          needsApproval: true,
+        },
+        execute: async (args: Record<string, unknown>): Promise<string> => {
+          const name = String(args.name ?? '');
+          const updates: { description?: string; instructions?: string } = {};
+          if (args.description !== undefined && args.description !== null) {
+            updates.description = String(args.description);
+          }
+          if (args.instructions !== undefined && args.instructions !== null) {
+            updates.instructions = String(args.instructions);
+          }
+          const skill = await this.skillRegistry!.updateSkill(name, updates);
+          return JSON.stringify({
+            success: true,
+            name: skill.metadata.name,
+            description: skill.metadata.description,
+            message: `Skill "${name}" updated successfully.`,
+          });
+        },
+      });
+    }
+
+    if (!this.registry.get('read_skill')) {
+      this.registry.register({
+        definition: {
+          name: 'read_skill',
+          description: 'Read the full current content of a skill — frontmatter description, instructions body, and a listing of its bundled files. Use before edit_skill to see exactly what a skill currently contains.',
+          category: 'plugin',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Skill name from get_available_skills' },
+            },
+            required: ['name'],
+          },
+          needsApproval: false,
+        },
+        execute: async (args: Record<string, unknown>): Promise<string> => {
+          const name = String(args.name ?? '');
+          const skill = await this.skillRegistry!.readSkill(name);
+          if (!skill) {
+            throw new Error(`Skill "${name}" not found. Use get_available_skills to list available skills.`);
+          }
+          return JSON.stringify(skill);
+        },
+      });
+    }
+
+    if (!this.registry.get('delete_skill')) {
+      this.registry.register({
+        definition: {
+          name: 'delete_skill',
+          description: 'Delete a skill and its folder with all bundled files. Use only when the user explicitly asks to delete, remove, or forget a skill. Built-in skills cannot be deleted.',
+          category: 'plugin',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Skill name to delete' },
+            },
+            required: ['name'],
+          },
+          needsApproval: true,
+        },
+        execute: async (args: Record<string, unknown>): Promise<string> => {
+          const name = String(args.name ?? '');
+          await this.skillRegistry!.deleteSkill(name);
+          this.activeSkillNames.delete(name);
+          return JSON.stringify({ success: true, message: `Skill "${name}" deleted successfully.` });
+        },
+      });
+    }
+  }
+
   private classifyComplexity(task: string): { score: number; label: 'simple' | 'complex' | 'very_complex'; breakdown: string; requiresGrounding: boolean } {
     const complexityIndicators = [
       'research', 'report', 'analyze', 'compare', 'summarize',
@@ -880,10 +987,10 @@ ${context || 'No additional context provided.'}
 
     const criticalTools = new Set([
       'read_file', 'edit_note', 'multi_edit', 'create_note', 'search_vault', 'get_outline', 'grep_vault',
-      'search_attached_indexes',
-      'list_files', 'list_recent_files', 'get_backlinks', 'get_tags', 'cli', 'web_search', 'webfetch',
+      'search_attached_indexes', 'youtube_transcript',
+      'list_files', 'list_recent_files', 'get_backlinks', 'get_tags', 'cli', 'web_search', 'webfetch', 'fetch_pdf',
       'delegate_to_explorer', 'delegate_to_researcher', 'delegate_to_auditor', 'delegate_to_writer',
-      'create_skill', 'use_skill', 'get_available_skills',
+      'create_skill', 'use_skill', 'get_available_skills', 'edit_skill', 'read_skill', 'delete_skill',
     ]);
     const critical: ToolDefinition[] = [];
     const rest: ToolDefinition[] = [];
@@ -922,6 +1029,8 @@ ${context || 'No additional context provided.'}
       if (needsExternalCapabilities && d.category === 'mcp') score += 2;
       if (needsWebSearch && d.name === 'web_search') score += 5;
       if (needsWebSearch && d.name === 'webfetch') score += 3;
+      if (needsWebSearch && d.name === 'fetch_pdf') score += 3;
+      if (/pdf|paper|document|report|thesis|whitepaper/i.test(lowerTask) && d.name === 'fetch_pdf') score += 5;
       if (lowerTask.includes(d.name.toLowerCase().replace(/_/g, ' '))) score += 3;
       // Apply strategy boost
       const boost = strategyBoost.get(d.name) ?? 0;
@@ -1094,8 +1203,6 @@ ${context || 'No additional context provided.'}
   }
 
   private async checkApproval(toolCall: ToolCall, thought: string, originalContent: string, isCreate: boolean, messages: Array<Record<string, unknown>>, nativeMode: boolean = false, nativeBuffer?: { results: Array<Record<string, unknown>>; nudges: Array<Record<string, unknown>> }): Promise<{ allowed: boolean; approvalId: string | null }> {
-    if (!this.safetyLayer.needsApproval(toolCall)) return { allowed: true, approvalId: null };
-
     const args = toolCall.arguments;
     const path = String(args.path ?? '');
     if (path && !this.safetyLayer.isPathAllowed(path)) {
@@ -1127,6 +1234,8 @@ ${context || 'No additional context provided.'}
       }
       return { allowed: false, approvalId: null };
     }
+
+    if (!this.safetyLayer.needsApproval(toolCall)) return { allowed: true, approvalId: null };
 
     const approved = await this.safetyLayer.requestApproval(toolCall, thought, originalContent, isCreate);
     const approvalId = this.safetyLayer.getLastApprovalId();

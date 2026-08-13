@@ -6,7 +6,7 @@ import { Platform } from 'obsidian';
  * while gracefully disabling incompatible features on mobile.
  */
 export const PLATFORM_FEATURES = {
-    PDF_EXTRACTION: !Platform.isMobile,
+    PDF_EXTRACTION: true,
 
     RSS_FEEDS: true,
 

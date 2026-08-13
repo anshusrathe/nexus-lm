@@ -7,6 +7,7 @@ import { OllamaService, ChatMessage as OllamaChatMessage } from '../services/oll
 import { NvidiaService, ChatMessage as NvidiaChatMessage } from '../services/nvidiaService';
 import { UnifiedProviderManager } from '../services/unifiedProviderManager';
 import { createDetached } from '../utils/domUtils';
+import { extractTextFromFile } from '../utils/localFileExtractor';
 
 export interface SavedSlideshow {
   id: string;
@@ -256,7 +257,7 @@ export class SlideManager {
     for (const path of notePaths) {
       const file = this.app.vault.getFileByPath(path);
       if (file) {
-        const content = await this.app.vault.read(file);
+        const content = await extractTextFromFile(this.app, file);
         combinedContent += `\n\n--- ${file.basename} ---\n\n${content}`;
       }
     }

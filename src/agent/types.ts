@@ -11,7 +11,6 @@ export interface AgentConfig {
   approvalMode: ApprovalMode;
   denyList: string[];
   enableCLI: boolean;
-  enablePluginDiscovery: boolean;
   enableMCP: boolean;
   enableSkills?: boolean;
   enabledSkills?: string[];
@@ -93,7 +92,6 @@ export interface AgentDependencies {
     approvalMode: ApprovalMode;
     denyList: string[];
     enableCLI: boolean;
-    enablePluginDiscovery: boolean;
     provider: string;
     model: string;
     apiKey: string;

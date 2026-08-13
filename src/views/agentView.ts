@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, setIcon, Notice, ButtonComponent, TFile } from 'obsidian';
+import { ItemView, WorkspaceLeaf, setIcon, Notice, ButtonComponent, TFile, Platform } from 'obsidian';
 import { mount, unmount } from 'svelte';
 import AgentTrace from './AgentTrace.svelte';
 import type { AgentEvent, ToolCall, ToolDefinition } from '../agent/types';
@@ -6,7 +6,7 @@ import { buildProviderTools, normalizeToolCalls } from '../agent/nativeToolCall'
 import type { AgentContextItem } from './agentTraceTypes';
 
 import { UnifiedProviderManager } from '../services/unifiedProviderManager';
-import { AISettings, getModelsGroupedByProvider, getModelDisplayName, getGeminiThinkingConfig } from '../settings';
+import { AISettings, getModelsGroupedByProvider, getModelDisplayName, getGeminiThinkingConfig, getModelZapColor, isThinkingButtonVisible } from '../settings';
 import type AIPlugin from '../main';
 import { AIChatSessionManager, type AIChatSession } from '../managers/aiChatSessionManager';
 import { ModelSelector, type ModelSelection } from '../modelSelector';
@@ -62,6 +62,7 @@ export class AgentView extends ItemView {
   private agentSelectedEmbeddingIndexes: Set<string> = new Set();
   private agentCapsuleDisplay: HTMLElement | null = null;
   private agentContextMenuEl: HTMLElement | null = null;
+  private agentContextMenuOpenFromMore: boolean = false;
   private statusSpinnerEl: HTMLElement | null = null;
   private statusTextEl: HTMLElement | null = null;
   private state: AgentViewState = { isRunning: false, stepCount: 0, startTime: 0, currentThought: '' };
@@ -87,6 +88,9 @@ export class AgentView extends ItemView {
   private navListEl: HTMLElement | null = null;
   private navOpenTimer: number | null = null;
   private jumpBtnEl: HTMLElement | null = null;
+  private quickPromptsEl: HTMLElement | null = null;
+  private quickPromptsListEl: HTMLElement | null = null;
+  private quickPromptsAddBtnEl: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: AIPlugin) {
     super(leaf);
@@ -367,15 +371,15 @@ export class AgentView extends ItemView {
     this.syncTraceComponent();
   }
 
-  private openAgentFileMenu(anchorEl: HTMLElement): void {
+  private openAgentFileMenu(anchorEl: HTMLElement, fromMore = false): void {
     this.closeAgentFileMenu();
+    this.agentContextMenuOpenFromMore = fromMore;
 
     const menu = createDetached(this.containerEl.ownerDocument, 'div');
     menu.className = 'context-file-menu';
 
     const rect = anchorEl.getBoundingClientRect();
     menu.addClass('nl-position-fixed');
-    menu.setCssProps({ '--menu-left': `${rect.left}px` });
     menu.addClass('nl-z-index-9999');
     menu.addClass('nl-min-width-260px');
 
@@ -404,6 +408,11 @@ export class AgentView extends ItemView {
 
     this.containerEl.ownerDocument.body.appendChild(menu);
 
+    if (anchorEl.classList.contains('capsule-more-tag')) {
+      menu.setCssProps({ '--menu-left': `${rect.right - menu.offsetWidth}px` });
+    } else {
+      menu.setCssProps({ '--menu-left': `${rect.left}px` });
+    }
     menu.setCssProps({ '--menu-top': `${rect.top - menu.offsetHeight - 8}px` });
     this.agentContextMenuEl = menu;
   }
@@ -416,28 +425,63 @@ export class AgentView extends ItemView {
   }
 
   private renderAgentFileList(container: HTMLElement, searchTerm: string): void {
-    container.empty();
-    const lowerSearch = searchTerm.toLowerCase();
+    const files = Array.from(this.agentSelectedFiles);
+    const maxVisible = 3;
 
-    const files = this.app.vault.getFiles().filter(file => isExtractable(file.name));
-    const matchingFiles = files.filter(file =>
-      file.basename.toLowerCase().includes(lowerSearch) ||
-      file.path.toLowerCase().includes(lowerSearch)
-    ).slice(0, 15);
+    if (this.agentContextMenuOpenFromMore && files.length > maxVisible) {
+      const remaining = files.slice(maxVisible);
+      const remHeader = container.createDiv({ cls: 'context-file-menu-section-header' });
+      remHeader.textContent = 'Added files';
+      remaining.forEach(path => {
+        const item = container.createDiv({ cls: 'context-file-menu-item added' });
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file instanceof TFile) {
+          const iconSpan = item.createSpan();
+          setIcon(iconSpan, this.getFileTypeIcon(file.name));
+          item.appendText(` ${file.basename}`);
+        } else {
+          item.textContent = path.split('/').pop() || path;
+        }
+        item.title = path;
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.agentSelectedFiles.delete(path);
+          this.renderAgentFileCapsules();
+          container.empty();
+          this.renderAgentContextList(container, searchTerm);
+        });
+      });
+      container.createDiv({ cls: 'context-file-menu-divider' });
+    }
 
-    if (matchingFiles.length === 0) {
+    let allFiles = this.app.vault.getFiles().filter(file => isExtractable(file.name));
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      allFiles = allFiles.filter(file =>
+        file.basename.toLowerCase().includes(lowerSearch) ||
+        file.path.toLowerCase().includes(lowerSearch)
+      );
+    }
+
+    const recentFiles = allFiles
+      .slice()
+      .sort((a, b) => b.stat.mtime - a.stat.mtime)
+      .slice(0, searchTerm ? allFiles.length : 5);
+
+    const recHeader = container.createDiv({ cls: 'context-file-menu-section-header' });
+    recHeader.textContent = 'Recent files';
+
+    if (recentFiles.length === 0) {
       const noResults = container.createDiv({ cls: 'context-file-menu-item nl-opacity-05' });
       noResults.textContent = 'No matches found';
     } else {
-      matchingFiles.forEach((file, index) => {
+      recentFiles.forEach((file) => {
+        if (this.agentSelectedFiles.has(file.path)) return;
         const item = container.createDiv({ cls: 'context-file-menu-item' });
         const iconSpan = item.createSpan();
         setIcon(iconSpan, this.getFileTypeIcon(file.name));
         item.appendText(` ${file.basename}`);
-
-        if (index === 0) {
-          item.classList.add('selected');
-        }
+        item.title = file.path;
 
         item.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -448,6 +492,7 @@ export class AgentView extends ItemView {
   }
 
   private renderAgentContextList(container: HTMLElement, searchTerm: string): void {
+    container.empty();
     this.renderAgentFileList(container, searchTerm);
 
     const indexes = (this.plugin.settings.indexConfigurations || [])
@@ -492,11 +537,66 @@ export class AgentView extends ItemView {
   }
 
   private getFileTypeIcon(filename: string): string {
-    if (filename.endsWith('.md')) return 'file-text';
-    if (filename.endsWith('.png') || filename.endsWith('.jpg') || filename.endsWith('.jpeg') || filename.endsWith('.gif') || filename.endsWith('.svg')) return 'image';
-    if (filename.endsWith('.pdf')) return 'file';
-    if (filename.endsWith('.canvas')) return 'layout-dashboard';
-    return 'file';
+    const extension = filename.split('.').pop()?.toLowerCase() || '';
+    const iconMap: { [key: string]: string } = {
+      'pdf': 'file-text',
+      'doc': 'file-text',
+      'docx': 'file-text',
+      'txt': 'file-text',
+      'rtf': 'file-text',
+      'xlsx': 'sheet',
+      'xls': 'sheet',
+      'csv': 'sheet',
+      'ods': 'sheet',
+      'ppt': 'presentation',
+      'pptx': 'presentation',
+      'odp': 'presentation',
+      'png': 'image',
+      'jpg': 'image',
+      'jpeg': 'image',
+      'gif': 'image',
+      'bmp': 'image',
+      'svg': 'image',
+      'webp': 'image',
+      'tiff': 'image',
+      'ico': 'image',
+      'heic': 'image',
+      'heif': 'image',
+      'mp3': 'audio-file',
+      'wav': 'audio-file',
+      'flac': 'audio-file',
+      'aac': 'audio-file',
+      'm4a': 'audio-file',
+      'ogg': 'audio-file',
+      'mp4': 'video',
+      'avi': 'video',
+      'mkv': 'video',
+      'mov': 'video',
+      'wmv': 'video',
+      'flv': 'video',
+      'webm': 'video',
+      'js': 'code',
+      'ts': 'code',
+      'py': 'code',
+      'java': 'code',
+      'cpp': 'code',
+      'c': 'code',
+      'html': 'code',
+      'css': 'code',
+      'json': 'code',
+      'xml': 'code',
+      'yml': 'code',
+      'yaml': 'code',
+      'zip': 'archive',
+      'rar': 'archive',
+      '7z': 'archive',
+      'tar': 'archive',
+      'gz': 'archive',
+      'md': 'document',
+      'markdown': 'document',
+      'default': 'file'
+    };
+    return iconMap[extension] || iconMap['default'];
   }
 
   private handleAgentFileSelect(file: TFile): void {
@@ -557,8 +657,12 @@ export class AgentView extends ItemView {
     });
 
     if (files.length > maxVisible) {
-      const moreTag = container.createDiv({ cls: 'capsule-file-tag' });
+      const moreTag = container.createDiv({ cls: 'capsule-file-tag capsule-more-tag' });
       moreTag.textContent = `+${files.length - maxVisible}`;
+      moreTag.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openAgentFileMenu(moreTag, true);
+      });
     }
   }
 
@@ -606,6 +710,7 @@ export class AgentView extends ItemView {
     if (this.state.isRunning) {
       this.updateStatusBar();
     }
+    this.syncQuickPromptsVisibility();
   }
 
   private formatElapsedMmSs(ms: number): string {
@@ -745,29 +850,40 @@ export class AgentView extends ItemView {
     const provider = this.getActiveProviderId();
     const modelId = this.getActiveModelId();
     const settings = this.plugin.settings;
-    let label = 'Thinking off';
-    if (provider === 'gemini') {
-      if (modelId.startsWith('gemini-2.5')) {
-        label = settings.enableThinkingMode ? `Gemini 2.5: ${settings.gemini25ThinkingMode || 'dynamic'}` : 'Thinking off';
-      } else if (modelId.startsWith('gemini-3')) {
-        label = settings.enableThinkingMode ? `Gemini 3: ${settings.gemini3ThinkingLevel || 'high'}` : 'Thinking off';
-      } else {
-        label = settings.enableThinkingMode ? 'Thinking on' : 'Thinking off';
-      }
-    } else if (provider === 'groq' && /gpt-oss/i.test(modelId)) {
-      label = `Groq: ${settings.groqThinkingLevel || 'medium'}`;
-    } else if (provider === 'ollama') {
-      const isGptOss = modelId.toLowerCase().includes('gpt-oss');
-      if (isGptOss) {
-        label = `Ollama: ${settings.ollamaGptOssThinkingLevel || 'medium'}`;
-      } else {
-        label = settings.ollamaThinkingEnabled ? 'Thinking on' : 'Thinking off';
-      }
-    } else if (provider === 'openrouter' || provider === 'nvidia') {
-      label = 'Thinking (passive)';
+
+    const isVisible = isThinkingButtonVisible(provider, modelId, settings);
+    this.thinkingBtnEl.style.display = isVisible ? '' : 'none';
+    if (!isVisible) return;
+
+    const groqGptOssRegex = /^openai\/gpt-oss(-safeguard)?-(20b|120b)$/i;
+    const isGroqGptOss = provider === 'groq' && groqGptOssRegex.test(modelId);
+    const isOllamaGptOss = provider === 'ollama' && modelId.toLowerCase().includes('gpt-oss');
+    const isGptOss = isOllamaGptOss || isGroqGptOss;
+
+    const isGemini25 = provider === 'gemini' && modelId.startsWith('gemini-2.5');
+    const isGemini3 = provider === 'gemini' && modelId.startsWith('gemini-3');
+
+    const isActive = provider === 'gemini'
+      ? !!settings.enableThinkingMode
+      : (isGptOss ? !!(provider === 'groq' ? settings.groqThinkingLevel : settings.ollamaGptOssThinkingLevel) : !!settings.ollamaThinkingEnabled);
+
+    this.thinkingBtnEl.toggleClass('has-dropdown', isGemini25 || isGemini3 || isGptOss);
+    this.thinkingBtnEl.toggleClass('has-instructions', isActive);
+
+    this.thinkingBtnEl.setAttr('aria-label', `${provider === 'gemini' ? 'Gemini' : provider === 'groq' ? 'Groq' : 'Ollama'} thinking controls`);
+
+    if (provider === 'gemini' && isGemini25) {
+      this.thinkingBtnEl.setAttr('title', `Gemini 2.5 thinking: ${settings.enableThinkingMode ? (settings.gemini25ThinkingMode || 'dynamic') : 'off'}`);
+    } else if (provider === 'gemini' && isGemini3) {
+      this.thinkingBtnEl.setAttr('title', `Gemini 3.x thinking: ${settings.enableThinkingMode ? (settings.gemini3ThinkingLevel || 'high') : 'off'}`);
+    } else if (provider === 'gemini') {
+      this.thinkingBtnEl.setAttr('title', settings.enableThinkingMode ? 'Thinking enabled' : 'Thinking disabled');
+    } else if (isGptOss) {
+      const thinkingLevel = provider === 'groq' ? settings.groqThinkingLevel : settings.ollamaGptOssThinkingLevel;
+      this.thinkingBtnEl.setAttr('title', `Thinking level: ${thinkingLevel || 'medium'}`);
+    } else {
+      this.thinkingBtnEl.setAttr('title', settings.ollamaThinkingEnabled ? 'Thinking enabled' : 'Thinking disabled');
     }
-    this.thinkingBtnEl.setAttr('title', label);
-    this.thinkingBtnEl.setAttr('aria-label', label);
   }
 
   private async handleThinkingButtonClick(): Promise<void> {
@@ -974,6 +1090,12 @@ export class AgentView extends ItemView {
       for (const model of group.models) {
         const item = modelList.createDiv({ cls: 'model-select-menu-item' });
         item.createSpan({ text: model.name });
+
+        const iconsContainer = item.createSpan({ cls: 'model-icons-container' });
+        const zapSpan = iconsContainer.createSpan({ cls: 'model-zap-icon' });
+        setIcon(zapSpan, 'zap');
+        zapSpan.style.color = getModelZapColor(this.plugin.settings, model.provider, model.id);
+
         if (model.provider === activeProvider && model.id === activeModel) {
           item.addClass('selected');
         }
@@ -983,12 +1105,7 @@ export class AgentView extends ItemView {
           this.plugin.settings.model = model.id;
           this.plugin.settings.provider = model.provider;
           this.modelBtn?.setButtonText(model.name);
-          if (this.thinkingBtnEl) {
-            const isDropdown = (model.provider === 'gemini' && (model.id.startsWith('gemini-2.5') || model.id.startsWith('gemini-3'))) ||
-              (model.provider === 'groq' && /gpt-oss/i.test(model.id)) ||
-              (model.provider === 'ollama' && model.id.toLowerCase().includes('gpt-oss'));
-            this.thinkingBtnEl.toggleClass('has-dropdown', isDropdown);
-          }
+          this.updateThinkingButtonLabel();
           menuEl.remove();
           void this.plugin.saveSettings();
         });
@@ -1147,6 +1264,162 @@ export class AgentView extends ItemView {
     window.setTimeout(() => this.containerEl.ownerDocument.addEventListener('click', closeHandler), 0);
   }
 
+  private syncQuickPromptsVisibility(): void {
+    const visible = (this.plugin.settings.agentQuickPromptsVisible ?? true)
+      && this.turns.length === 0
+      && !this.currentTask
+      && !this.state.isRunning;
+    this.setQuickPromptsVisible(visible);
+  }
+
+  public setQuickPromptsVisible(visible: boolean): void {
+    if (visible) {
+      if (this.quickPromptsEl || !this.traceContainerEl) return;
+      this.renderQuickPrompts(this.traceContainerEl);
+    } else {
+      if (this.quickPromptsEl) {
+        this.quickPromptsEl.remove();
+        this.quickPromptsEl = null;
+        this.quickPromptsListEl = null;
+        this.quickPromptsAddBtnEl = null;
+        this.traceContainerEl?.removeClass('has-quick-prompts');
+      }
+    }
+  }
+
+  private renderQuickPrompts(parent: HTMLElement): void {
+    if (this.quickPromptsEl) return;
+    const card = parent.createDiv({ cls: 'agent-quick-prompts' });
+    this.quickPromptsEl = card;
+    if (parent.firstChild !== card) {
+      parent.insertBefore(card, parent.firstChild);
+    }
+    parent.addClass('has-quick-prompts');
+
+    const list = card.createDiv({ cls: 'agent-quick-prompts-list' });
+    this.quickPromptsListEl = list;
+    this.renderQuickPromptsList();
+
+    const addBtn = card.createEl('button', { cls: 'agent-quick-prompts-add' });
+    const addIcon = addBtn.createSpan({ cls: 'agent-quick-prompts-add-icon' });
+    setIcon(addIcon, 'plus');
+    addBtn.createSpan({ text: 'Add prompt', cls: 'agent-quick-prompts-add-text' });
+    addBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.startQuickPromptEditor();
+    });
+    this.quickPromptsAddBtnEl = addBtn;
+  }
+
+  private renderQuickPromptsList(): void {
+    if (!this.quickPromptsListEl) return;
+    this.quickPromptsListEl.empty();
+    const prompts = this.plugin.settings.agentQuickPrompts || [];
+    prompts.forEach((prompt, index) => {
+      const cardEl = this.quickPromptsListEl!.createDiv({
+        cls: 'agent-quick-prompt-card',
+        attr: { role: 'button', tabindex: '0', title: prompt }
+      });
+      cardEl.createSpan({ cls: 'agent-quick-prompt-card-text', text: prompt });
+      cardEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.useQuickPrompt(prompt);
+      });
+      cardEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.useQuickPrompt(prompt);
+        }
+      });
+
+      const removeBtn = cardEl.createEl('button', {
+        cls: 'agent-quick-prompt-remove-btn',
+        attr: { 'aria-label': 'Remove prompt', title: 'Remove prompt', type: 'button' }
+      });
+      setIcon(removeBtn, 'minus');
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        void this.removeQuickPrompt(index);
+      });
+    });
+  }
+
+  private async removeQuickPrompt(index: number): Promise<void> {
+    if (!this.plugin.settings.agentQuickPrompts) return;
+    this.plugin.settings.agentQuickPrompts.splice(index, 1);
+    await this.plugin.saveSettings();
+    this.renderQuickPromptsList();
+  }
+
+  private useQuickPrompt(prompt: string): void {
+    const text = String(prompt || '').trim();
+    if (!text || !this.inputEl) return;
+    this.inputEl.value = text;
+    this.inputEl.focus();
+  }
+
+  private startQuickPromptEditor(): void {
+    if (!this.quickPromptsListEl || !this.quickPromptsAddBtnEl) return;
+    if (this.quickPromptsListEl.querySelector('.agent-quick-prompt-editor')) return;
+
+    if (this.quickPromptsAddBtnEl) {
+      this.quickPromptsAddBtnEl.addClass('is-editing');
+    }
+
+    const editor = this.quickPromptsListEl.createDiv({ cls: 'agent-quick-prompt-editor' });
+    const textarea = editor.createEl('textarea', {
+      cls: 'agent-quick-prompt-editor-input',
+      attr: { placeholder: 'Enter a prompt for the agent...', rows: '3' },
+    });
+    const actions = editor.createDiv({ cls: 'agent-quick-prompt-editor-actions' });
+    const cancelBtn = actions.createEl('button', { cls: 'agent-quick-prompt-editor-btn', text: 'Cancel' });
+    const saveBtn = actions.createEl('button', { cls: 'agent-quick-prompt-editor-btn agent-quick-prompt-editor-btn-primary', text: 'Save' });
+
+    const closeEditor = (saved: boolean): void => {
+      if (!saved) {
+        editor.remove();
+        this.quickPromptsAddBtnEl?.removeClass('is-editing');
+        textarea.blur();
+        return;
+      }
+      const value = textarea.value.trim();
+      if (!value) {
+        editor.remove();
+        this.quickPromptsAddBtnEl?.removeClass('is-editing');
+        return;
+      }
+      if (!this.plugin.settings.agentQuickPrompts) {
+        this.plugin.settings.agentQuickPrompts = [];
+      }
+      this.plugin.settings.agentQuickPrompts.push(value);
+      void this.plugin.saveSettings();
+      editor.remove();
+      this.quickPromptsAddBtnEl?.removeClass('is-editing');
+      this.renderQuickPromptsList();
+    };
+
+    cancelBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeEditor(false);
+    });
+    saveBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeEditor(true);
+    });
+    textarea.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        closeEditor(true);
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeEditor(false);
+      }
+    });
+
+    window.setTimeout(() => textarea.focus(), 0);
+  }
+
   async onOpen(): Promise<void> {
     const { contentEl } = this;
     contentEl.empty();
@@ -1185,13 +1458,6 @@ export class AgentView extends ItemView {
     setIcon(this.thinkingBtnEl, 'brain');
     this.thinkingBtnEl.addClass('nl-cursor-pointer');
     this.thinkingBtnEl.setAttr('tabindex', '0');
-    const thinkProvider = this.getActiveProviderId();
-    const thinkModelId = this.getActiveModelId();
-    if ((thinkProvider === 'gemini' && (thinkModelId.startsWith('gemini-2.5') || thinkModelId.startsWith('gemini-3'))) ||
-        (thinkProvider === 'groq' && /gpt-oss/i.test(thinkModelId)) ||
-        (thinkProvider === 'ollama' && thinkModelId.toLowerCase().includes('gpt-oss'))) {
-      this.thinkingBtnEl.addClass('has-dropdown');
-    }
     this.updateThinkingButtonLabel();
     this.thinkingBtnEl.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1257,7 +1523,7 @@ export class AgentView extends ItemView {
       placeholder: 'Enter a task for the agent...',
     });
     this.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !Platform.isMobile) {
         e.preventDefault();
         void this.handleSend();
       }
@@ -1289,6 +1555,7 @@ export class AgentView extends ItemView {
     });
 
     this.updateUI();
+    this.syncQuickPromptsVisibility();
   }
 
   private handleSendClick(): void {

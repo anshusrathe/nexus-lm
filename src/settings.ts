@@ -1,8 +1,9 @@
-import { App, PluginSettingTab, Setting, Notice, Modal, setIcon, TFolder, Platform, requestUrl } from 'obsidian';
+import { App, PluginSettingTab, Setting, Notice, Modal, setIcon, TFolder, TFile, Platform, requestUrl, normalizePath } from 'obsidian';
 import { SUPPORTED_EXTRACTABLE_EXTENSIONS } from './utils/localFileExtractor';
 import { MCPRegistryModal } from './modals/mcpRegistryModal';
 import { ModelLatencyModal } from './modals/modelLatencyModal';
 import { CustomProviderModal } from './modals/customProviderModal';
+import { AgentRulesModal } from './modals/agentRulesModal';
 import { MCPRegistryEntry } from './mcp/mcpRegistry';
 import { validateNvidiaApiKey } from './services/nvidiaService';
 import { showConfirm } from './modals/confirmModal';
@@ -12,6 +13,8 @@ import { SavedSlideshow } from './tools/createSlides';
 import { detectBinaryPath, clearBinaryCache } from './agent/cliExecutor';
 import type AIPlugin from './main';
 import { createDetached } from './utils/domUtils';
+import { VIEW_TYPE_AGENT as AGENT_VIEW_TYPE } from './views/agentView';
+import type { AgentView } from './views/agentView';
 
 // Move Provider type directly into settings.ts
 export type Provider = 'gemini' | 'groq' | 'openrouter' | 'opencode' | 'ollama' | 'nvidia' | 'lmstudio' | (string & {});
@@ -196,7 +199,6 @@ export interface AISettings {
   agentApprovalMode: 'all' | 'writes-only' | 'never';
   agentDenyList: string[];
   agentEnableCLI: boolean;
-  agentEnablePluginDiscovery: boolean;
   agentEnableMCP: boolean;
   agentEnabledMCPs?: string[];
   agentCliBinaryPath: string;
@@ -218,6 +220,11 @@ export interface AISettings {
   agentWebSearchMode: 'highlights' | 'text';
   agentWebSearchCache: boolean;
   agentWebSearchTokenBudget: 'low' | 'medium' | 'high';
+  // Mobile view layout setting
+  mobileOpenInSidebar?: boolean;
+  // Agent quick prompts
+  agentQuickPromptsVisible: boolean; // Show the quick prompts card in the Agent view (empty sessions only)
+  agentQuickPrompts: string[]; // Quick prompt list shown in the Agent view
 }
 
 /**
@@ -377,7 +384,6 @@ customModels: [
   agentApprovalMode: 'writes-only',
   agentDenyList: [],
   agentEnableCLI: true,
-  agentEnablePluginDiscovery: false,
   agentEnableMCP: false,
   agentEnabledMCPs: undefined,
   agentCliBinaryPath: '',
@@ -399,6 +405,18 @@ customModels: [
   agentWebSearchMode: 'highlights',
   agentWebSearchCache: true,
   agentWebSearchTokenBudget: 'medium',
+  // Mobile layout defaults
+  mobileOpenInSidebar: false,
+  // Agent quick prompts defaults
+  agentQuickPromptsVisible: true,
+  agentQuickPrompts: [
+    'Create a new note on [topic] with a structured outline',
+    'Search my vault for notes related to [topic] and summarize the key ideas',
+    'Use web search to find the latest information on [topic] and summarize it',
+    'Extract the main takeaways from the PDF at [path]',
+    'Brainstorm 5 ideas for [goal] and save them to a new note',
+    'Review the note at [path] and suggest concrete improvements',
+  ],
 };
 
 export interface CustomEmbeddingModel {
@@ -509,6 +527,24 @@ export interface ModelMenuGroup {
  * @param settings - The AI settings containing custom models
  * @returns An array of model groups, each containing models for a specific provider
  */
+/**
+ * Returns the Zap icon color for a given model based on latency and verification status.
+ * - Fastest models (<500ms): Green (#22c55e)
+ * - Slower models (>=500ms): Orange (#f97316)
+ * - Not verified yet enabled: Red (#ef4444)
+ */
+export function getModelZapColor(settings: AISettings, provider: string, modelId: string): string {
+  const customModel = settings.customModels.find(m => m.provider === provider && m.id === modelId);
+  if (customModel?.verificationStatus === 'verified' && customModel.verificationLatency !== undefined) {
+    if (customModel.verificationLatency < 500) {
+      return '#22c55e';
+    } else {
+      return '#f97316';
+    }
+  }
+  return '#ef4444';
+}
+
 export function getModelsGroupedByProvider(settings: AISettings): ModelMenuGroup[] {
   const groups: ModelMenuGroup[] = [];
 
@@ -619,6 +655,17 @@ export function getModelsGroupedByProvider(settings: AISettings): ModelMenuGroup
       }
     });
   }
+
+  // Sort models in each provider group in ascending order of verification latency
+  groups.forEach(group => {
+    group.models.sort((a, b) => {
+      const customA = settings.customModels.find(m => m.provider === a.provider && m.id === a.id);
+      const customB = settings.customModels.find(m => m.provider === b.provider && m.id === b.id);
+      const latA = (customA?.verificationStatus === 'verified' && customA.verificationLatency !== undefined) ? customA.verificationLatency : Infinity;
+      const latB = (customB?.verificationStatus === 'verified' && customB.verificationLatency !== undefined) ? customB.verificationLatency : Infinity;
+      return latA - latB;
+    });
+  });
 
   return groups;
 }
@@ -800,6 +847,25 @@ export function getGeminiThinkingConfig(modelId: string, settings: AISettings): 
 
   return undefined;
 }
+
+export function isThinkingButtonVisible(provider: string, modelId: string, settings: AISettings): boolean {
+  if (settings.autoModeEnabled) return false;
+  if (!provider || !modelId) return false;
+  if (provider !== 'ollama' && provider !== 'gemini' && provider !== 'groq') return false;
+
+  if (provider === 'groq') {
+    const groqGptOssRegex = /^openai\/gpt-oss(-safeguard)?-(20b|120b)$/i;
+    return groqGptOssRegex.test(modelId);
+  }
+
+  if (provider === 'ollama') {
+    const ollamaModel = settings.customModels?.find(m => m.provider === 'ollama' && m.id === modelId);
+    return !!ollamaModel?.capabilities?.includes('thinking');
+  }
+
+  return provider === 'gemini';
+}
+
 
 /**
  * Returns a safe max_tokens value for a Groq (or similar TPM-limited) request.
@@ -1242,6 +1308,20 @@ export class AISettingTab extends PluginSettingTab {
   }
 
   private renderBasicTab(containerEl: HTMLElement): void {
+    if (Platform.isMobile) {
+      new Setting(containerEl).setName('Mobile view layout').setHeading();
+      new Setting(containerEl)
+        .setName('Open plugin in sidebar')
+        .setDesc('Plugin to be opened in the sidebar')
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.mobileOpenInSidebar ?? false)
+          .onChange(async (value) => {
+            this.plugin.settings.mobileOpenInSidebar = value;
+            await this.plugin.saveSettings();
+            new Notice(`Mobile layout: ${value ? 'Sidebar' : 'Main tab'}`);
+          }));
+    }
+
     new Setting(containerEl).setName('API configuration').setHeading();
 
     new Setting(containerEl)
@@ -1613,7 +1693,7 @@ await this.plugin.saveSettings();
     }
 
     const tableContainer = containerEl.createDiv({ cls: 'index-table-container' });
-    const tableEl = tableContainer.createEl('table', { cls: 'index-table' });
+    const tableEl = tableContainer.createEl('table', { cls: 'index-table custom-providers-table' });
     const theadEl = tableEl.createEl('thead');
     const headerRow = theadEl.createEl('tr');
     headerRow.createEl('th', { text: 'Name' });
@@ -1623,8 +1703,8 @@ await this.plugin.saveSettings();
     const tbodyEl = tableEl.createEl('tbody');
     for (const provider of this.plugin.settings.customProviders) {
       const row = tbodyEl.createEl('tr');
-      row.createEl('td').setText(provider.name);
-      row.createEl('td').setText(provider.baseUrl);
+      row.createEl('td', { cls: 'custom-provider-name-cell' }).setText(provider.name);
+      row.createEl('td', { cls: 'custom-provider-url-cell' }).setText(provider.baseUrl);
       
       const actionsCell = row.createEl('td', { cls: 'index-actions-cell' });
       
@@ -1878,40 +1958,36 @@ await this.plugin.saveSettings();
       const filesCell = row.createEl('td', { cls: 'index-files-cell' });
       
       // Calculate total files in vault for percentage
-      // BM25 indexes everything (no exclusions); embedding respects per-index exclusions
-      const allEligibleFiles = (type === 'embedding' && index.indexAllFileTypes && !Platform.isMobile)
-        ? this.app.vault.getFiles().filter(f => SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(f.extension))
+      // Both embedding and BM25 respect file type preference and exclusions
+      const includeAllFileTypes = index.indexAllFileTypes && !Platform.isMobile;
+      const allEligibleFiles = includeAllFileTypes
+        ? this.app.vault.getFiles().filter(f => SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(f.extension.toLowerCase()))
         : this.app.vault.getMarkdownFiles();
-      let totalFiles: number;
-      if (type === 'bm25') {
-        // BM25 indexes the whole vault — no exclusions
-        totalFiles = allEligibleFiles.length;
-      } else {
-        // Embedding: use per-index exclusions if set, else global exclusions
-        const perIndexExcludedFolders: string[] = index.excludedFolders || [];
-        const perIndexExcludedFiles: string[] = index.excludedFiles || [];
-        totalFiles = allEligibleFiles.filter(file => {
-          const inExcludedFolder = perIndexExcludedFolders.some(folder => {
-            // Root sentinel: only match files with no subfolder (no '/' in path)
-            if (folder === '') return !file.path.includes('/');
-            const nf = folder.startsWith('/') ? folder : '/' + folder;
-            const np = file.path.startsWith('/') ? file.path : '/' + file.path;
-            return np.startsWith(nf + '/') || np === nf;
-          });
-          if (inExcludedFolder) return false;
-          const inExcludedFile = perIndexExcludedFiles.some(ef => {
-            const ne = ef.startsWith('/') ? ef.slice(1) : ef;
-            const np = file.path.startsWith('/') ? file.path.slice(1) : file.path;
-            return np === ne;
-          });
-          return !inExcludedFile;
-        }).length;
-      }
+
+      const perIndexExcludedFolders: string[] = index.excludedFolders || [];
+      const perIndexExcludedFiles: string[] = index.excludedFiles || [];
+      const totalFiles = allEligibleFiles.filter(file => {
+        const inExcludedFolder = perIndexExcludedFolders.some(folder => {
+          // Root sentinel: only match files with no subfolder (no '/' in path)
+          if (folder === '') return !file.path.includes('/');
+          const nf = folder.startsWith('/') ? folder : '/' + folder;
+          const np = file.path.startsWith('/') ? file.path : '/' + file.path;
+          return np.startsWith(nf + '/') || np === nf;
+        });
+        if (inExcludedFolder) return false;
+        const inExcludedFile = perIndexExcludedFiles.some(ef => {
+          const ne = ef.startsWith('/') ? ef.slice(1) : ef;
+          const np = file.path.startsWith('/') ? file.path.slice(1) : file.path;
+          return np === ne;
+        });
+        return !inExcludedFile;
+      }).length;
       
-      const completionPercentage = totalFiles > 0 ? Math.round((index.fileCount / totalFiles) * 100) : 0;
+      const displayFileCount = Math.min(index.fileCount, totalFiles);
+      const completionPercentage = totalFiles > 0 ? Math.min(100, Math.round((displayFileCount / totalFiles) * 100)) : 0;
       
       // Show "X/Y files (Z%)" format
-      filesCell.setText(`${index.fileCount}/${totalFiles} (${completionPercentage}%)`);
+      filesCell.setText(`${displayFileCount}/${totalFiles} (${completionPercentage}%)`);
 
       // Status cell (includes last updated, progress percentage, and error)
       const statusCell = row.createEl('td', { cls: 'index-status-cell' });
@@ -2570,42 +2646,40 @@ await this.plugin.saveSettings();
   }
 
   private renderToolsTab(containerEl: HTMLElement): void {
-    // MCP server configuration (Top) — desktop only
-    if (!Platform.isMobile) {
-      new Setting(containerEl).setName('MCP server configuration').setHeading();
-      containerEl.createEl('p', { 
-        text: 'Configure Model Context Protocol (MCP) servers to extend AI capabilities with external tools and resources. Use @mcp in chat to access MCP tools.',
-        cls: 'setting-item-description'
-      });
+    // MCP server configuration (Top)
+    new Setting(containerEl).setName('MCP server configuration').setHeading();
+    containerEl.createEl('p', { 
+      text: 'Configure Model Context Protocol (MCP) servers to extend AI capabilities with external tools and resources. Use @mcp in chat to access MCP tools.',
+      cls: 'setting-item-description'
+    });
 
-      this.renderMCPPrerequisites(containerEl);
+    this.renderMCPPrerequisites(containerEl);
 
+    new Setting(containerEl)
+      .setName('Enable MCP support')
+      .setDesc('Enable Model Context Protocol integration for AI chat')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.mcpEnabled ?? true)
+        .onChange(async (value) => {
+          this.plugin.settings.mcpEnabled = value;
+          await this.plugin.saveSettings();
+          new Notice(`MCP support ${value ? 'enabled' : 'disabled'}`);
+          this.display(); // Refresh to show/hide MCP servers
+        }));
+
+    if (this.plugin.settings.mcpEnabled) {
       new Setting(containerEl)
-        .setName('Enable MCP support')
-        .setDesc('Enable Model Context Protocol integration for AI chat')
+        .setName('Auto-connect servers on startup')
+        .setDesc('When enabled, MCP servers connect automatically when the app loads. When disabled, servers must be connected manually from the server selection modal.')
         .addToggle(toggle => toggle
-          .setValue(this.plugin.settings.mcpEnabled ?? true)
+          .setValue(this.plugin.settings.mcpAutoConnect ?? true)
           .onChange(async (value) => {
-            this.plugin.settings.mcpEnabled = value;
+            this.plugin.settings.mcpAutoConnect = value;
             await this.plugin.saveSettings();
-            new Notice(`MCP support ${value ? 'enabled' : 'disabled'}`);
-            this.display(); // Refresh to show/hide MCP servers
+            new Notice(`MCP auto-connect ${value ? 'enabled' : 'disabled'}`);
           }));
 
-      if (this.plugin.settings.mcpEnabled) {
-        new Setting(containerEl)
-          .setName('Auto-connect servers on startup')
-          .setDesc('When enabled, MCP servers connect automatically when the app loads. When disabled, servers must be connected manually from the server selection modal.')
-          .addToggle(toggle => toggle
-            .setValue(this.plugin.settings.mcpAutoConnect ?? true)
-            .onChange(async (value) => {
-              this.plugin.settings.mcpAutoConnect = value;
-              await this.plugin.saveSettings();
-              new Notice(`MCP auto-connect ${value ? 'enabled' : 'disabled'}`);
-            }));
-
-        this.renderMCPServersTable(containerEl);
-      }
+      this.renderMCPServersTable(containerEl);
     }
 
     // Code Execution and Canvas (Below MCP)
@@ -2651,7 +2725,6 @@ await this.plugin.saveSettings();
       approvalMode: this.plugin.settings.agentApprovalMode ?? 'writes-only',
       denyList: this.plugin.settings.agentDenyList ?? getDefaultAgentDenyList(this.plugin.app.vault.configDir),
       enableCLI: this.plugin.settings.agentEnableCLI ?? true,
-      enablePluginDiscovery: this.plugin.settings.agentEnablePluginDiscovery ?? false,
       enableMCP: this.plugin.settings.agentEnableMCP ?? false,
       enableSkills: this.plugin.settings.agentSkillsEnabled ?? false,
       enabledSkills: this.plugin.settings.agentSkillsEnabled ? this.plugin.settings.agentEnabledSkills ?? [] : [],
@@ -2684,7 +2757,6 @@ await this.plugin.saveSettings();
               approvalMode: this.plugin.settings.agentApprovalMode,
               denyList: this.plugin.settings.agentDenyList,
               enableCLI: this.plugin.settings.agentEnableCLI,
-              enablePluginDiscovery: this.plugin.settings.agentEnablePluginDiscovery,
               enableMCP: this.plugin.settings.agentEnableMCP ?? false,
               enableSkills: this.plugin.settings.agentSkillsEnabled ?? false,
               enabledSkills: this.plugin.settings.agentEnabledSkills ?? [],
@@ -2692,6 +2764,15 @@ await this.plugin.saveSettings();
               canDelegate: true,
             });
           }
+        }));
+
+    new Setting(containerEl)
+      .setName('Set the behavior of the agent')
+      .setDesc('Configure custom rules for the agent stored in AGENT_RULES.md.')
+      .addButton(btn => btn
+        .setButtonText('Edit rules')
+        .onClick(() => {
+          new AgentRulesModal(this.app).open();
         }));
 
     new Setting(containerEl)
@@ -2713,18 +2794,22 @@ await this.plugin.saveSettings();
           }
         }));
 
-    new Setting(containerEl)
-      .setName('Enable CLI tools')
-      .setDesc('Allow the agent to use Obsidian CLI commands (desktop only).')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.agentEnableCLI ?? true)
-        .onChange(async (value) => {
-          this.plugin.settings.agentEnableCLI = value;
-          await this.plugin.saveSettings();
-          new Notice(`Agent CLI tools ${value ? 'enabled' : 'disabled'}. Restart to apply.`);
-        }));
+    if (!Platform.isMobile) {
+      new Setting(containerEl)
+        .setName('Enable CLI tools')
+        .setDesc('Allow the agent to use Obsidian CLI commands (desktop only).')
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.agentEnableCLI ?? true)
+          .onChange(async (value) => {
+            this.plugin.settings.agentEnableCLI = value;
+            await this.plugin.saveSettings();
+            new Notice(`Agent CLI tools ${value ? 'enabled' : 'disabled'}. Restart to apply.`);
+            this.display();
+          }));
+    }
 
-    const cliPathSetting = new Setting(containerEl)
+    if ((this.plugin.settings.agentEnableCLI ?? true) && !Platform.isMobile) {
+      const cliPathSetting = new Setting(containerEl)
       .setName('CLI binary path')
       .setDesc('Custom path to the obsidian CLI binary (e.g. C:\\Program Files\\Obsidian\\Obsidian.com). Leave empty for auto-detection.')
       .addText(text => text
@@ -2751,16 +2836,7 @@ await this.plugin.saveSettings();
           }
         });
     });
-
-    new Setting(containerEl)
-      .setName('Enable plugin discovery')
-      .setDesc('Allow the agent to discover and interact with other Obsidian plugins.')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.agentEnablePluginDiscovery ?? false)
-        .onChange(async (value) => {
-          this.plugin.settings.agentEnablePluginDiscovery = value;
-          await this.plugin.saveSettings();
-        }));
+    }
 
     new Setting(containerEl)
       .setName('Enable MCP tools')
@@ -2785,12 +2861,13 @@ await this.plugin.saveSettings();
 
     new Setting(containerEl)
       .setName('Deny list')
-      .setDesc('Comma-separated paths the agent is not allowed to modify.')
+      .setDesc('Comma-separated paths the agent is not allowed to access or modify.')
       .addText(text => text
         .setValue((this.plugin.settings.agentDenyList ?? getDefaultAgentDenyList(this.plugin.app.vault.configDir)).join(', '))
         .onChange(async (value) => {
           this.plugin.settings.agentDenyList = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
           await this.plugin.saveSettings();
+          this.updateAgentRuntimeConfig();
         }));
 
     // ── Agent Web Search Section ──
@@ -2912,15 +2989,16 @@ await this.plugin.saveSettings();
 
     if (this.plugin.settings.agentSkillsEnabled) {
       const reg = (this.plugin as unknown as Record<string, unknown>).skillRegistry as
-        { getAll: () => Array<{ metadata: { name: string; description: string }; enabled: boolean; installedByAgent: boolean }>;
-          enable: (name: string) => void; disable: (name: string) => void; isEnabled: (name: string) => boolean } | undefined;
+        { getAll: () => Array<{ metadata: { name: string; description: string }; directory: string; enabled: boolean; installedByAgent: boolean; builtin: boolean }>;
+          enable: (name: string) => void; disable: (name: string) => void; isEnabled: (name: string) => boolean;
+          discover: () => Promise<void>; deleteSkill: (name: string) => Promise<void> } | undefined;
 
       if (reg) {
         const allSkills = reg.getAll();
 
         if (allSkills.length === 0) {
           skillsContent.createEl('p', {
-            text: 'No skills found. Skills can be created by placing SKILL.md files in .Nexus-LM-data/skills/ or by asking the agent to create one.',
+            text: 'No skills found. Skills can be created by placing SKILL.md files in .Nexus-LM-data/skills/, by asking the agent to create one, or the agent can edit and delete them on request.',
             cls: 'setting-item-description'
           });
         }
@@ -2950,39 +3028,74 @@ await this.plugin.saveSettings();
                 .map(s => s.metadata.name);
               await this.plugin.saveSettings();
             }));
+
+          skillSetting.addButton(btn => btn
+            .setButtonText('Edit')
+            .onClick(async () => {
+              const file = this.app.vault.getAbstractFileByPath(normalizePath(`${skill.directory}/SKILL.md`));
+              if (file instanceof TFile) {
+                await this.app.workspace.getLeaf(false).openFile(file);
+              } else {
+                new Notice(`Could not open SKILL.md for "${skill.metadata.name}".`);
+              }
+            }));
+
+          if (!skill.builtin) {
+            skillSetting.addButton(btn => btn
+              .setButtonText('Delete')
+              .onClick(async () => {
+                const confirmed = window.confirm(`Delete skill "${skill.metadata.name}"? This cannot be undone.`);
+                if (!confirmed) return;
+                await reg.deleteSkill(skill.metadata.name);
+                this.plugin.settings.agentEnabledSkills = allSkills
+                  .filter(s => s.metadata.name !== skill.metadata.name && reg.isEnabled(s.metadata.name))
+                  .map(s => s.metadata.name);
+                await this.plugin.saveSettings();
+                this.display();
+                new Notice(`Skill "${skill.metadata.name}" deleted.`);
+              }));
+          }
         }
 
         new Setting(skillsContent)
           .addButton(btn => btn
             .setButtonText('Refresh skills')
             .onClick(async () => {
-              const refreshFn = (this.plugin as unknown as Record<string, unknown>).refreshAgentSkills as (() => Promise<void>) | undefined;
-              if (refreshFn) {
-                await refreshFn();
-                this.display();
-                new Notice('Skills refreshed');
-              }
-            }))
-          .addButton(btn => btn
-            .setButtonText('Open skills folder')
-            .onClick(async () => {
-              if (!Platform.isDesktop) return;
-              const vaultDir = (this.app.vault.adapter as unknown as { getBasePath?: () => string })?.getBasePath?.();
-              if (vaultDir) {
-                const { exec } = await import('child_process');
-                const skillsPath = `${vaultDir}/.Nexus-LM-data/skills`;
-                const platform = (typeof process !== 'undefined' && process.platform) || '';
-                if (platform === 'win32') {
-                  exec(`explorer "${skillsPath}"`);
-                } else if (platform === 'darwin') {
-                  exec(`open "${skillsPath}"`);
-                } else {
-                  exec(`xdg-open "${skillsPath}"`);
-                }
-              }
+              await reg.discover();
+              this.display();
+              new Notice('Skills refreshed');
             }));
+
+        skillsContent.createEl('p', {
+          text: 'Skills are stored in .Nexus-LM-data/skills/ inside your vault. Place a SKILL.md file there to add one.',
+          cls: 'setting-item-description'
+        });
       }
     }
+
+  // ── Agent Quick Prompts Section ──
+  new Setting(containerEl).setName('Quick prompts').setHeading();
+
+  new Setting(containerEl)
+    .setName('Show quick prompts')
+    .setDesc('Show the quick prompts card in the Agent view while the session is empty. Clicking a prompt fills the input area; press Enter to send it.')
+    .addToggle(toggle => toggle
+      .setValue(this.plugin.settings.agentQuickPromptsVisible ?? true)
+      .onChange(async (value) => {
+        this.plugin.settings.agentQuickPromptsVisible = value;
+        await this.plugin.saveSettings();
+        this.app.workspace.getLeavesOfType(AGENT_VIEW_TYPE).forEach(leaf => {
+          (leaf.view as AgentView | null)?.setQuickPromptsVisible?.(value);
+        });
+      }));
+
+  const quickPromptsDesc = containerEl.createDiv({ cls: 'setting-item-description' });
+  quickPromptsDesc.createSpan({ text: `Custom prompts added from the Agent view are saved here: ` });
+  const quickPromptsCount = quickPromptsDesc.createSpan({ cls: 'tag' });
+  const refreshQuickPromptsCount = () => {
+    quickPromptsCount.textContent = String(this.plugin.settings.agentQuickPrompts?.length ?? 0);
+  };
+  refreshQuickPromptsCount();
   }
 
   private renderMiscTab(containerEl: HTMLElement): void {
@@ -4071,6 +4184,15 @@ if (this.validatePath(normalizedPath)) {
 
 
   private renderMCPPrerequisites(containerEl: HTMLElement): void {
+    if (Platform.isMobile) {
+      const mobileWrapper = containerEl.createDiv({ cls: 'mcp-prereq-wrapper' });
+      mobileWrapper.createEl('p', {
+        text: '📱 Mobile Platform Info: Mobile devices support remote HTTPS (SSE) MCP servers. Stdio servers (npx/uvx local processes) require desktop.',
+        cls: 'setting-item-description'
+      });
+      return;
+    }
+
     const checked = this.plugin.settings.mcpPrereqsChecked ?? {};
 
     // If both are already confirmed, show nothing
@@ -4492,15 +4614,23 @@ class MCPServerModal extends Modal {
     // Transport Type
     new Setting(this.fieldsContainer)
       .setName('Transport Type')
-      .setDesc('Choose how to connect to the MCP server')
+      .setDesc(Platform.isMobile ? 'HTTPS (SSE) is supported on mobile devices' : 'Choose how to connect to the MCP server')
       .addDropdown(dropdown => {
         this.transportSelect = dropdown.selectEl;
-        dropdown.addOption('stdio', 'stdio (Local Process)')
-          .addOption('sse', 'SSE (HTTP/HTTPS)')
-          .setValue(this.existingServer?.transport || 'stdio')
-          .onChange((value) => {
-            this.updateTransportFields(value as 'stdio' | 'sse');
-          });
+        if (Platform.isMobile) {
+          dropdown.addOption('sse', 'SSE (HTTP/HTTPS)')
+            .setValue('sse')
+            .onChange((value) => {
+              this.updateTransportFields(value as 'stdio' | 'sse');
+            });
+        } else {
+          dropdown.addOption('stdio', 'stdio (Local Process)')
+            .addOption('sse', 'SSE (HTTP/HTTPS)')
+            .setValue(this.existingServer?.transport || 'stdio')
+            .onChange((value) => {
+              this.updateTransportFields(value as 'stdio' | 'sse');
+            });
+        }
       });
     
     // stdio fields container

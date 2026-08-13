@@ -452,7 +452,7 @@
 }
 
 /* ============================================================
-   Code Block Enhancement — toolbar, run/repair toggles, canvas
+   Code Block Enhancement â€” toolbar, run/repair toggles, canvas
    ============================================================ */
 
 .code-block-wrapper {
@@ -546,7 +546,7 @@
   color: var(--text-muted);
 }
 
-/* Toggle switch — matches Obsidian's native toggle style */
+/* Toggle switch â€” matches Obsidian's native toggle style */
 .code-exec-toggle {
   width: 32px;
   height: 18px;
@@ -641,7 +641,7 @@
   color: var(--text-error, var(--color-red, #f44336));
 }
 
-/* Mermaid repair row — shown below the diagram when a parse error is detected */
+/* Mermaid repair row â€” shown below the diagram when a parse error is detected */
 .mermaid-repair-row {
   border-top: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
@@ -747,7 +747,7 @@
   height: 14px;
 }
 
-/* "View Code" toggle button — highlighted when code panel is open */
+/* "View Code" toggle button â€” highlighted when code panel is open */
 .code-canvas-view-code-btn.is-active {
   color: var(--interactive-accent);
   background: var(--background-modifier-hover);
@@ -831,7 +831,7 @@
   height: 11px;
 }
 
-/* Save button — accent green tint to distinguish from Run/Render */
+/* Save button â€” accent green tint to distinguish from Run/Render */
 .code-canvas-save-btn {
   background: var(--color-green, #4caf50);
   color: #fff;
@@ -866,7 +866,7 @@
   border-left: 3px solid var(--color-red, #f44336);
 }
 
-/* Render area (mermaid / markdown / dataview / json) — use normal text font */
+/* Render area (mermaid / markdown / dataview / json) â€” use normal text font */
 .code-canvas-render-area {
   font-family: var(--font-text);
   font-size: 14px;
@@ -1278,7 +1278,7 @@
 }
 
 /* When a metadata card is present in the response item, 
-   the actions must not overlap it — reposition them below */
+   the actions must not overlap it â€” reposition them below */
 .response-item--has-metadata .response-actions {
   position: static;
   justify-content: flex-end;
@@ -2748,7 +2748,7 @@
 }
 
 .feed-checkbox:checked::after {
-  content: '✓';
+  content: 'âœ“';
   position: absolute;
   top: 50%;
   left: 50%;
@@ -3944,6 +3944,14 @@
   color: var(--text-muted);
   font-size: 0.9em;
   margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.notebook-supported-types-note {
+  font-weight: bold;
+  font-size: 0.85em;
+  margin-top: 6px;
+  margin-bottom: 12px;
   line-height: 1.4;
 }
 
@@ -5392,6 +5400,14 @@
   gap: 8px;
 }
 
+.model-select-menu-item .model-icons-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .model-select-menu-item .model-web-icon {
   display: flex;
   align-items: center;
@@ -5402,6 +5418,18 @@
 .model-select-menu-item .model-web-icon svg {
   width: 16px;
   height: 16px;
+}
+
+.model-select-menu-item .model-zap-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.model-select-menu-item .model-zap-icon svg {
+  width: 15px;
+  height: 15px;
 }
 
 .model-select-menu-item.is-active {
@@ -8312,7 +8340,7 @@
 }
 
 .agent-todo-checkbox.completed::before {
-  content: '✓';
+  content: 'âœ“';
   font-weight: bold;
 }
 
@@ -8324,7 +8352,7 @@
 }
 
 .agent-todo-checkbox.error::before {
-  content: '✗';
+  content: 'âœ—';
   font-weight: bold;
 }
 
@@ -9797,7 +9825,7 @@
 
   /* Add toggle indicator for sources panel */
   .notebook-sources-panel::before {
-    content: '📚 Sources';
+    content: 'ðŸ“š Sources';
     display: block;
     padding: 12px 16px;
     background: var(--background-secondary);
@@ -12228,7 +12256,7 @@
 }
 
 /* Use specific class for hiding panels to avoid conflicts */
-.notebook-mobile-view .mobile-panel-hidden {
+.notebook-mobile-view .mobile-tab-content .mobile-panel-hidden {
   display: none;
 }
 
@@ -13662,7 +13690,7 @@
 
 /* Index Management Modal Styles */
 
-/* Modal container — keep it reasonably sized so it never exceeds the viewport */
+/* Modal container â€” keep it reasonably sized so it never exceeds the viewport */
 .index-management-modal {
   width: min(700px, 92vw);
   max-width: 92vw;
@@ -13681,7 +13709,7 @@
   line-height: 1.5;
 }
 
-/* The inner scroll area — vertical only */
+/* The inner scroll area â€” vertical only */
 .index-modal-scroll-container {
   overflow-y: auto;
   overflow-x: hidden;
@@ -13729,7 +13757,7 @@
   font-size: 13px;
 }
 
-/* Table wrapper: NO horizontal scroll — table must fit within modal */
+/* Table wrapper: NO horizontal scroll â€” table must fit within modal */
 .index-table-container {
   border-radius: 6px;
   border: 1px solid var(--background-modifier-border);
@@ -13815,6 +13843,35 @@
   width: 80px;
 }
 
+/* Custom Providers table (3 columns: Name | Base URL | Actions) */
+.index-table.custom-providers-table th:first-child,
+.index-table.custom-providers-table td.custom-provider-name-cell {
+  width: 30%;
+  text-align: left !important;
+  font-weight: 500;
+  word-break: break-word;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.index-table.custom-providers-table th:nth-child(2),
+.index-table.custom-providers-table td.custom-provider-url-cell {
+  width: 55%;
+  text-align: left !important;
+  word-break: break-all;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+}
+
+.index-table.custom-providers-table th:nth-child(3),
+.index-table.custom-providers-table td.index-actions-cell {
+  width: 15%;
+  text-align: right !important;
+  vertical-align: middle;
+}
+
 .index-table td {
   padding: 10px;
   border-bottom: 1px solid var(--background-modifier-border);
@@ -13829,7 +13886,7 @@
   background: var(--background-modifier-hover);
 }
 
-/* ── Column widths ───────────────────────────────────────── */
+/* â”€â”€ Column widths â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Checkbox column */
 .index-checkbox-cell {
@@ -13845,7 +13902,7 @@
   vertical-align: middle;
 }
 
-/* Name column — takes remaining space, wraps text */
+/* Name column â€” takes remaining space, wraps text */
 .index-name-cell {
   font-weight: 500;
   word-wrap: break-word;
@@ -13858,7 +13915,7 @@
   vertical-align: middle;
 }
 
-/* Model column — fixed width, wraps text */
+/* Model column â€” fixed width, wraps text */
 .index-model-cell {
   width: 25%;
   color: var(--text-muted);
@@ -13873,7 +13930,7 @@
   vertical-align: middle;
 }
 
-/* Files column — wider to fit "X/Y (Z%)" format */
+/* Files column â€” wider to fit "X/Y (Z%)" format */
 .index-files-cell {
   width: 120px;
   text-align: center;
@@ -13884,7 +13941,7 @@
   padding: 10px;
 }
 
-/* Status column — wider for date + "(Partial)" indicator */
+/* Status column â€” wider for date + "(Partial)" indicator */
 .index-status-cell {
   width: 160px;
   font-size: 11.5px;
@@ -13926,7 +13983,7 @@
   white-space: normal;
 }
 
-/* Actions column — two icon buttons side by side */
+/* Actions column â€” two icon buttons side by side */
 .index-actions-cell {
   width: 80px;
   text-align: right;
@@ -13978,14 +14035,14 @@
   }
 }
 
-/* ── Add section ─────────────────────────────────────────── */
+/* â”€â”€ Add section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .index-add-section {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--background-modifier-border);
 }
 
-/* ── Add index dialog (floating overlay) ────────────────── */
+/* â”€â”€ Add index dialog (floating overlay) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .index-add-dialog {
   position: fixed;
   top: 50%;
@@ -14031,7 +14088,7 @@
   background: var(--interactive-hover);
 }
 
-/* ── Bottom action buttons ───────────────────────────────── */
+/* â”€â”€ Bottom action buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .index-modal-buttons {
   display: flex;
   gap: 8px;
@@ -14059,7 +14116,7 @@
   background: var(--interactive-hover);
 }
 
-/* ── Per-index exclusions picker ─────────────────────────── */
+/* â”€â”€ Per-index exclusions picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .index-dialog-exclusions {
   margin-top: 16px;
   border-top: 1px solid var(--background-modifier-border);
@@ -14079,7 +14136,7 @@
   gap: 10px;
 }
 
-/* Search bar — wrapper is just a block, no relative/overflow tricks */
+/* Search bar â€” wrapper is just a block, no relative/overflow tricks */
 .index-excl-search-wrapper {
   display: block;
 }
@@ -14100,7 +14157,7 @@
   border-color: var(--interactive-accent);
 }
 
-/* Results rendered inline (not absolute) — no blur, no clipping */
+/* Results rendered inline (not absolute) â€” no blur, no clipping */
 .index-excl-search-results {
   display: none;
   border: 1px solid var(--background-modifier-border);
@@ -14809,7 +14866,7 @@
   text-decoration: underline;
 }
 
-/* ── MCP Registry Modal ─────────────────────────────────────────────────── */
+/* â”€â”€ MCP Registry Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .mcp-modal-title-row {
   display: flex;
@@ -15041,7 +15098,7 @@
   color: var(--text-muted);
 }
 
-/* ── MCP Env Var Wizard ──────────────────────────────────────────────────── */
+/* â”€â”€ MCP Env Var Wizard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .mcp-env-wizard {
   width: 520px;
@@ -15158,7 +15215,7 @@
   background: var(--interactive-accent-hover);
 }
 
-/* ── MCP Wizard path fields ─────────────────────────────────────────────── */
+/* â”€â”€ MCP Wizard path fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .mcp-wizard-section-title {
   font-size: 13px;
@@ -16989,7 +17046,7 @@
 }
 
 .pdf-toc-summary:before {
-  content: '▶';
+  content: 'â–¶';
   display: inline-block;
   margin-right: 5px;
   font-size: 0.7em;
@@ -17256,7 +17313,7 @@
   }
 }
 
-/* ─── Menu separators ─────────────────────────────────── */
+/* â”€â”€â”€ Menu separators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .menu-separator {
   margin: 4px 0;
   border: none;
@@ -17268,12 +17325,12 @@
   border-top: 1px solid var(--background-modifier-border);
 }
 
-/* ─── Wallpaper picker ─────────────────────────────────── */
+/* â”€â”€â”€ Wallpaper picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .wallpaper-picker-shadow {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-/* ─── Example cards ────────────────────────────────────── */
+/* â”€â”€â”€ Example cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .example-card {
   margin: 16px 0;
   padding: 16px;
@@ -17306,7 +17363,7 @@
   background: var(--background-modifier-hover);
 }
 
-/* ─── Examples footer ──────────────────────────────────── */
+/* â”€â”€â”€ Examples footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .examples-footer {
   margin-top: 20px;
   padding-top: 16px;
@@ -17315,13 +17372,13 @@
   font-size: 0.9em;
 }
 
-/* ─── Tips list ─────────────────────────────────────────── */
+/* â”€â”€â”€ Tips list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .tips-list {
   margin: 8px 0;
   padding-left: 20px;
 }
 
-/* ─── Landing View Hub Styles ──────────────────────────── */
+/* â”€â”€â”€ Landing View Hub Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .nexus-hub-container {
     width: 100%;
     height: 100%;
@@ -19714,6 +19771,201 @@ svg.theme-active-no-pointer {
 }
 
 .agent-nav-rail-item {
+}
+
+.agent-execution-content {
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--background-modifier-border);
+  transition: all 0.2s ease-in-out;
+}
+
+/* Content & Overflow Fixes (Query, Response, Math, Codeblocks, Tables, URLs) */
+.agent-turn-card,
+.agent-query-card,
+.agent-response-card,
+.agent-view .markdown-rendered {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.agent-view a {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.agent-view pre,
+.agent-view code {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-view .math,
+.agent-view .math-block,
+.agent-view .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+/* Agent View Table Slider - Matching AI Chat Section */
+.agent-view .table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 10px 0;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.agent-view table {
+  width: 100%;
+  border-collapse: collapse;
+  display: table;
+  table-layout: auto;
+}
+
+.agent-view table th,
+.agent-view table td {
+  border: 1px solid var(--background-modifier-border);
+  padding: 8px 12px;
+  text-align: left;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 80px;
+  max-width: 300px;
+}
+
+.agent-view table th {
+  background-color: rgba(128, 128, 128, 0.15);
+  font-weight: 600;
+}
+
+/* Flush Header & Wide Cards Overrides */
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .view-content {
+  padding: 0;
+}
+
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view {
+  padding: 0;
+  margin: 0;
+}
+
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-view-header {
+  margin: 0;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  width: 100%;
+  padding: 8px 12px;
+}
+
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-view-trace {
+  padding: 10px 6px 24px;
+}
+
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-query-card,
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-response-card {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
+  padding: 10px 10px;
+}
+
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view > .chat-input-container {
+  width: calc(100% - 12px);
+  max-width: none;
+  margin: 0 auto 10px;
+}
+
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-response-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.workspace-leaf-content[data-type="NEXUS_LM_AGENT"] .agent-view .agent-response-action-btn {
+  margin-left: auto;
+}
+
+/* Agent view: session question navigation rail */
+.agent-view {
+  position: relative;
+}
+
+.ai-response-view > .response-view-wrapper > .chat-input-container {
+  position: relative;
+}
+
+.agent-nav-rail {
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
+}
+
+.agent-nav-rail.is-hidden {
+  display: none;
+}
+
+.agent-nav-rail-bar {
+  width: 4px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--interactive-accent);
+  cursor: pointer;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.agent-nav-rail-bar:hover,
+.agent-nav-rail.is-open .agent-nav-rail-bar {
+  background: var(--interactive-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 22%, transparent);
+}
+
+.agent-nav-rail-popover {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  min-width: 220px;
+  max-width: 300px;
+  max-height: min(60vh, 480px);
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--background-primary) 88%, transparent);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(14px) saturate(1.2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-50%) translateX(-6px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+  pointer-events: none;
+}
+
+.agent-nav-rail.is-open .agent-nav-rail-popover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+  pointer-events: auto;
+}
+
+.agent-nav-rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.agent-nav-rail-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -19802,5 +20054,279 @@ svg.theme-active-no-pointer {
   height: 16px;
 }
 
+/* ============================================================
+   AI Chat View â€” Compact cards & reading area optimization
+   Mirrors Agent view card density and font sizing
+   ============================================================ */
 
+.ai-response-view .responses-container {
+  padding: 8px 8px 16px;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.ai-response-view .response-item,
+.ai-response-view .response-item.liquid-glass-active {
+  padding: 10px 12px;
+}
+
+.ai-response-view .response-question {
+  font-size: var(--font-ui-small);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+}
+
+.ai-response-view .response-question.liquid-glass-active {
+  padding: 8px 10px;
+}
+
+.ai-response-view .response-answer {
+  font-size: var(--font-ui-small);
+  padding-bottom: 14px;
+}
+
+.ai-response-view .response-answer .ai-message {
+  font-size: var(--font-ui-small);
+}
+
+
+
+
+
+
+/* -- Agent quick prompts ------------------------------- */
+.agent-view-trace.has-quick-prompts .agent-trace-empty {
+  display: none;
+}
+
+.agent-view .agent-quick-prompts {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 16px 36px;
+  box-sizing: border-box;
+}
+
+.agent-view .agent-quick-prompts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.agent-view .agent-quick-prompt-card {
+  display: flex !important;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100% !important;
+  height: auto !important;
+  min-height: fit-content !important;
+  max-height: none !important;
+  box-sizing: border-box;
+  padding: 12px 14px 12px 16px;
+  margin: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font: inherit;
+  font-size: var(--font-ui-small);
+  text-align: left;
+  white-space: normal !important;
+  overflow: hidden;
+  box-shadow: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.agent-view .agent-quick-prompt-card:hover {
+  background: color-mix(in srgb, var(--background-secondary) 82%, var(--interactive-accent) 18%);
+  border-color: color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+}
+
+.agent-view .agent-quick-prompt-card:active {
+  transform: translateY(1px);
+}
+
+.agent-view .agent-quick-prompt-card-text {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.5;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.agent-view .agent-quick-prompt-remove-btn {
+  flex: 0 0 auto;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 24px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  padding: 0 !important;
+  margin: -2px -4px 0 0;
+  border: none !important;
+  border-radius: 4px;
+  background: transparent !important;
+  color: var(--text-muted);
+  box-shadow: none !important;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.agent-view .agent-quick-prompt-card:hover .agent-quick-prompt-remove-btn {
+  opacity: 0.8;
+}
+
+.agent-view .agent-quick-prompt-remove-btn:hover {
+  opacity: 1 !important;
+  color: var(--text-error, var(--interactive-accent)) !important;
+  background: var(--background-modifier-hover) !important;
+}
+
+.agent-view .agent-quick-prompt-remove-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.agent-view .agent-quick-prompts-add {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 40px !important;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--font-ui-small);
+  white-space: normal !important;
+  box-shadow: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.agent-view .agent-quick-prompts-add:hover {
+  border-color: color-mix(in srgb, var(--interactive-accent) 55%, transparent);
+  color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+}
+
+.agent-view .agent-quick-prompts-add.is-editing {
+  display: none !important;
+}
+
+.agent-view .agent-quick-prompts-add-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agent-view .agent-quick-prompts-add-icon svg {
+  width: 1.05em;
+  height: 1.05em;
+}
+
+.agent-view .agent-quick-prompt-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  margin-top: 6px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+
+.agent-view .agent-quick-prompt-editor-input {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font: inherit;
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.agent-view .agent-quick-prompt-editor-input:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: none;
+  outline: none;
+}
+
+.agent-view .agent-quick-prompt-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.agent-view .agent-quick-prompt-editor-btn {
+  height: auto !important;
+  min-height: 30px !important;
+  padding: 5px 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font: inherit;
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.agent-view .agent-quick-prompt-editor-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.agent-view .agent-quick-prompt-editor-btn-primary {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.agent-view .agent-quick-prompt-editor-btn-primary:hover {
+  background: var(--interactive-accent-hover);
+}
+
+/* ─── Mobile Keyboard Offset ─── */
+/* Uses --nexus-keyboard-offset set by visualViewport listener in main.ts */
+
+/* Sidebar-hosted views: push input above keyboard */
+body.is-mobile .workspace-split.mod-right-split .chat-input-container,
+body.is-mobile .workspace-split.mod-right-split .mobile-notebook-input-container {
+  bottom: var(--nexus-keyboard-offset, 0px);
+  transition: bottom 0.1s ease-out;
+}
+
+/* Notebook chat: ensure no gap between input area and keyboard */
+body.is-mobile .notebook-chat-container .chat-input-container,
+body.is-mobile .notebook-chat-container .mobile-notebook-input-container {
+  padding-bottom: calc(12px + var(--nexus-keyboard-offset, 0px));
+  box-sizing: border-box;
+  transition: padding-bottom 0.1s ease-out;
+}
 

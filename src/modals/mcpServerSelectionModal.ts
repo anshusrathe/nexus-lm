@@ -1,4 +1,4 @@
-import { App, Modal, setIcon } from 'obsidian';
+import { App, Modal, setIcon, Platform } from 'obsidian';
 import { MCPServerConfig } from '../settings';
 import { MCPService, MCPResource, MCPTool } from '../mcp/mcpService';
 
@@ -27,7 +27,7 @@ export class MCPServerSelectionModal extends Modal {
     constructor(app: App, mcpService: MCPService, availableServers: MCPServerConfig[], onSubmit: (selection: MCPServerSelection) => void, mcpAutoConnect = true) {
         super(app);
         this.mcpService = mcpService;
-        this.availableServers = availableServers.filter(s => !s.disabled);
+        this.availableServers = availableServers.filter(s => !s.disabled && (!Platform.isMobile || s.transport === 'sse'));
         this.onSubmit = onSubmit;
         this.mcpAutoConnect = mcpAutoConnect;
     }

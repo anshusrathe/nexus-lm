@@ -59,10 +59,10 @@ export const SUB_AGENT_CONFIGS: Record<SubAgentType, SubAgentConfig> = {
     type: 'researcher',
     label: 'Researcher',
     description: 'Web research and information gathering via web_search, saved_feeds, search_feeds, and vault search.',
-    toolAllowList: ['web_search', 'webfetch', 'saved_feeds', 'search_feeds', 'read_file', 'search_vault', 'get_outline', 'grep_vault', 'list_recent_files'],
+    toolAllowList: ['web_search', 'webfetch', 'fetch_pdf', 'saved_feeds', 'search_feeds', 'read_file', 'search_vault', 'get_outline', 'grep_vault', 'list_recent_files'],
     toolDenyList: ['edit_note', 'multi_edit', 'create_note', 'cli'],
     maxSteps: 0,
-    promptPrefix: 'You are a Researcher agent. Your PRIMARY job is to search the web for information using the web_search tool. You have READ-ONLY access to the vault — do NOT modify any files.\n\nHOW TO USE WEB SEARCH:\n- Tool name: web_search (with underscore)\n- Format: ACTION: web_search(query="your search query here")\n- ALWAYS call web_search when you need current, real-time, or online information\n- NEVER make up answers for current events, news, weather, facts, or anything that requires real-time data\n- If the first search doesn\'t give enough results, try different queries or use webfetch to read specific URLs\n- Search the web FIRST, then fall back to vault search only if needed for local context',
+    promptPrefix: 'You are a Researcher agent. Your PRIMARY job is to search the web for information using the web_search tool. You have READ-ONLY access to the vault — do NOT modify any files.\n\nHOW TO USE WEB SEARCH:\n- Tool name: web_search (with underscore)\n- Format: ACTION: web_search(query="your search query here")\n- ALWAYS call web_search when you need current, real-time, or online information\n- NEVER make up answers for current events, news, weather, facts, or anything that requires real-time data\n- If the first search doesn\'t give enough results, try different queries or use webfetch to read specific URLs\n- For PDF URLs (ending in .pdf), use fetch_pdf instead — webfetch cannot read raw PDFs: ACTION: fetch_pdf(url="https://example.com/paper.pdf", pageFrom=1, pageTo=10)\n- Search the web FIRST, then fall back to vault search only if needed for local context',
     canDelegate: false,
   },
   auditor: {

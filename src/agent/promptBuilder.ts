@@ -148,6 +148,16 @@ ${toolDescriptions}`;
    Format: ACTION: web_search(query="specific search query here")
    Do NOT answer from memory when the topic requires current information. Do NOT skip web_search.`);
     }
+    if (toolNames.has('youtube_transcript')) {
+      optionalRules.push(`17. YouTube transcripts (youtube_transcript):
+   Whenever the user provides a YouTube video URL or asks about a YouTube video, you MUST call youtube_transcript with the full video URL (e.g. https://www.youtube.com/watch?v=...). It returns the actual video transcript. Do NOT call webfetch on YouTube URLs and do NOT call web_search to find video content — they do not return transcripts. Format: ACTION: youtube_transcript(url="https://www.youtube.com/watch?v=...")`);
+    }
+    if (toolNames.has('fetch_pdf')) {
+      optionalRules.push(`18. Online PDFs (fetch_pdf):
+   When a URL is a PDF (ends in .pdf or serves application/pdf), read it with fetch_pdf — webfetch cannot parse raw PDFs (it will return garbage or fail).
+   Format: ACTION: fetch_pdf(url="https://example.com/paper.pdf", pageFrom=1, pageTo=10)
+   PDFs are parsed in memory only — never downloaded to the vault. pageFrom/pageTo are 1-based page numbers; default range is pages 1-10. For long documents raise pageTo or paginate (e.g. 1-20, 21-40, 41-60). Max PDF size is 50 MB. Only text-based PDFs work; scanned/image-only PDFs return no text.`);
+    }
     if (toolNames.has('search_attached_indexes')) {
       optionalRules.push(`14. Semantic search (search_attached_indexes):
    The tool name is exactly: search_attached_indexes (with underscores, no spaces).
@@ -164,6 +174,14 @@ ${toolDescriptions}`;
    - To read the full body of an article discovered from feed entries:
      Format: ACTION: webfetch(url="https://example.com/article-url")
    - WORKFLOW: First call saved_feeds to discover saved feed URLs (if URL not provided by user), then call search_feeds to search & filter entries, and finally call webfetch if deep reading is requested.`);
+    }
+    if (toolNames.has('edit_skill') || toolNames.has('delete_skill') || toolNames.has('read_skill')) {
+      optionalRules.push(`16. Skill lifecycle (read_skill, edit_skill, delete_skill):
+   When the user asks to modify, improve, update, or delete a skill, use these tools directly — skills are always editable by you.
+   - Call read_skill(name="...") first to see the current content.
+   - Then call edit_skill(name="...", description="...", instructions="...") to update what the skill does or how it works.
+   - Call delete_skill(name="...") only when the user explicitly asks to remove a skill.
+   Never claim a skill cannot be edited.`);
     }
 
     return `Execution policy:

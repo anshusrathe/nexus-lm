@@ -193,7 +193,6 @@ export class SubAgentSession {
         approvalMode: 'never',
         denyList: mainDeps.settings.denyList,
         enableCLI: false,
-        enablePluginDiscovery: false,
         enableMCP: false,
         enableSkills: false,
         enabledSkills: [],

@@ -1,4 +1,4 @@
-import { App, Modal } from 'obsidian';
+import { App, Modal, Platform } from 'obsidian';
 import { MCPRegistryEntry, MCPEnvVarSpec, MCPPathSpec, MCP_REGISTRY } from '../mcp/mcpRegistry';
 import { createDetached } from '../utils/domUtils';
 
@@ -98,6 +98,7 @@ export class MCPRegistryModal extends Modal {
 
     filtered.forEach(entry => {
       const card = this.listContainer.createDiv({ cls: 'mcp-registry-card' });
+      const isStdioOnMobile = Platform.isMobile && entry.transport === 'stdio';
 
       const cardHeader = card.createDiv({ cls: 'mcp-registry-card-header' });
       cardHeader.createSpan({ text: entry.name, cls: 'mcp-registry-card-name' });
@@ -105,6 +106,12 @@ export class MCPRegistryModal extends Modal {
         text: entry.transport.toUpperCase(),
         cls: `mcp-registry-badge mcp-badge-${entry.transport}`,
       });
+      if (isStdioOnMobile) {
+        cardHeader.createSpan({
+          text: 'DESKTOP ONLY',
+          cls: 'mcp-registry-badge mcp-badge-desktop-only',
+        });
+      }
       cardHeader.createSpan({
         text: entry.category,
         cls: 'mcp-registry-badge mcp-badge-category',
@@ -148,11 +155,16 @@ export class MCPRegistryModal extends Modal {
         card.createSpan({ text: '✓ No API key needed', cls: 'mcp-registry-no-key' });
       }
 
-      const addBtn = card.createEl('button', { text: 'Configure →', cls: 'mod-cta mcp-registry-add-btn' });
-      addBtn.addEventListener('click', () => {
-        this.close();
-        this.openEnvVarWizard(entry);
-      });
+      if (isStdioOnMobile) {
+        const addBtn = card.createEl('button', { text: 'Desktop Only', cls: 'mcp-registry-add-btn disabled' });
+        addBtn.disabled = true;
+      } else {
+        const addBtn = card.createEl('button', { text: 'Configure →', cls: 'mod-cta mcp-registry-add-btn' });
+        addBtn.addEventListener('click', () => {
+          this.close();
+          this.openEnvVarWizard(entry);
+        });
+      }
 
       if (entry.docsUrl) {
         const docsLink = card.createEl('a', { text: 'Docs ↗', cls: 'mcp-registry-docs-link' });

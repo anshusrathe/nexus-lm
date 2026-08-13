@@ -10,6 +10,27 @@ interface AuditEntry {
   contentPreview: string;
 }
 
+export function isPathDenied(path: string, denyList: string[]): boolean {
+  const normalized = normalizePath(path).replace(/^\/+|\/+$/g, '');
+  if (!normalized) return false;
+  const pathParts = normalized.split('/');
+  for (const deniedRaw of denyList) {
+    const denied = normalizePath(deniedRaw).replace(/^\/+|\/+$/g, '');
+    if (!denied) continue;
+    const deniedParts = denied.split('/');
+    if (deniedParts.length > pathParts.length) continue;
+    let match = true;
+    for (let i = 0; i < deniedParts.length; i++) {
+      if (pathParts[i] !== deniedParts[i]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return true;
+  }
+  return false;
+}
+
 export class SafetyLayer {
   private app: App;
   private denyList: string[];
@@ -39,13 +60,7 @@ export class SafetyLayer {
   }
 
   isPathAllowed(path: string): boolean {
-    const normalized = normalizePath(path);
-    for (const denied of this.denyList) {
-      if (normalized.startsWith(denied) || normalized.includes('/' + denied + '/')) {
-        return false;
-      }
-    }
-    return true;
+    return !isPathDenied(path, this.denyList);
   }
 
   isPathTraversalSafe(path: string): boolean {
@@ -60,7 +75,7 @@ export class SafetyLayer {
     if (this.approvalMode === 'never') return false;
     if (this.approvalMode === 'all') return true;
     if (this.approvalMode === 'writes-only') {
-      const readTools = ['read_file', 'search_vault', 'get_outline', 'grep_vault', 'list_files', 'list_recent_files', 'get_backlinks', 'get_tags', 'web_search', 'webfetch', 'search_attached_indexes', 'saved_feeds', 'search_feeds'];
+      const readTools = ['read_file', 'search_vault', 'get_outline', 'grep_vault', 'list_files', 'list_recent_files', 'get_backlinks', 'get_tags', 'web_search', 'webfetch', 'fetch_pdf', 'search_attached_indexes', 'saved_feeds', 'search_feeds'];
       if (readTools.includes(toolCall.name)) return false;
       const writeTools = ['create_note', 'edit_note', 'multi_edit', 'delete_file', 'move_file'];
       if (writeTools.includes(toolCall.name)) return true;

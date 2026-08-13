@@ -1,6 +1,7 @@
 import { App, Modal, setIcon, Platform } from 'obsidian';
 import { AISettings } from '../settings';
 import { EmbeddingsManager } from '../managers/embeddingsManager';
+import { SUPPORTED_EXTRACTABLE_EXTENSIONS } from '../utils/localFileExtractor';
 
 interface IndexConfig {
     id: string;
@@ -135,25 +136,27 @@ export class IndexStatusModal extends Modal {
     }
 
     private async loadAndRender(config: IndexConfig, type: 'embedding' | 'bm25') {
-        const allVaultFiles = type === 'bm25'
-            ? this.app.vault.getFiles().filter(f => f.extension === 'md' || (!Platform.isMobile && f.extension === 'pdf'))
+        const includeAllFileTypes = (config as unknown as { indexAllFileTypes?: boolean }).indexAllFileTypes && !Platform.isMobile;
+        const allVaultFiles = includeAllFileTypes
+            ? this.app.vault.getFiles().filter(f => SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(f.extension.toLowerCase()))
             : this.app.vault.getMarkdownFiles();
 
         // Non-excluded files for this index
         const includedFiles = allVaultFiles.filter(
-            f => !this.embeddingsManager.isFileExcluded(f.path, type === 'embedding' ? config.id : undefined)
+            f => !this.embeddingsManager.isFileExcluded(f.path, config.id)
         );
         const totalIncluded = includedFiles.length;
 
         // Indexed files
-        const indexedPaths = new Set(await this.embeddingsManager.getIndexedFilesForId(config.id));
+        const rawIndexedPaths = await this.embeddingsManager.getIndexedFilesForId(config.id);
+        const indexedPaths = new Set(rawIndexedPaths.filter(p => !this.embeddingsManager.isFileExcluded(p, config.id)));
         // Include empty/no-content files so the count matches total eligible files
         for (const f of includedFiles) {
             if (!indexedPaths.has(f.path) && (f.stat?.size || 0) === 0) {
                 indexedPaths.add(f.path);
             }
         }
-        const indexedCount = indexedPaths.size;
+        const indexedCount = Math.min(indexedPaths.size, totalIncluded);
 
         // Non-indexed = included but not in index
         const nonIndexed = includedFiles
@@ -161,7 +164,7 @@ export class IndexStatusModal extends Modal {
             .map(f => f.path)
             .sort();
 
-        const pct = totalIncluded > 0 ? Math.round((indexedCount / totalIncluded) * 100) : 0;
+        const pct = totalIncluded > 0 ? Math.min(100, Math.round((indexedCount / totalIncluded) * 100)) : 0;
         const isSelected =
             type === 'embedding'
                 ? this.settings.selectedEmbeddingIndexId === config.id
