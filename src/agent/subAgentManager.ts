@@ -1,6 +1,6 @@
 import type { ToolDefinition, ToolCall, AgentDependencies } from './types';
 import { ToolRegistry } from './toolRegistry';
-import { SubAgentType, SubAgentResult, SUB_AGENT_CONFIGS } from './subAgentTypes';
+import { SubAgentType, SubAgentResult } from './subAgentTypes';
 import { SubAgentSession } from './subAgentSession';
 import type { SubAgentStep } from './subAgentTypes';
 interface QueuedJob {
@@ -51,7 +51,6 @@ export class SubAgentManager {
     onStep?: (step: SubAgentStep) => void,
     onStarted?: (session: SubAgentSession) => void,
   ): { jobId: string; promise: Promise<SubAgentResult> } {
-    const config = SUB_AGENT_CONFIGS[type];
     const sessionId = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const session = new SubAgentSession(sessionId, 'parent', type, onStep);
 

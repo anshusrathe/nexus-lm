@@ -6,7 +6,7 @@
  */
 
 import { requestUrl } from 'obsidian';
-import { CustomModel, CustomEmbeddingModel, AISettings, Provider } from '../settings';
+import { CustomModel, CustomEmbeddingModel, AISettings } from '../settings';
 import { validateOpenRouterApiKey } from './openRouterService';
 import { validateNvidiaApiKey } from './nvidiaService';
 import { normalizeOpenAIBaseUrl } from './customOpenAIProvider';

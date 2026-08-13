@@ -21,7 +21,7 @@
     "obsidian": "^1.4.0",
     "pdfjs-dist": "^5.1.91",
     "pptx2json": "^0.0.10",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^23.0.0",
@@ -38,6 +38,7 @@
     "typescript": "^5.0.0"
   },
   "overrides": {
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "dompurify": "^3.4.13"
   }
 }

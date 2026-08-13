@@ -18,7 +18,7 @@ import { AgentMemory } from './agentMemory';
 import { AgentMetrics } from './metrics';
 import { StaticRules } from './staticRules';
 import { parseTemporal, formatTemporalForMemory, type TemporalContext } from './temporalParser';
-import { classifyIntent, extractRawQuery, type IntentClassification, type ToolStrategy } from './intentClassifier';
+import { classifyIntent, extractRawQuery, type IntentClassification } from './intentClassifier';
 import { toOpenAIFormat, buildToolResultMessage } from './nativeToolCall';
 
 const MAX_STEPS_DEFAULT = 25;
@@ -283,8 +283,6 @@ export class AgentOrchestrator {
     // Classify intent using only the user's actual query (not full conversation context)
     this.currentIntent = classifyIntent(task, rawQuery, attachedEmbeddingIndexIds.length > 0);
     const intentInfo = this.currentIntent;
-    const strategy = intentInfo.strategy;
-    
 
     const taskAnalysis = `Task profile: ${label.toUpperCase()}; intent=${intentInfo.taskType}; complexity=${intentInfo.complexity}; ${this.requiresRuntimeGrounding ? 'runtime grounding required' : 'direct answer allowed'} (${breakdown})`;
     
@@ -418,7 +416,6 @@ ${experiences}
     if (!this.currentSession) return;
 
     const session = this.currentSession;
-    const successSteps = session.steps.filter((s) => s.status === 'completed');
     const failedSteps = session.steps.filter((s) => s.status === 'failed');
 
     // Record session metrics
@@ -471,7 +468,7 @@ ${experiences}
         importance,
         artifacts: uniquePaths,
       });
-    } catch (err) {
+    } catch {
       // Best-effort memory save: failures must never break the agent run.
     }
   }

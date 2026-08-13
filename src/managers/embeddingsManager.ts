@@ -3,7 +3,6 @@ import { AISettings, getProviderForEmbeddingModel } from '../settings';
 import { normalizeOpenAIBaseUrl } from '../services/customOpenAIProvider';
 import { parseTemporalQuery } from '../utils/temporalFilter';
 import { OramaWorkerManager } from '../utils/oramaWorkerManager';
-import { extractTextFromPdf } from '../utils/pdfExtractor';
 import { extractTextFromFile, SUPPORTED_EXTRACTABLE_EXTENSIONS } from '../utils/localFileExtractor';
 
 type IndexConfiguration = {

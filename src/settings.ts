@@ -1560,7 +1560,7 @@ await this.plugin.saveSettings();
                 } else {
                   new Notice('Connected to LM Studio, but no models were found. Load or download a model first (dropdown in LM Studio\'s main screen).');
                 }
-              } catch (e) {
+              } catch {
                 new Notice(`Failed to connect to LM Studio at ${this.plugin.settings.lmStudioBaseUrl}. Check that the local server is running, the URL is correct, and that network access is allowed (Windows Firewall).`);
               } finally {
                 btn.setDisabled(false);

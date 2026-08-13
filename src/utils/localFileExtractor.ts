@@ -1,4 +1,4 @@
-import { App, TFile, Notice } from 'obsidian';
+import { App, TFile } from 'obsidian';
 import { extractTextFromPdf } from './pdfExtractor';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';

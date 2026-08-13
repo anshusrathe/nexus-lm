@@ -57,7 +57,7 @@ export class ExaMCPProvider {
     if (this.initialized) return;
     
 
-    const initResult = await this.sendRequest('initialize', {
+    await this.sendRequest('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {},
       clientInfo: { name: 'nexus-lm', version: '1.0.0' },
@@ -164,7 +164,7 @@ export class ExaMCPProvider {
     let json: Record<string, unknown>;
     try {
       json = typeof response.json === 'object' ? response.json as Record<string, unknown> : JSON.parse(response.text || '{}') as Record<string, unknown>;
-    } catch (e) {
+    } catch {
       
       throw new Error('Exa MCP: Invalid JSON response: ' + response.text?.slice(0, 200));
     }
@@ -247,8 +247,6 @@ export class ExaMCPProvider {
       const lines = block.split('\n');
       let title = '';
       let url = '';
-      let published = '';
-      let author = '';
       const contentLines: string[] = [];
       let inContent = false;
       let contentField = '';
@@ -258,10 +256,8 @@ export class ExaMCPProvider {
           title = line.slice(7).trim();
         } else if (line.startsWith('URL: ')) {
           url = line.slice(5).trim();
-        } else if (line.startsWith('Published: ')) {
-          published = line.slice(11).trim();
-        } else if (line.startsWith('Author: ')) {
-          author = line.slice(8).trim();
+        } else if (line.startsWith('Published: ') || line.startsWith('Author: ')) {
+          // Metadata lines: parsed but not surfaced in results.
         } else if (line.startsWith('Highlights:') || line.startsWith('Content:')) {
           inContent = true;
           contentField = line.startsWith('Highlights:') ? 'Highlights:' : 'Content:';

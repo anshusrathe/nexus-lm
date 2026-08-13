@@ -115,7 +115,6 @@ const CODE_PATTERNS = [
 
 function detectIntents(task: string): IntentType[] {
   const intents: IntentType[] = [];
-  const lower = task.toLowerCase();
 
   if (SEARCH_FEED_PATTERNS.some(p => p.test(task))) intents.push('search_feeds');
   if (YOUTUBE_PATTERNS.some(p => p.test(task))) intents.push('youtube');
@@ -153,8 +152,6 @@ function pickPrimaryIntent(intents: IntentType[]): IntentType {
 }
 
 function buildStrategy(primaryIntent: IntentType, intents: IntentType[], task: string, hasAttachedIndexes: boolean = false): ToolStrategy {
-  const lower = task.toLowerCase();
-
   switch (primaryIntent) {
     case 'youtube': {
       return {

@@ -211,7 +211,7 @@ async function desktopNodeStream(
   callbacks: StreamCallbacks,
   abortSignal?: AbortSignal
 ): Promise<void> {
-  const nodeRequire = (window as unknown as { require?: NodeRequire }).require;
+  const nodeRequire = (window as unknown as { require?: NodeJS.Require }).require;
   if (!nodeRequire) throw new Error('Desktop streaming transport is unavailable');
   const target = new URL(url);
   const transport = nodeRequire(target.protocol === 'http:' ? 'http' : 'https') as typeof import('https');
