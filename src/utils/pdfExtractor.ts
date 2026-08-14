@@ -1,56 +1,47 @@
 // This file will contain functionality for extracting text from PDF files using PDF.js.
 
-import { TFile, Vault, Notice, Platform, App, Modal, ButtonComponent } from 'obsidian';
+import { TFile, Vault, App, Modal, ButtonComponent } from 'obsidian';
 import { DirectorySuggester } from './directorySuggester';
-import type { PdfjsLib, PdfDocumentProxy, PdfTextItem, PdfOutlineItem } from '../types/pdf';
+import type { PdfDocumentProxy, PdfTextItem, PdfOutlineItem } from '../types/pdf';
+import * as pdfjsLib from 'pdfjs-dist';
 
-// Assuming pdfjsLib is available globally or imported correctly via build process
-// You might need to import it like this if your build process supports it:
-// import * as pdfjsLib from 'pdfjs-dist';
-// And set the worker source:
-// pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/<version>/pdf.worker.min.js`;
-// Or bundle the worker with your plugin's assets and set the path accordingly.
-// For this code snippet, we'll assume pdfjsLib is accessible,
-// likely attached to the global window object by your build setup if bundled correctly.
+export function getPdfjsLib(): typeof pdfjsLib {
+  const lib = (window as { pdfjsLib?: typeof pdfjsLib }).pdfjsLib || pdfjsLib;
+  if (!lib.GlobalWorkerOptions.workerSrc) {
+    lib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${lib.version || '5.1.91'}/build/pdf.worker.min.mjs`;
+  }
+  if (!(window as { pdfjsLib?: typeof pdfjsLib }).pdfjsLib) {
+    (window as { pdfjsLib?: typeof pdfjsLib }).pdfjsLib = lib;
+  }
+  return lib;
+}
 
 /**
- * Extracts text content from a PDF file using PDF.js.
+ * Extracts text content from raw PDF bytes (ArrayBuffer) using PDF.js.
+ * Works with both local files (read via vault.readBinary) and remote PDFs
+ * (fetched via requestUrl) — the bytes are parsed entirely in memory.
  * Attempts to preserve basic formatting (lines, paragraphs, columns) using heuristics.
- * @param file The TFile object representing the PDF file in the Obsidian vault.
- * @param vault The Obsidian Vault object to read the file.
+ * @param arrayBuffer The raw PDF bytes.
+ * @param opts Optional page range to extract (1-based, inclusive).
  * @returns A promise that resolves with the extracted text as a single string.
  */
-export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { from?: number, to?: number }): Promise<string> {
-  if (Platform.isMobile) {
-    new Notice('PDF text extraction is not supported on mobile devices due to performance and compatibility issues.');
-        return '';
-  }
+export async function extractTextFromPdfData(arrayBuffer: ArrayBuffer, opts?: { from?: number, to?: number }): Promise<string> {
   try {
-    // Read the PDF file as an ArrayBuffer using Obsidian's API
-    const arrayBuffer = await vault.readBinary(file);
+    // Load the PDF document using PDF.js
+    const pdfjs = getPdfjsLib();
 
-    // Load the PDF document using pdfjsLib (assuming it's accessible, e.g., on window)
-    const pdfjsLib = (window as { pdfjsLib?: PdfjsLib }).pdfjsLib; // Access from global scope if bundled this way
-
-    if (!pdfjsLib) {
-        throw new Error("PDF.js library not loaded. Ensure pdfjs-dist is installed and bundled correctly.");
-    }
-
-    // Set the worker source if not already set globally (Highly recommended for performance)
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-                  // As a temporary measure for development, you could use a CDN, but bundling is recommended for distribution:
-         // pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-         // Note: Using a CDN in a released plugin requires careful consideration.
-    }
-
-    const pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pdfDocument = await pdfjs.getDocument({ data: arrayBuffer }).promise;
 
     let fullText = '';
     const numPages = pdfDocument.numPages;
     let start = 1, end = numPages;
-    if (opts && opts.from && opts.to) {
-      start = Math.max(1, opts.from);
-      end = Math.min(numPages, opts.to);
+    if (opts) {
+      if (opts.from && opts.from >= 1) {
+        start = Math.max(1, opts.from);
+      }
+      if (opts.to && opts.to >= 1) {
+        end = Math.min(numPages, opts.to);
+      }
     }
 
     // Heuristic thresholds (values might need tuning based on typical PDF layouts)
@@ -65,7 +56,9 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
       const textContent = await page.getTextContent();
 
       // Filter out empty strings if they don't have a meaningful position/width
-      const items = textContent.items.filter((item: PdfTextItem) => item.str.trim().length > 0 || item.width > 0);
+      const items = (textContent.items as PdfTextItem[]).filter((item): item is PdfTextItem => 
+        typeof item === 'object' && item !== null && 'str' in item && typeof item.str === 'string' && (item.str.trim().length > 0 || item.width > 0)
+      );
 
       if (items.length === 0) {
           if (i < end) fullText += '\n\n---\n\n'; // Add separator even for empty pages
@@ -214,6 +207,19 @@ export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { fro
 }
 
 /**
+ * Extracts text content from a PDF file in the Obsidian vault using PDF.js.
+ * @param file The TFile object representing the PDF file in the Obsidian vault.
+ * @param vault The Obsidian Vault object to read the file.
+ * @param opts Optional page range to extract (1-based, inclusive).
+ * @returns A promise that resolves with the extracted text as a single string.
+ */
+export async function extractTextFromPdf(file: TFile, vault: Vault, opts?: { from?: number, to?: number }): Promise<string> {
+  // Read the PDF file as an ArrayBuffer using Obsidian's API
+  const arrayBuffer = await vault.readBinary(file);
+  return await extractTextFromPdfData(arrayBuffer, opts);
+}
+
+/**
  * Modal for PDF extraction options (page range, directory)
  */
 export class PdfExtractOptionsModal extends Modal {
@@ -350,7 +356,7 @@ export class PdfExtractOptionsModal extends Modal {
     // Preview navigation
     const previewNav = rightPanel.createDiv({ cls: 'pdf-preview-nav' });
     this.previewNavPrev = previewNav.createEl('button', { text: '◀ Previous' });
-    this.previewPageInfo = previewNav.createEl('span', { cls: 'pdf-preview-page-info' });
+    this.previewPageInfo = previewNav.createSpan({ cls: 'pdf-preview-page-info' });
     this.previewNavNext = previewNav.createEl('button', { text: 'Next ▶' });
     
     this.previewNavPrev.onclick = () => {

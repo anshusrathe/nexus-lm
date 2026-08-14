@@ -9,7 +9,7 @@
  */
 
 import { requestUrl } from 'obsidian';
-import { simulatedStream, fetchStream, createOllamaParser } from '../utils/streamingUtils';
+import { simulatedStream, fetchStream, createOllamaParser, PartialStreamError } from '../utils/streamingUtils';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -190,7 +190,8 @@ export class OllamaService {
   async generateContent(
     model: string,
     messages: ChatMessage[],
-    options?: GenerationOptions
+    options?: GenerationOptions,
+    onFinish?: (finishReason: string) => void
   ): Promise<string> {
     const requestBody: OllamaChatRequestBody = {
       model,
@@ -214,6 +215,14 @@ export class OllamaService {
       }
       headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
+
+    const extractFinishReason = (data: OllamaChatResponse) => {
+      if (data.done === false) {
+        if (onFinish) onFinish('length');
+      } else if (data.done === true) {
+        if (onFinish) onFinish('stop');
+      }
+    };
 
     
     if (this.isCloudMode) {
@@ -240,6 +249,7 @@ export class OllamaService {
       }
 
       const data = response.json as OllamaChatResponse;
+      extractFinishReason(data);
       return data.message?.content || '';
     } else {
       
@@ -264,6 +274,7 @@ export class OllamaService {
       }
 
       const data = response.json as OllamaChatResponse;
+      extractFinishReason(data);
       return data.message?.content || '';
     }
   }
@@ -272,7 +283,8 @@ export class OllamaService {
     model: string,
     messages: ChatMessage[],
     onEvent: (evt: OllamaStreamEvent) => void,
-    options?: GenerationOptions
+    options?: GenerationOptions,
+    onFinish?: (finishReason: string) => void
   ): Promise<void> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -299,7 +311,8 @@ export class OllamaService {
     const parser = createOllamaParser();
     const callbacks = {
       onChunk: (text: string) => onEvent({ type: 'content', text }),
-      onThinking: (text: string) => onEvent({ type: 'thinking', text })
+      onThinking: (text: string) => onEvent({ type: 'thinking', text }),
+      onFinish
     };
 
     
@@ -314,6 +327,7 @@ export class OllamaService {
       );
       return;
     } catch (error) {
+      if (error instanceof PartialStreamError) throw error;
       if (error instanceof OllamaApiError) throw error;
           }
 
@@ -548,6 +562,33 @@ export class OllamaService {
   }
 
   /**
+   * Ollama's native /api/chat requires tool call arguments to be JSON OBJECTS.
+   * OpenAI-format history carries them as JSON strings, which Ollama fails to
+   * parse ("Value looks like object, but can't find closing '}' symbol").
+   * Normalize every assistant tool_calls entry before sending.
+   */
+  private normalizeToolCallArguments(messages: ChatMessage[]): ChatMessage[] {
+    return messages.map((msg) => {
+      if (msg.role !== 'assistant') return msg;
+      const toolCalls = (msg as unknown as Record<string, unknown>).tool_calls;
+      if (!Array.isArray(toolCalls) || toolCalls.length === 0) return msg;
+      const normalized = toolCalls.map((rawTc) => {
+        const tc = rawTc as Record<string, unknown>;
+        const fn = tc.function as Record<string, unknown> | undefined;
+        if (!fn || typeof fn !== 'object' || typeof fn.arguments !== 'string') return tc;
+        try {
+          const parsed = JSON.parse(fn.arguments) as unknown;
+          const argsObj = typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed : {};
+          return { ...tc, function: { ...fn, arguments: argsObj } };
+        } catch {
+          return { ...tc, function: { ...fn, arguments: {} } };
+        }
+      });
+      return { ...msg, tool_calls: normalized } as unknown as ChatMessage;
+    });
+  }
+
+  /**
    * Generate content with tool calling support
    * @param model - The model ID to use
    * @param messages - Array of chat messages
@@ -568,7 +609,7 @@ export class OllamaService {
     streamCallback?: (chunk: string) => void
   ): Promise<{ content: string; totalTokens?: number }> {
     let fullContent = '';
-    let conversationMessages = [...messages];
+    let conversationMessages = [...this.normalizeToolCallArguments(messages)];
     let totalTokens = 0;
     let toolRoundsExecuted = 0;
     const MAX_CONTINUATION_NUDGES = 3;
@@ -584,7 +625,12 @@ export class OllamaService {
         temperature: options.temperature ?? 0.7,
         stream: false
       };
-      if (options?.think !== undefined) {
+      // Known Ollama server bug: thinking models (minimax-m3, nemotron-3-super,
+      // qwen3) return EMPTY output when think + tools are combined (ollama#10976,
+      // fixed by #16758). Disable think whenever tools are active.
+      if (tools && tools.length > 0) {
+        requestBody.think = false;
+      } else if (options?.think !== undefined) {
         requestBody.think = options.think;
       }
 
@@ -711,5 +757,93 @@ export class OllamaService {
     }
 
     return { content: fullContent, totalTokens };
+  }
+
+  /**
+   * Single-round native tool calling: one request, returns tool calls without executing them.
+   * The caller owns the tool execution loop.
+   */
+  async generateContentWithToolsOnce(
+    model: string,
+    messages: ChatMessage[],
+    tools: ToolDefinition[],
+    options: GenerationOptions
+  ): Promise<{ content: string; finishReason?: string; toolCalls?: Array<Record<string, unknown>>; thinking?: string }> {
+    if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+    // Self-healing: thinking models can return a totally empty message with no
+    // tool_calls (empty-content bug, plus general flakiness). Instead of
+    // handing the caller an empty response that the agent view would throw on,
+    // append a continue-nudge and retry a limited number of times.
+    const MAX_EMPTY_NUDGES = 2;
+    let nudgeCount = 0;
+    let workingMessages = messages;
+
+    while (true) {
+      const requestBody: OllamaChatRequestBody = {
+        model,
+        messages: this.normalizeToolCallArguments(workingMessages),
+        tools,
+        temperature: options.temperature ?? 0.7,
+        stream: false
+      };
+      // Known Ollama server bug: thinking models return EMPTY output when
+      // think + tools are combined (ollama#10976). Disable think when tools
+      // are active — the caller's thinking preference cannot be honored anyway.
+      if (tools && tools.length > 0) {
+        requestBody.think = false;
+      } else if (options?.think !== undefined) {
+        requestBody.think = options.think;
+      }
+
+      const response = await requestUrl({
+        url: `${this.baseUrl}/api/chat`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.apiKey ? { 'Authorization': `Bearer ${this.apiKey}` } : {})
+        },
+        body: JSON.stringify(requestBody),
+        throw: false
+      });
+
+      if (response.status >= 400) {
+        const errorText = response.text;
+        throw new OllamaApiError(`Ollama API error (${response.status}): ${errorText}`, response.status);
+      }
+
+      if (this.onHeadersReceived) {
+        const h = new Headers();
+        Object.entries(response.headers).forEach(([k, v]) => h.set(k, Array.isArray(v) ? v.join(', ') : v));
+        this.onHeadersReceived(h);
+      }
+
+      const data = response.json as OllamaChatResponse;
+      const message = data.message;
+
+      const content = message?.content || '';
+      const toolCalls = message?.tool_calls && message.tool_calls.length > 0
+        ? message.tool_calls as unknown as Array<Record<string, unknown>>
+        : undefined;
+      const thinking = typeof message?.thinking === 'string' && message.thinking.length > 0 ? message.thinking : undefined;
+
+      if (content || toolCalls || thinking || nudgeCount >= MAX_EMPTY_NUDGES) {
+        return {
+          content,
+          finishReason: data.done ? 'stop' : undefined,
+          toolCalls,
+          thinking,
+        };
+      }
+
+      nudgeCount++;
+      workingMessages = [
+        ...workingMessages,
+        {
+          role: 'user' as const,
+          content: 'Your last response was empty. Produce a complete answer now — call a tool if you need information, otherwise answer directly.'
+        }
+      ];
+    }
   }
 }

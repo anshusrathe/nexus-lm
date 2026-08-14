@@ -1,5 +1,6 @@
-import { App, Modal } from 'obsidian';
+import { App, Modal, Platform } from 'obsidian';
 import { MCPRegistryEntry, MCPEnvVarSpec, MCPPathSpec, MCP_REGISTRY } from '../mcp/mcpRegistry';
+import { createDetached } from '../utils/domUtils';
 
 /**
  * Substitutes all pathSpec placeholders in an entry's args array.
@@ -69,7 +70,7 @@ export class MCPRegistryModal extends Modal {
 
     // Footer
     const footer = contentEl.createDiv({ cls: 'mcp-registry-footer' });
-    footer.createEl('span', {
+    footer.createSpan({
       text: 'Don\'t see your server? Use "Add MCP Server" to configure it manually.',
       cls: 'mcp-registry-footer-text',
     });
@@ -97,14 +98,21 @@ export class MCPRegistryModal extends Modal {
 
     filtered.forEach(entry => {
       const card = this.listContainer.createDiv({ cls: 'mcp-registry-card' });
+      const isStdioOnMobile = Platform.isMobile && entry.transport === 'stdio';
 
       const cardHeader = card.createDiv({ cls: 'mcp-registry-card-header' });
-      cardHeader.createEl('span', { text: entry.name, cls: 'mcp-registry-card-name' });
-      cardHeader.createEl('span', {
+      cardHeader.createSpan({ text: entry.name, cls: 'mcp-registry-card-name' });
+      cardHeader.createSpan({
         text: entry.transport.toUpperCase(),
         cls: `mcp-registry-badge mcp-badge-${entry.transport}`,
       });
-      cardHeader.createEl('span', {
+      if (isStdioOnMobile) {
+        cardHeader.createSpan({
+          text: 'DESKTOP ONLY',
+          cls: 'mcp-registry-badge mcp-badge-desktop-only',
+        });
+      }
+      cardHeader.createSpan({
         text: entry.category,
         cls: 'mcp-registry-badge mcp-badge-category',
       });
@@ -120,12 +128,12 @@ export class MCPRegistryModal extends Modal {
       // Path requirements indicator
       if (entry.pathSpecs && entry.pathSpecs.some(p => p.isVaultPath)) {
         const vaultHint = card.createDiv({ cls: 'mcp-registry-env-hint' });
-        vaultHint.createEl('span', { text: '📁 Vault path: ', cls: 'mcp-registry-env-hint-label' });
-        vaultHint.createEl('span', { text: 'auto-filled from your current vault', cls: 'mcp-registry-env-hint-keys' });
+        vaultHint.createSpan({ text: '📁 Vault path: ', cls: 'mcp-registry-env-hint-label' });
+        vaultHint.createSpan({ text: 'auto-filled from your current vault', cls: 'mcp-registry-env-hint-keys' });
       } else if (entry.pathSpecs && entry.pathSpecs.length > 0) {
         const pathHint = card.createDiv({ cls: 'mcp-registry-env-hint' });
-        pathHint.createEl('span', { text: '📂 Needs path: ', cls: 'mcp-registry-env-hint-label' });
-        pathHint.createEl('span', {
+        pathHint.createSpan({ text: '📂 Needs path: ', cls: 'mcp-registry-env-hint-label' });
+        pathHint.createSpan({
           text: entry.pathSpecs.map(p => p.label).join(', '),
           cls: 'mcp-registry-env-hint-keys',
         });
@@ -135,23 +143,28 @@ export class MCPRegistryModal extends Modal {
       if (entry.envVarSpecs && entry.envVarSpecs.length > 0) {
         const required = entry.envVarSpecs.filter(e => e.required);
         const hint = card.createDiv({ cls: 'mcp-registry-env-hint' });
-        hint.createEl('span', {
+        hint.createSpan({
           text: `🔑 Requires ${required.length} API key${required.length !== 1 ? 's' : ''}: `,
           cls: 'mcp-registry-env-hint-label',
         });
-        hint.createEl('span', {
+        hint.createSpan({
           text: required.map(e => e.label).join(', '),
           cls: 'mcp-registry-env-hint-keys',
         });
       } else if (!entry.pathSpecs?.length) {
-        card.createEl('span', { text: '✓ No API key needed', cls: 'mcp-registry-no-key' });
+        card.createSpan({ text: '✓ No API key needed', cls: 'mcp-registry-no-key' });
       }
 
-      const addBtn = card.createEl('button', { text: 'Configure →', cls: 'mod-cta mcp-registry-add-btn' });
-      addBtn.addEventListener('click', () => {
-        this.close();
-        this.openEnvVarWizard(entry);
-      });
+      if (isStdioOnMobile) {
+        const addBtn = card.createEl('button', { text: 'Desktop Only', cls: 'mcp-registry-add-btn disabled' });
+        addBtn.disabled = true;
+      } else {
+        const addBtn = card.createEl('button', { text: 'Configure →', cls: 'mod-cta mcp-registry-add-btn' });
+        addBtn.addEventListener('click', () => {
+          this.close();
+          this.openEnvVarWizard(entry);
+        });
+      }
 
       if (entry.docsUrl) {
         const docsLink = card.createEl('a', { text: 'Docs ↗', cls: 'mcp-registry-docs-link' });
@@ -224,10 +237,10 @@ class MCPEnvVarWizard extends Modal {
         const labelRow = fieldGroup.createDiv({ cls: 'mcp-wizard-label-row' });
         labelRow.createEl('label', { text: spec.label, cls: 'mcp-wizard-label' });
         if (!spec.required) {
-          labelRow.createEl('span', { text: ' (optional)', cls: 'mcp-wizard-optional' });
+          labelRow.createSpan({ text: ' (optional)', cls: 'mcp-wizard-optional' });
         }
         if (spec.isVaultPath) {
-          labelRow.createEl('span', { text: ' — auto-filled', cls: 'mcp-wizard-auto-badge' });
+          labelRow.createSpan({ text: ' — auto-filled', cls: 'mcp-wizard-auto-badge' });
         }
 
         fieldGroup.createEl('p', { text: spec.description, cls: 'mcp-wizard-desc' });
@@ -250,7 +263,7 @@ class MCPEnvVarWizard extends Modal {
 
         if (spec.isVaultPath && autoValue) {
           input.classList.add('mcp-wizard-input-autofilled');
-          fieldGroup.createEl('span', {
+          fieldGroup.createSpan({
             text: '✓ Detected from your current vault. Edit if needed.',
             cls: 'mcp-wizard-autofill-note',
           });
@@ -274,14 +287,14 @@ class MCPEnvVarWizard extends Modal {
           cls: 'mcp-wizard-label',
         });
         if (!spec.required) {
-          labelRow.createEl('span', { text: ' (optional)', cls: 'mcp-wizard-optional' });
+          labelRow.createSpan({ text: ' (optional)', cls: 'mcp-wizard-optional' });
         }
 
         fieldGroup.createEl('p', { text: spec.description, cls: 'mcp-wizard-desc' });
 
         if (spec.link) {
           const linkRow = fieldGroup.createDiv({ cls: 'mcp-wizard-link-row' });
-          linkRow.createEl('span', { text: '→ ' });
+          linkRow.createSpan({ text: '→ ' });
           const a = linkRow.createEl('a', { text: 'Get your key here ↗', cls: 'mcp-wizard-link' });
           a.href = spec.link;
           a.target = '_blank';
@@ -360,7 +373,7 @@ class MCPEnvVarWizard extends Modal {
     input.classList.add('mcp-wizard-input-error');
     const existing = input.parentElement?.querySelector('.mcp-wizard-error');
     if (!existing) {
-      const err = this.containerEl.ownerDocument.createElement('span');
+      const err = createDetached(this.containerEl.ownerDocument, 'span');
       err.className = 'mcp-wizard-error';
       err.textContent = message;
       input.insertAdjacentElement('afterend', err);

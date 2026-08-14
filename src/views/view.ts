@@ -1,5 +1,5 @@
 import { App, TAbstractFile, ItemView, WorkspaceLeaf, TFile, ButtonComponent, Notice, MarkdownRenderer, Component, Modal, Setting, setIcon, normalizePath, Platform } from 'obsidian';
-import { AISettings, getModelsGroupedByProvider, getModelDisplayName, getProviderForModel } from '../settings';
+import { AISettings, getModelsGroupedByProvider, getModelDisplayName, getProviderForModel, getModelZapColor } from '../settings';
 import { DirectorySuggester } from '../utils/directorySuggester';
 import { NotebookManager, Notebook } from '../managers/notebookManager'; 
 import { NotebookFormModal } from '../modals/notebookModals'; 
@@ -13,7 +13,9 @@ import { MCQManager } from '../tools/createMCQs';
 import { ConceptMapManager, ConceptMapModal, SavedConceptMap, ConceptMapData } from '../tools/createConceptMaps';
 import { SlideManager, SlideshowSettingsModal, SavedSlideshow, SlideshowVoiceSettingsModal } from '../tools/createSlides';
 import { isMultimodalSupported } from '../utils/multimodalUtils';
+import { isExtractable, extractTextFromFile } from '../utils/localFileExtractor';
 import { showConfirm } from '../modals/confirmModal';
+import { createDetached } from '../utils/domUtils';
 
 interface Question {
   text: string;
@@ -87,8 +89,8 @@ export class NoteSuggester {
   private getAvailableFiles(): TFile[] {
     if (this.multimodalEnabled) {
       
-      return this.app.vault.getFiles().filter((file: TFile) => 
-        file.extension === 'md' || isMultimodalSupported(file.name)
+      return this.app.vault.getFiles().filter((file: TFile) =>
+        isExtractable(file.name) || isMultimodalSupported(file.name)
       );
     }
     return this.app.vault.getMarkdownFiles();
@@ -559,7 +561,6 @@ export class AITutorView extends ItemView {
       (selectedPaths) => {
         
         this.state.selectedFiles = new Set(selectedPaths);
-
         const startQAButton = this.container.querySelector('.start-qa-button') as HTMLElement;
         const startMCQButton = this.container.querySelector('.start-mcq-button') as HTMLElement;
         const startConceptMapButton = this.container.querySelector('.start-conceptmap-button') as HTMLElement;
@@ -585,7 +586,7 @@ export class AITutorView extends ItemView {
         
         void this.updateContextBar();
       },
-      false 
+      true 
     );
 
     const buttonContainer = this.container.createDiv({ cls: 'button-container' });
@@ -740,7 +741,7 @@ export class AITutorView extends ItemView {
       
       
       const nameContainer = card.createDiv({ cls: 'notebook-name-container' });
-      nameContainer.createEl('span', { text: notebook.name, cls: 'notebook-name' });
+      nameContainer.createSpan({ text: notebook.name, cls: 'notebook-name' });
 
       
       card.addEventListener('click', (e) => {
@@ -757,7 +758,6 @@ export class AITutorView extends ItemView {
         .setClass('notebook-action-button')
         .onClick(() => this.handleEditNotebook(notebook));
 
-      
       new ButtonComponent(actions)
         .setIcon('trash')
         .setTooltip('Delete Notebook')
@@ -786,7 +786,6 @@ export class AITutorView extends ItemView {
   }
 
   private async handleEditNotebook(notebook: Notebook) {
-    
     const notebooks = this.notebookManager.getNotebooks();
     const latestNotebook = notebooks.find(nb => nb.id === notebook.id);
     
@@ -808,7 +807,6 @@ export class AITutorView extends ItemView {
 
   private async handleDeleteNotebook(notebookId: string) {
     if (await showConfirm(this.app, 'Are you sure you want to delete this notebook?')) {
-      
       (this.activeDocument.activeElement as HTMLElement)?.blur();
       this.notebookManager.deleteNotebook(notebookId);
       void this.invalidateNotebookCache(notebookId);
@@ -817,7 +815,6 @@ export class AITutorView extends ItemView {
   }
 
   private handleLoadNotebook(notebook: Notebook) {
-    
     const notebooks = this.notebookManager.getNotebooks();
     const latestNotebook = notebooks.find(nb => nb.id === notebook.id);
     
@@ -828,7 +825,6 @@ export class AITutorView extends ItemView {
     
     const sourceCount = (latestNotebook.sourcePaths?.length || 0) + (latestNotebook.sourceFolders?.length || 0);
     
-    
     const existingLeaf = this.findLeafWithNotebook(latestNotebook.id);
     if (existingLeaf) {
       this.app.workspace.setActiveLeaf(existingLeaf, { focus: true });
@@ -837,7 +833,12 @@ export class AITutorView extends ItemView {
     }
 
     new Notice(`Loading notebook: ${latestNotebook.name} with ${sourceCount} source(s).`);
-    void this.app.workspace.getLeaf(true).setViewState({
+    // Notebooks always open in main tab on mobile (not sidebar), even if mobileOpenInSidebar is enabled
+    const isMobile = Platform.isMobile;
+    const targetLeaf = isMobile
+      ? this.app.workspace.getLeaf(true)
+      : (this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getLeaf(true));
+    void targetLeaf?.setViewState({
       type: VIEW_TYPE_NOTEBOOK_CHAT,
       active: true,
       state: { notebook: latestNotebook },
@@ -871,7 +872,7 @@ export class AITutorView extends ItemView {
 
     const menuEl = this.containerEl.createDiv({ cls: 'model-select-menu' });
     
-    
+    // Search input for models
     const searchContainer = menuEl.createDiv({ 
       cls: 'model-search-container'
     });
@@ -886,12 +887,12 @@ export class AITutorView extends ItemView {
     const itemsToFilter: { itemEl: HTMLElement, name: string }[] = [];
     const headersToFilter: { headerEl: HTMLElement, items: HTMLElement[], separatorEl?: HTMLElement }[] = [];
 
-    
+    // Model options
     const modelGroups = getModelsGroupedByProvider(this.settings);
 
-    
+    // Populate menu items
     modelGroups.forEach((group, groupIndex) => {
-      
+      // Group header
       const headerEl = menuEl.createDiv({ cls: 'model-select-menu-header' });
       headerEl.textContent = group.label;
 
@@ -899,16 +900,19 @@ export class AITutorView extends ItemView {
       const headerObj = { headerEl, items: groupItems, separatorEl: undefined as HTMLElement | undefined };
       headersToFilter.push(headerObj);
 
-      
+      // Add group options
       group.models.forEach(model => {
         const option = menuEl.createDiv({ cls: 'model-select-menu-item' });
         groupItems.push(option);
         itemsToFilter.push({ itemEl: option, name: model.name.toLowerCase() });
+        
+        const textSpan = option.createSpan();
+        textSpan.textContent = model.name;
 
-        if ((this.settings.aiTutorModel || this.settings.model) === model.id) {
-          option.classList.add('selected');
-        }
-        option.textContent = model.name;
+        const iconsContainer = option.createSpan({ cls: 'model-icons-container' });
+        const zapSpan = iconsContainer.createSpan({ cls: 'model-zap-icon' });
+        setIcon(zapSpan, 'zap');
+        zapSpan.style.color = getModelZapColor(this.settings, model.provider, model.id);
         option.addEventListener('click', () => {
           void (async () => {
             this.settings.aiTutorModel = model.id;
@@ -1002,7 +1006,7 @@ export class AITutorView extends ItemView {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (file instanceof TFile) {
         try {
-          const content = await this.app.vault.read(file);
+          const content = await extractTextFromFile(this.app, file);
           currentTokens += tokenEstimator['countTokens'](content);
         } catch {
           // File may not exist or be accessible - safe to ignore
@@ -1051,7 +1055,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = this.activeDocument.createElement('div');
+      const progressContainer = createDetached(this.activeDocument, 'div');
       progressContainer.className = 'qna-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1247,7 +1251,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
 
-      const progressContainer = this.activeDocument.createElement('div');
+      const progressContainer = createDetached(this.activeDocument, 'div');
       progressContainer.className = 'mcq-inline-progress';
 
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1489,7 +1493,7 @@ export class AITutorView extends ItemView {
     }
     
     
-    const dialog = this.activeDocument.createElement('div');
+    const dialog = createDetached(this.activeDocument, 'div');
     dialog.className = 'mcq-progress-dialog mcq-progress-inline';
     
     
@@ -1557,11 +1561,11 @@ export class AITutorView extends ItemView {
     }
     
     
-    const overlay = this.activeDocument.createElement('div');
+    const overlay = createDetached(this.activeDocument, 'div');
     overlay.className = 'mcq-error-overlay';
     
     
-    const dialog = this.activeDocument.createElement('div');
+    const dialog = createDetached(this.activeDocument, 'div');
     dialog.className = 'mcq-error-dialog';
     
     
@@ -1649,7 +1653,7 @@ export class AITutorView extends ItemView {
     else if (result.accuracy >= 65) accuracyClass = 'accuracy-medium';
     else accuracyClass = 'accuracy-low';
     
-    accuracyCell.createEl('span', {
+    accuracyCell.createSpan({
       text: `${result.accuracy.toFixed(1)}%`,
       cls: accuracyClass
     });
@@ -1694,7 +1698,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = this.activeDocument.createElement('div');
+      const progressContainer = createDetached(this.activeDocument, 'div');
       progressContainer.className = 'concept-map-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1784,7 +1788,7 @@ export class AITutorView extends ItemView {
       startButtons.forEach(btn => btn.addClass('nl-pointer-events-none'));
 
       
-      const progressContainer = this.activeDocument.createElement('div');
+      const progressContainer = createDetached(this.activeDocument, 'div');
       progressContainer.className = 'slideshow-inline-progress';
       
       const progressHeader = progressContainer.createDiv({ cls: 'inline-progress-header' });
@@ -1945,7 +1949,7 @@ export class AITutorView extends ItemView {
       setIcon(iconEl, 'network');
       
       
-      const nameEl = nameContainer.createEl('span', { cls: 'visual-name' });
+      const nameEl = nameContainer.createSpan({ cls: 'visual-name' });
       if (searchQuery) {
         this.highlightText(nameEl, conceptMap.name, searchQuery);
       } else {
@@ -1953,7 +1957,7 @@ export class AITutorView extends ItemView {
       }
       
       const timestamp = new Date(conceptMap.timestamp).toLocaleDateString();
-      cardContent.createEl('span', { text: timestamp, cls: 'visual-date' });
+      cardContent.createSpan({ text: timestamp, cls: 'visual-date' });
 
       
       card.addEventListener('click', (e) => {
@@ -1990,7 +1994,7 @@ export class AITutorView extends ItemView {
       setIcon(iconEl, 'presentation');
       
       
-      const nameEl = nameContainer.createEl('span', { cls: 'visual-name' });
+      const nameEl = nameContainer.createSpan({ cls: 'visual-name' });
       if (searchQuery) {
         this.highlightText(nameEl, slideshow.name, searchQuery);
       } else {
@@ -1999,7 +2003,7 @@ export class AITutorView extends ItemView {
       
       const timestamp = new Date(slideshow.timestamp).toLocaleDateString();
       const typeLabel = 'Zen';
-      cardContent.createEl('span', { text: `${timestamp} • ${typeLabel}`, cls: 'visual-date' });
+      cardContent.createSpan({ text: `${timestamp} • ${typeLabel}`, cls: 'visual-date' });
 
       
       card.addEventListener('click', (e) => {

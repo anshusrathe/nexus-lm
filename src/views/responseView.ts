@@ -1,6 +1,6 @@
 import { App, ItemView, WorkspaceLeaf, ButtonComponent, Notice, MarkdownRenderer, TFile, Component, SuggestModal, TFolder, Modal, Setting, setIcon, normalizePath, requestUrl, Platform } from 'obsidian';
 import { OramaWorkerManager } from '../utils/oramaWorkerManager';
-import { AISettings, Provider, getModelsGroupedByProvider, getModelDisplayName as getModelDisplayNameFromSettings, getProviderForEmbeddingModel, getGeminiThinkingConfig, getModelTemperature, getModelTopP } from '../settings';
+import { AISettings, Provider, getModelsGroupedByProvider, getModelDisplayName as getModelDisplayNameFromSettings, getProviderForEmbeddingModel, getGeminiThinkingConfig, getModelTemperature, getModelTopP, getModelZapColor, isThinkingButtonVisible } from '../settings';
 import { TokenEstimator, TaskType } from '../utils/tokenEstimator';
 import { ModelSelector, ModelSelection } from '../modelSelector';
 import AIPlugin from '../main';
@@ -14,6 +14,7 @@ import { YouTubeChatService } from '../services/youtubeChatService';
 import { YouTubeTranscriptModal } from '../modals/youtubeTranscriptModal';
 import { processDiagramContent } from '../tools/fileCreateTool';
 import { MultimodalInput, processFileForMultimodal, isTextFile, isImageFile, isPDFFile, isAudioFile, isVideoFile, isMultimodalSupported, getFileIcon, extractImagesFromMarkdown } from '../utils/multimodalUtils';
+import { extractTextFromFile, isExtractable } from '../utils/localFileExtractor';
 import { RateLimitManager } from '../utils/rateLimitManager';
 import { GeminiService } from '../services/geminiService';
 import { GeminiFileAPIService } from '../services/geminiFileAPI';
@@ -21,6 +22,9 @@ import { MCPServerSelectionModal } from '../modals/mcpServerSelectionModal';
 import { MCPToolCallingService } from '../mcp/mcpToolCalling';
 import { executeCode, detectLanguage, isExecutable, isRenderable, wrapInMarkdownFence } from '../tools/codeExecutor';
 import { SaveNoteModal } from '../modals/saveNoteModal';
+import { openSessionHistoryModal } from '../modals/sessionHistoryModal';
+import { createDetached } from '../utils/domUtils';
+import { isGeminiOrOllama, buildWebpageContext } from '../utils/webpageContext';
 
 interface MCPResourceReadResult {
     contents: Array<{
@@ -78,6 +82,13 @@ interface Response {
     vaultAnswer?: string;
     vaultResults?: Array<{ path: string; score: number }>;
     fileOperations?: unknown[];
+    summary?: string;
+    keywords?: string[];
+    lessons?: string[];
+    importance?: number;
+    stepsCount?: number;
+    success?: boolean;
+    artifacts?: string[];
     
     metadata?: {
         vaultSearchFallback?: {
@@ -268,7 +279,7 @@ class FileModal extends SuggestModal<TFile> {
     }
 
     renderSuggestion(file: TFile, el: HTMLElement) {
-        el.createEl("div", { text: file.path });
+        el.createDiv({ text: file.path });
     }
 
     onChooseSuggestion(file: TFile) {
@@ -301,7 +312,7 @@ class FolderModal extends SuggestModal<TFolder> {
     }
 
     renderSuggestion(folder: TFolder, el: HTMLElement) {
-        el.createEl("div", { text: folder.path + '/' });
+        el.createDiv({ text: folder.path + '/' });
     }
 
     onChooseSuggestion(folder: TFolder) {
@@ -334,7 +345,7 @@ class ImageModal extends SuggestModal<TFile> {
     }
 
     renderSuggestion(file: TFile, el: HTMLElement) {
-        el.createEl("div", { text: file.path });
+        el.createDiv({ text: file.path });
     }
 
     onChooseSuggestion(file: TFile) {
@@ -398,7 +409,7 @@ class YouTubeURLModal extends Modal {
                     new Notice('Please enter a YouTube URL');
                     return;
                 }
-                if (!/^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)/.test(url)) {
+                if (!/^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(url)) {
                     new Notice('Invalid YouTube URL. Please enter a valid YouTube video link.');
                     return;
                 }
@@ -813,8 +824,8 @@ class SystemInstructionsModal extends Modal {
                 }
 
                 const itemContent = itemEl.createDiv({ cls: 'collections-item-content' });
-                itemContent.createEl('span', { text: saved.name, cls: 'collections-item-name' });
-                itemContent.createEl('span', {
+                itemContent.createSpan({ text: saved.name, cls: 'collections-item-name' });
+                itemContent.createSpan({
                     text: `${saved.instructions.length} chars`,
                     cls: 'collections-item-meta'
                 });
@@ -949,6 +960,10 @@ export class ResponseView extends ItemView {
     private selectedFiles: Set<string> = new Set();
     private activeSearchModes: Set<string> = new Set();
     private inputContainer!: HTMLElement;
+    private navRailEl: HTMLElement | null = null;
+    private navListEl: HTMLElement | null = null;
+    private navOpenTimer: number | null = null;
+    private jumpBtnEl: HTMLElement | null = null;
     private selectedFilesDisplay!: HTMLElement;
     private plugin: AIPlugin;
     get activeDocument() { return this.containerEl.ownerDocument; }
@@ -978,6 +993,8 @@ export class ResponseView extends ItemView {
     private aiChatSessionManager: AIChatSessionManager;
     private sessionHistoryModal: HTMLElement | null = null;
     private currentSessionId: string | null = null;
+    private currentSessionType: 'chat' | 'agent' | null = null;
+    private currentSessionCreatedAt: number | null = null;
     private renderingRestoredSession: boolean = false; 
     private currentSystemInstructions: string = ''; 
 
@@ -1284,6 +1301,36 @@ export class ResponseView extends ItemView {
         
         this.inputContainer = wrapper.createDiv({ cls: 'chat-input-container' });
 
+        const navRail = wrapper.createDiv({ cls: 'agent-nav-rail' });
+        this.navRailEl = navRail;
+        const navBar = navRail.createDiv({ cls: 'agent-nav-rail-bar' });
+        navBar.setAttr('aria-label', 'Session questions navigation');
+        navBar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            navRail.addClass('is-open');
+        });
+        navRail.addEventListener('mouseenter', () => this.setNavOpen(true));
+        navRail.addEventListener('mouseleave', () => this.scheduleNavClose());
+        document.addEventListener('click', (e) => {
+            if (this.navRailEl && !this.navRailEl.contains(e.target as Node)) {
+                this.setNavOpen(false);
+            }
+        });
+        const navPopover = navRail.createDiv({ cls: 'agent-nav-rail-popover' });
+        this.navListEl = navPopover.createDiv({ cls: 'agent-nav-rail-list' });
+
+        const jumpBtn = this.inputContainer.createDiv({ cls: 'agent-jump-bottom-btn' });
+        this.jumpBtnEl = jumpBtn;
+        setIcon(jumpBtn, 'arrow-down');
+        jumpBtn.setAttr('aria-label', 'Scroll to bottom');
+        jumpBtn.setAttr('tabindex', '0');
+        jumpBtn.addEventListener('click', () => {
+            if (this.contentContainer) {
+                this.contentContainer.scrollTo({ top: this.contentContainer.scrollHeight, behavior: 'smooth' });
+            }
+        });
+        this.contentContainer.addEventListener('scroll', () => this.updateJumpButton());
+
         
         if (Platform.isMobile) {
             let lastScrollTop = 0;
@@ -1413,7 +1460,7 @@ export class ResponseView extends ItemView {
         
         const prompts = [
             'Ask anything... Give it a moment to generate...',
-            'Use prefix @webpage (with Gemini & Ollama)...',
+            'Use prefix @webpage to read web pages and online PDFs...',
             'Use prefix @vault for semantic vault search...',
             'Use prefix @flash for faster vault search via keyword...',
             'Use prefix @web for web searched answers...',
@@ -1589,7 +1636,7 @@ export class ResponseView extends ItemView {
                 return;
             }
 
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !Platform.isMobile) {
                 e.preventDefault();
                 const query = this.queryInput.value;
                 if (query.trim()) {
@@ -1711,26 +1758,12 @@ export class ResponseView extends ItemView {
     }
 
     private renderOllamaThinkingButton(container: HTMLElement): void {
-        
-        if (this.settings.autoModeEnabled) return;
-
         const activeProvider = this.getActiveChatProvider();
-        if (activeProvider !== 'ollama' && activeProvider !== 'gemini' && activeProvider !== 'groq') return;
         const currentModelId = this.getActiveChatModelId();
-        
-        
+        if (!isThinkingButtonVisible(activeProvider, currentModelId, this.settings)) return;
+
         const groqGptOssRegex = /^openai\/gpt-oss(-safeguard)?-(20b|120b)$/i;
         const isGroqGptOss = activeProvider === 'groq' && groqGptOssRegex.test(currentModelId);
-        
-        
-        if (activeProvider === 'groq' && !isGroqGptOss) return;
-        
-        
-        if (activeProvider === 'ollama') {
-            const ollamaModel = this.settings.customModels.find(m => m.provider === 'ollama' && m.id === currentModelId);
-            if (!ollamaModel?.capabilities?.includes('thinking')) return;
-        }
-
         const isOllamaGptOss = activeProvider === 'ollama' && this.isOllamaGptOssModel(currentModelId);
         const isGptOss = isOllamaGptOss || isGroqGptOss;
         
@@ -1746,6 +1779,9 @@ export class ResponseView extends ItemView {
         brainBtn.addClass('nl-cursor-pointer');
         brainBtn.setAttr('aria-label', `${activeProvider === 'gemini' ? 'Gemini' : activeProvider === 'groq' ? 'Groq' : 'Ollama'} thinking controls`);
         brainBtn.setAttr('tabindex', '0');
+        if (isGemini25 || isGemini3 || isGptOss) {
+            brainBtn.addClass('has-dropdown');
+        }
         if (isActive) {
             brainBtn.addClass('has-instructions');
         }
@@ -2232,6 +2268,10 @@ export class ResponseView extends ItemView {
                 iconsContainer.addClass('nl-align-items-center');
 
                 
+                const zapSpan = iconsContainer.createSpan({ cls: 'model-zap-icon' });
+                setIcon(zapSpan, 'zap');
+                zapSpan.style.color = getModelZapColor(this.settings, model.provider, model.id);
+
                 if ((isOllama || isGemini) && model.capabilities?.includes('thinking')) {
                     const iconSpan = iconsContainer.createSpan({ cls: 'model-web-icon' });
                     setIcon(iconSpan, 'brain');
@@ -2364,7 +2404,7 @@ export class ResponseView extends ItemView {
             }
 
             
-            const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+            const youtubeRegex = /https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i;
             const isYoutubeQuery = youtubeRegex.test(query) || 
                 Array.from(this.selectedFiles).some(path => youtubeRegex.test(path));
 
@@ -2720,7 +2760,7 @@ export class ResponseView extends ItemView {
             return;
         }
 
-        const pickerEl = this.activeDocument.createElement('div');
+        const pickerEl = createDetached(this.activeDocument, 'div');
         pickerEl.className = 'wallpaper-picker';
         pickerEl.addClass('nl-position-absolute');
         pickerEl.addClass('nl-z-index-1000');
@@ -3043,7 +3083,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             const tag = container.createDiv({ cls: 'capsule-file-tag' });
 
             
-            const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)/.test(path);
+            const isYouTubeUrl = /^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(path);
             const isWebUrl = /^https?:\/\//.test(path) && !isYouTubeUrl;
 
             if (isYouTubeUrl) {
@@ -3183,7 +3223,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
     private getAllFilesInFolder(folder: TFolder): TFile[] {
         let files: TFile[] = [];
         for (const child of folder.children) {
-            if (child instanceof TFile && child.extension === 'md') {
+            if (child instanceof TFile && (isExtractable(child.name) || isMultimodalSupported(child.name))) {
                 files.push(child);
             } else if (child instanceof TFolder) {
                 files = files.concat(this.getAllFilesInFolder(child));
@@ -3550,10 +3590,6 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         if (query.trim().startsWith('@mcp')) {
-            if (Platform.isMobile) {
-                new Notice('MCP is not available on mobile devices');
-                return;
-            }
             query = query.replace(/^@mcp\s*/, '').trim();
             if (!query) {
                 new Notice('Please provide a query after @mcp');
@@ -3567,9 +3603,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             }
 
             
-            const availableServers = (this.settings.mcpServers || []).filter(s => !s.disabled);
+            const availableServers = (this.settings.mcpServers || []).filter(s => !s.disabled && (!Platform.isMobile || s.transport === 'sse'));
             if (availableServers.length === 0) {
-                new Notice('No MCP servers configured. Please add servers in settings.');
+                new Notice(Platform.isMobile ? 'No active HTTPS (SSE) MCP servers found. Add or enable HTTPS servers in settings.' : 'No MCP servers configured. Please add servers in settings.');
                 return;
             }
 
@@ -3600,10 +3636,6 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         if (this.pendingMCPSelection) {
-            if (Platform.isMobile) {
-                this.pendingMCPSelection = null;
-                return;
-            }
             const mcpSelection = this.pendingMCPSelection;
 
             
@@ -3655,7 +3687,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                             }
                         } else if (fileOrFolder instanceof TFile) {
                             try {
-                                const content = await this.app.vault.read(fileOrFolder);
+                                const content = isExtractable(fileOrFolder.name)
+                                    ? await extractTextFromFile(this.app, fileOrFolder)
+                                    : await this.app.vault.read(fileOrFolder);
                                 fileContents.push(`--- File: ${fileOrFolder.basename} ---\n${content}\n`);
                             } catch {
                                 // File may not exist or be accessible - safe to ignore
@@ -3700,7 +3734,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                         const fileOrFolder = this.app.vault.getAbstractFileByPath(path);
                         if (fileOrFolder instanceof TFile) {
                             try {
-                                const content = await this.app.vault.read(fileOrFolder);
+                                const content = isExtractable(fileOrFolder.name)
+                                    ? await extractTextFromFile(this.app, fileOrFolder)
+                                    : await this.app.vault.read(fileOrFolder);
                                 contextFiles.push({
                                     path: fileOrFolder.path,
                                     content: content,
@@ -3785,14 +3821,15 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             }
 
             
-            const youtubeUrlMatch = query.match(/https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)[^\s]+/);
-            const youtubeUrlFromCapsule = contextUrls.find(url => /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)/.test(url));
+            const youtubeUrlMatch = query.match(/https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\/[^\s]+/i);
+            const youtubeUrlFromCapsule = contextUrls.find(url => /^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(url));
 
             if (youtubeUrlMatch || youtubeUrlFromCapsule) {
-                const youtubeUrl = youtubeUrlMatch ? youtubeUrlMatch[0] : youtubeUrlFromCapsule!;
+                const rawYoutubeUrl = youtubeUrlMatch ? youtubeUrlMatch[0] : youtubeUrlFromCapsule!;
+                const youtubeUrl = rawYoutubeUrl.replace(/[),.;:!?]+$/, '');
                 const isFromCapsule = !!youtubeUrlFromCapsule;
                 const promptText = youtubeUrlMatch
-                    ? query.replace(youtubeUrl, '').trim()
+                    ? query.replace(rawYoutubeUrl, '').trim()
                     : query.trim();
                 const finalPrompt = promptText || 'Summarize the main points of this YouTube video.';
 
@@ -4051,7 +4088,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 const fileContents = await Promise.all(
                     Array.from(this.selectedFiles).map(async path => {
                         
-                        if (/^https?:\/\/(www\.)?(youtube\.com(\/live\/|\/watch\?v=)?|youtu\.be)/.test(path)) {
+                        if (/^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(path)) {
                             const shouldSaveTranscript = this.settings.saveYoutubeTranscripts ?? true;
 
                             if (!shouldSaveTranscript) {
@@ -4119,6 +4156,10 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                                         }
                                         
                                         folderFiles.push({ path: file.path, content, similarity: 1.0 });
+                                    } else if (isExtractable(file.name)) {
+                                        
+                                        const content = await extractTextFromFile(this.app, file);
+                                        folderFiles.push({ path: file.path, content, similarity: 1.0 });
                                     }
                                 } catch {
                                     // File may not exist or be accessible - safe to ignore
@@ -4166,6 +4207,12 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                                         }
                                     }
                                     
+                                    return { path: fileOrFolder.path, content, similarity: 1.0 };
+                                }
+
+                                
+                                if (isExtractable(fileOrFolder.name)) {
+                                    const content = await extractTextFromFile(this.app, fileOrFolder);
                                     return { path: fileOrFolder.path, content, similarity: 1.0 };
                                 }
 
@@ -4224,59 +4271,88 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             let enhancedQuery = query;
             if (contextUrls.length > 0) {
-                if (this.settings.provider === 'ollama' && this.settings.ollamaApiKey) {
-                    
-                    this.updateProcessingUI(0.3, 1, `Fetching ${contextUrls.length} webpage(s) with Ollama...`);
+                const provider = this.settings.provider;
+                if (isGeminiOrOllama(provider)) {
+                    if (provider === 'ollama') {
+                        // Primary: Ollama's web fetch API. Fallback: requestUrl mechanism for failed/keyless fetches.
+                        this.updateProcessingUI(0.3, 1, `Fetching ${contextUrls.length} webpage(s) with Ollama...`);
 
-                    try {
-                        const ollamaService = new OllamaService(
-                            this.settings.ollamaBaseUrl || 'http://localhost:11434',
-                            this.settings.ollamaApiKey || '',
-                            (headers) => this.rateLimitManager.updateFromHeaders('ollama', this.settings.model, headers)
-                        );
+                        const ollamaPages: Array<{ url: string; title: string; content: string }> = [];
 
-                        const fetchedPages: Array<{ url: string; title: string; content: string }> = [];
-
-                        for (const url of contextUrls) {
+                        if (this.settings.ollamaApiKey) {
                             try {
-                                const pageData = await ollamaService.webFetch(url);
-                                fetchedPages.push({
-                                    url: url,
-                                    title: pageData.title,
-                                    content: pageData.content
-                                });
-                                                            } catch (fetchError) {
-                                                                const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown error';
-                                new Notice(`Failed to fetch ${url}: ${errorMsg}`);
+                                const ollamaService = new OllamaService(
+                                    this.settings.ollamaBaseUrl || 'http://localhost:11434',
+                                    this.settings.ollamaApiKey || '',
+                                    (headers) => this.rateLimitManager.updateFromHeaders('ollama', this.settings.model, headers)
+                                );
+
+                                for (const url of contextUrls) {
+                                    try {
+                                        const pageData = await ollamaService.webFetch(url);
+                                        ollamaPages.push({
+                                            url: url,
+                                            title: pageData.title,
+                                            content: pageData.content
+                                        });
+                                    } catch (fetchError) {
+                                        const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+                                        console.warn(`[NexusLM] Ollama webFetch failed for ${url}: ${errorMsg}`);
+                                    }
+                                }
+                            } catch (error) {
+                                const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+                                console.warn(`[NexusLM] Ollama web fetch service error: ${errorMsg}`);
                             }
                         }
 
-                        if (fetchedPages.length > 0) {
-                            
-                            let webpageContext = '\n\n--- Web Pages ---\n\n';
-                            fetchedPages.forEach((page, index) => {
-                                webpageContext += `--- Web Page [${index + 1}]: ${page.title} (${page.url}) ---\n`;
-                                webpageContext += `${page.content.substring(0, 5000)}\n\n`; 
-                            });
+                        const fetchedUrlSet = new Set(ollamaPages.map(p => p.url));
+                        const failedUrls = contextUrls.filter(u => !fetchedUrlSet.has(u));
 
-                            vaultContext += webpageContext;
-                            this.updateProcessingUI(0.4, 1, `Fetched ${fetchedPages.length} webpage(s). Processing...`);
-                        } else {
-                            new Notice('Failed to fetch any webpages. Continuing without webpage content.');
+                        let webpageContext = '';
+                        if (ollamaPages.length > 0) {
+                            webpageContext += '\n\n--- Web Pages ---\n\n';
+                            ollamaPages.forEach((page, index) => {
+                                webpageContext += `--- Web Page [${index + 1}]: ${page.title} (${page.url}) ---\n`;
+                                webpageContext += `${page.content.substring(0, 5000)}\n\n`;
+                            });
                         }
-                    } catch (error) {
-                                                const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-                        new Notice(`Webpage fetch failed: ${errorMsg}. Continuing without webpage content.`);
+
+                        let totalFetched = ollamaPages.length;
+                        if (failedUrls.length > 0) {
+                            this.updateProcessingUI(0.35, 1, `Fetching ${failedUrls.length} webpage(s) via fallback...`);
+                            const fallback = await buildWebpageContext(this.plugin.webSearchService, failedUrls);
+                            webpageContext += fallback.context;
+                            totalFetched += fallback.fetched;
+                        }
+
+                        if (webpageContext.trim()) {
+                            vaultContext += webpageContext;
+                            this.updateProcessingUI(0.4, 1, `Fetched ${totalFetched} webpage(s). Processing...`);
+                        }
+                    } else {
+                        // Gemini: Google Search grounding (URLs in query) is the primary mechanism when enabled.
+                        const groundingEnabled = this.webEnabled || useWebForThisQuery;
+                        if (groundingEnabled) {
+                            enhancedQuery = query + ' ' + contextUrls.join(' ');
+                            cleanQuery = cleanQuery + ' ' + contextUrls.join(' ');
+                        } else {
+                            // Fallback: fetch via requestUrl when grounding is not active.
+                            this.updateProcessingUI(0.3, 1, `Fetching ${contextUrls.length} webpage(s)...`);
+                            const result = await buildWebpageContext(this.plugin.webSearchService, contextUrls);
+                            if (result.context) {
+                                vaultContext += result.context;
+                                this.updateProcessingUI(0.4, 1, `Fetched ${result.fetched} webpage(s). Processing...`);
+                            }
+                        }
                     }
-                } else if (this.settings.provider === 'ollama' && !this.settings.ollamaApiKey) {
-                    
-                    new Notice('Ollama webpage fetch requires an API key. Please add your Ollama API key in settings. URLs will be included in the query instead.');
-                    enhancedQuery = query + ' ' + contextUrls.join(' ');
-                    cleanQuery = cleanQuery + ' ' + contextUrls.join(' ');
                 } else {
-                    
-                    enhancedQuery = query + ' ' + contextUrls.join(' ');
-                    cleanQuery = cleanQuery + ' ' + contextUrls.join(' '); 
+                    this.updateProcessingUI(0.3, 1, `Fetching ${contextUrls.length} webpage(s)...`);
+                    const result = await buildWebpageContext(this.plugin.webSearchService, contextUrls);
+                    if (result.context) {
+                        vaultContext += result.context;
+                        this.updateProcessingUI(0.4, 1, `Fetched ${result.fetched} webpage(s). Processing...`);
+                    }
                 }
             }
 
@@ -5022,7 +5098,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 }
 
                 if (targetEl) {
-                    const tooltip = this.activeDocument.createElement('div');
+                    const tooltip = createDetached(this.activeDocument, 'div');
                     tooltip.classList.add('footnote-tooltip');
                     tooltip.addClass('footnote-tooltip-style');
 
@@ -5069,7 +5145,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 const id = itemEl.getAttribute('id');
 
                 if (id) {
-                    const backArrow = this.activeDocument.createElement('a');
+                    const backArrow = createDetached(this.activeDocument, 'a');
                     backArrow.classList.add('footnote-backref');
                     backArrow.textContent = ' ↩';
                     backArrow.setAttribute('aria-label', 'Back to content');
@@ -5142,9 +5218,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             const extractYouTubeId = (url: string): string | null => {
                 const patterns = [
-                    /(?:youtube\.com\/(?:watch\?v=|live\/)|youtu\.be\/)([^&\s]+)/,
-                    /youtube\.com\/embed\/([^&\s]+)/,
-                    /youtube\.com\/v\/([^&\s]+)/
+                    /[?&]v=([^&#]+)/,
+                    /youtu\.be\/([^?#]+)/,
+                    /(?:youtube\.com|youtu\.be)\/(?:live|shorts|embed|v)\/([^/?&]+)/,
                 ];
                 for (const pattern of patterns) {
                     const match = url.match(pattern);
@@ -5195,7 +5271,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             if (hasCitations) {
                 
-                const citationsList = sourcesContent.createEl('div', { cls: 'footnote-citations' });
+                const citationsList = sourcesContent.createDiv({ cls: 'footnote-citations' });
                 sources.forEach((source, idx) => {
                     const citationItem = citationsList.createDiv({ cls: 'citation-item' });
                     citationItem.setText(`[^${idx + 1}]: `);
@@ -5424,7 +5500,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         if (hasCitations) {
             
-            const citationsList = sourcesContent.createEl('div', { cls: 'footnote-citations' });
+            const citationsList = sourcesContent.createDiv({ cls: 'footnote-citations' });
             let citationIndex = 1;
 
             
@@ -5527,11 +5603,20 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             actionsContainer.classList.add('liquid-glass-active');
         }
 
+        const getResponseIndex = (): number => {
+            const items = this.contentContainer
+                ? Array.from(this.contentContainer.querySelectorAll('.response-item'))
+                : [];
+            const domIndex = items.indexOf(responseEl);
+            if (domIndex !== -1) return domIndex;
+            return this.responses.findIndex(r => r.question === question);
+        };
+
         const deleteBtn = actionsContainer.createDiv({ cls: 'response-action-btn delete-response' });
         deleteBtn.setAttribute('aria-label', 'Delete response');
         setIcon(deleteBtn, 'trash-2');
         deleteBtn.addEventListener('click', () => {
-            const index = this.responses.findIndex(r => r.question === question);
+            const index = getResponseIndex();
             if (index !== -1) {
                 this.responses.splice(index, 1);
             }
@@ -5539,6 +5624,8 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             new Notice('Response deleted');
             
             this.updateContextBar();
+            this.updateNavRail();
+            this.updateJumpButton();
             
             void this.saveCurrentSession();
         });
@@ -5547,13 +5634,15 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         regenerateBtn.setAttribute('aria-label', 'Regenerate response');
         setIcon(regenerateBtn, 'refresh-cw');
         regenerateBtn.addEventListener('click', () => {
-            const index = this.responses.findIndex(r => r.question === question);
+            const index = getResponseIndex();
             if (index !== -1) {
                 this.responses.splice(index, 1);
             }
             responseEl.remove();
             
             this.updateContextBar();
+            this.updateNavRail();
+            this.updateJumpButton();
 
             this.loadingSpinner.classList.add('visible');
             this.processQuery(question).then(() => {
@@ -5898,6 +5987,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         void this.saveCurrentSession();
 
+        this.updateNavRail();
+        this.updateJumpButton();
+
         return { responseEl, progressEl, newResponse };
     }
 
@@ -5910,7 +6002,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             if (table.parentElement?.classList.contains('table-wrapper')) return;
 
-            const wrapper = this.activeDocument.createElement('div');
+            const wrapper = createDetached(this.activeDocument, 'div');
             wrapper.className = 'table-wrapper';
             table.parentNode?.insertBefore(wrapper, table);
             wrapper.appendChild(table);
@@ -6090,7 +6182,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             const executable = isExecutable(lang);
 
             
-            const wrapper = this.activeDocument.createElement('div');
+            const wrapper = createDetached(this.activeDocument, 'div');
             wrapper.className = 'code-block-wrapper';
             pre.parentNode?.insertBefore(wrapper, pre);
             wrapper.appendChild(pre);
@@ -6099,22 +6191,22 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             wrapper.dataset.code = initialCode;
 
             
-            const toolbar = this.activeDocument.createElement('div');
+            const toolbar = createDetached(this.activeDocument, 'div');
             toolbar.className = 'code-block-toolbar';
 
             
             if (lang !== 'unknown') {
-                const badge = this.activeDocument.createElement('span');
+                const badge = createDetached(this.activeDocument, 'span');
                 badge.className = 'code-lang-badge';
                 badge.textContent = lang;
                 toolbar.appendChild(badge);
             }
 
-            const toolbarRight = this.activeDocument.createElement('div');
+            const toolbarRight = createDetached(this.activeDocument, 'div');
             toolbarRight.className = 'code-block-toolbar-right';
 
             
-            const copyBtn = this.activeDocument.createElement('button');
+            const copyBtn = createDetached(this.activeDocument, 'button');
             copyBtn.className = 'code-block-btn';
             copyBtn.setAttribute('aria-label', 'Copy code');
             setIcon(copyBtn, 'copy');
@@ -6127,7 +6219,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             toolbarRight.appendChild(copyBtn);
 
             
-            const expandBtn = this.activeDocument.createElement('button');
+            const expandBtn = createDetached(this.activeDocument, 'button');
             expandBtn.className = 'code-block-btn';
             expandBtn.setAttribute('aria-label', 'Expand in canvas');
             setIcon(expandBtn, 'maximize-2');
@@ -6167,7 +6259,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             if (lang === 'json') {
-                const outputEl = this.activeDocument.createElement('div');
+                const outputEl = createDetached(this.activeDocument, 'div');
                 outputEl.className = 'code-exec-output hidden';
                 wrapper.appendChild(outputEl);
 
@@ -6180,20 +6272,20 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     return;
                 }
 
-                const renderToggleRow = this.activeDocument.createElement('div');
+                const renderToggleRow = createDetached(this.activeDocument, 'div');
                 renderToggleRow.className = 'code-exec-toggle-row';
 
-                const renderLabel = this.activeDocument.createElement('span');
+                const renderLabel = createDetached(this.activeDocument, 'span');
                 renderLabel.className = 'code-exec-label';
                 renderLabel.textContent = 'Render visualization';
 
-                const renderToggle = this.activeDocument.createElement('div');
+                const renderToggle = createDetached(this.activeDocument, 'div');
                 renderToggle.className = 'code-exec-toggle';
                 renderToggle.setAttribute('role', 'switch');
                 renderToggle.setAttribute('aria-checked', 'false');
                 renderToggle.setAttribute('aria-label', 'Render visualization');
 
-                const backBtn = this.activeDocument.createElement('button');
+                const backBtn = createDetached(this.activeDocument, 'button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
                 backBtn.addClass('nl-display-none');
@@ -6229,7 +6321,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             if (!executable) return;
 
             
-            const outputEl = this.activeDocument.createElement('div');
+            const outputEl = createDetached(this.activeDocument, 'div');
             outputEl.className = 'code-exec-output hidden';
             
             wrapper.appendChild(outputEl);
@@ -6243,21 +6335,21 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                 void this.runCode(pre, lang, outputEl, wrapper, true, question);
             } else {
                 
-                const runToggleRow = this.activeDocument.createElement('div');
+                const runToggleRow = createDetached(this.activeDocument, 'div');
                 runToggleRow.className = 'code-exec-toggle-row';
 
-                const runLabel = this.activeDocument.createElement('span');
+                const runLabel = createDetached(this.activeDocument, 'span');
                 runLabel.className = 'code-exec-label';
                 runLabel.textContent = 'Run code';
 
-                const runToggle = this.activeDocument.createElement('div');
+                const runToggle = createDetached(this.activeDocument, 'div');
                 runToggle.className = 'code-exec-toggle';
                 runToggle.setAttribute('role', 'switch');
                 runToggle.setAttribute('aria-checked', 'false');
                 runToggle.setAttribute('aria-label', 'Run code');
 
                 
-                const backBtn = this.activeDocument.createElement('button');
+                const backBtn = createDetached(this.activeDocument, 'button');
                 backBtn.className = 'code-block-btn code-back-btn';
                 backBtn.setAttribute('aria-label', 'Back to code');
                 backBtn.addClass('nl-display-none');
@@ -6312,7 +6404,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.classList.add('code-exec-running');
         outputEl.empty();
 
-        const spinner = this.activeDocument.createElement('span');
+        const spinner = createDetached(this.activeDocument, 'span');
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         outputEl.appendChild(spinner);
@@ -6324,7 +6416,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         if (result.isHtml && result.htmlContent) {
             outputEl.classList.add('code-exec-success');
-            const iframe = this.activeDocument.createElement('iframe');
+            const iframe = createDetached(this.activeDocument, 'iframe');
             iframe.className = 'code-exec-iframe';
             iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-modals');
             iframe.srcdoc = result.htmlContent;
@@ -6345,13 +6437,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             void MarkdownRenderer.render(this.app, result.markdownContent, outputEl, '', this);
         } else if (result.success) {
             outputEl.classList.add('code-exec-success');
-            const outputPre = this.activeDocument.createElement('pre');
+            const outputPre = createDetached(this.activeDocument, 'pre');
             outputPre.className = 'code-exec-output-text';
             outputPre.textContent = result.output;
             outputEl.appendChild(outputPre);
         } else {
             outputEl.classList.add('code-exec-error');
-            const errorPre = this.activeDocument.createElement('pre');
+            const errorPre = createDetached(this.activeDocument, 'pre');
             errorPre.className = 'code-exec-output-text';
             errorPre.textContent = `Error: ${result.error}`;
             if (result.output) {
@@ -6383,14 +6475,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             if (wrapper.querySelector('.mermaid-repair-row')) return;
 
-            const repairRow = this.activeDocument.createElement('div');
+            const repairRow = createDetached(this.activeDocument, 'div');
             repairRow.className = 'code-exec-toggle-row mermaid-repair-row';
 
-            const repairLabel = this.activeDocument.createElement('span');
+            const repairLabel = createDetached(this.activeDocument, 'span');
             repairLabel.className = 'code-exec-label';
             repairLabel.textContent = 'Repair diagram';
 
-            const repairBtn = this.activeDocument.createElement('button');
+            const repairBtn = createDetached(this.activeDocument, 'button');
             repairBtn.className = 'code-block-btn';
             repairBtn.setAttribute('aria-label', 'Repair mermaid diagram');
             setIcon(repairBtn, 'wrench');
@@ -6454,13 +6546,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         question = ''
     ) {
         
-        const loadingEl = this.activeDocument.createElement('div');
+        const loadingEl = createDetached(this.activeDocument, 'div');
         loadingEl.className = 'code-exec-output code-exec-running';
-        const spinner = this.activeDocument.createElement('span');
+        const spinner = createDetached(this.activeDocument, 'span');
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         loadingEl.appendChild(spinner);
-        const loadingText = this.activeDocument.createElement('span');
+        const loadingText = createDetached(this.activeDocument, 'span');
         loadingText.className = 'code-exec-label';
         loadingText.textContent = 'Repairing diagram…';
         loadingEl.appendChild(loadingText);
@@ -6490,7 +6582,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             this.saveCodeEdit(question, oldCode, fixedCode, 'mermaid');
 
             
-            const tempContainer = this.activeDocument.createElement('div');
+            const tempContainer = createDetached(this.activeDocument, 'div');
             await MarkdownRenderer.render(
                 this.app,
                 '```mermaid\n' + fixedCode + '\n```',
@@ -6512,13 +6604,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         } catch (err: unknown) {
             loadingEl.remove();
 
-            const errRow = this.activeDocument.createElement('div');
+            const errRow = createDetached(this.activeDocument, 'div');
             errRow.className = 'code-exec-toggle-row mermaid-repair-row';
-            const errLabel = this.activeDocument.createElement('span');
+            const errLabel = createDetached(this.activeDocument, 'span');
             errLabel.className = 'code-exec-label';
             errLabel.addClass('nl-color-remaining-13');
             errLabel.textContent = `Repair failed: ${err instanceof Error ? err.message : String(err)}`;
-            const retryBtn = this.activeDocument.createElement('button');
+            const retryBtn = createDetached(this.activeDocument, 'button');
             retryBtn.className = 'code-block-btn';
             retryBtn.setAttribute('aria-label', 'Retry repair');
             setIcon(retryBtn, 'refresh-cw');
@@ -6545,14 +6637,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.querySelector('.code-repair-toggle-row')?.remove();
         wrapper.querySelector('.code-repair-toggle-row')?.remove();
 
-        const repairRow = this.activeDocument.createElement('div');
+        const repairRow = createDetached(this.activeDocument, 'div');
         repairRow.className = 'code-exec-toggle-row code-repair-toggle-row';
 
-        const repairLabel = this.activeDocument.createElement('span');
+        const repairLabel = createDetached(this.activeDocument, 'span');
         repairLabel.className = 'code-exec-label';
         repairLabel.textContent = 'Repair code';
 
-        const repairToggle = this.activeDocument.createElement('div');
+        const repairToggle = createDetached(this.activeDocument, 'div');
         repairToggle.className = 'code-exec-toggle code-repair-toggle-switch';
         repairToggle.setAttribute('role', 'switch');
         repairToggle.setAttribute('aria-checked', 'false');
@@ -6585,7 +6677,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         outputEl.classList.remove('hidden', 'code-exec-error', 'code-exec-success');
         outputEl.classList.add('code-exec-running');
         outputEl.empty();
-        const spinner = this.activeDocument.createElement('span');
+        const spinner = createDetached(this.activeDocument, 'span');
         spinner.className = 'code-exec-spinner';
         setIcon(spinner, 'loader');
         outputEl.appendChild(spinner);
@@ -6621,7 +6713,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             outputEl.classList.remove('code-exec-running');
             outputEl.classList.add('code-exec-error');
             outputEl.empty();
-            const errPre = this.activeDocument.createElement('pre');
+            const errPre = createDetached(this.activeDocument, 'pre');
             errPre.className = 'code-exec-output-text';
             errPre.textContent = `Repair failed: ${err instanceof Error ? err.message : String(err)}`;
             outputEl.appendChild(errPre);
@@ -6900,7 +6992,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                             bm25Config.buildProgress = 0;
                         }
 
-                        const allFiles = this.app.vault.getMarkdownFiles();
+                        const allFiles = this.app.vault.getFiles().filter(f => f.extension === 'md' || f.extension === 'pdf');
                         const bm25Count = bm25Config ? bm25Config.fileCount : 0;
                         this.settings.bm25IndexedFiles = allFiles.length > 0
                             ? Math.round((bm25Count / allFiles.length) * 100) : 0;
@@ -7045,7 +7137,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     const docs = loadResponse?.documents || loadResponse?.metadata?.documents || [];
                     for (const doc of docs) {
                         const docPath = String(doc.path || '');
-                        if (docPath && docPath.endsWith('.md')) {
+                        if (docPath && (docPath.endsWith('.md') || (isBM25 && docPath.endsWith('.pdf')))) {
                             indexedFilePaths.add(docPath);
                         }
                     }
@@ -7054,7 +7146,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
             
             
-            const allFiles = this.app.vault.getMarkdownFiles();
+            const allFiles = isBM25
+                ? this.app.vault.getFiles().filter(f => f.extension === 'md' || f.extension === 'pdf')
+                : this.app.vault.getMarkdownFiles();
             const includedFiles = isBM25
                 ? allFiles
                 : allFiles.filter((file) => !embeddingsManager.isFileExcluded(file.path, indexId));
@@ -7106,8 +7200,9 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             const session: AIChatSession = {
                 id: this.currentSessionId,
                 name: sessionName,
-                createdAt: now, 
+                createdAt: this.currentSessionCreatedAt ?? now, 
                 updatedAt: now,
+                sessionType: this.currentSessionType ?? 'chat',
                 systemInstructions: this.currentSystemInstructions || undefined, 
                 messages: this.responses.map(r => ({
                     question: r.question,
@@ -7132,7 +7227,20 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     
                     searchMode: r.searchMode,
                     
-                    vaultIndexName: r.vaultIndexName
+                    vaultIndexName: r.vaultIndexName,
+
+                    isAgentResponse: r.isAgentResponse,
+                    agentSteps: r.agentSteps,
+                    vaultAnswer: r.vaultAnswer,
+                    vaultResults: r.vaultResults,
+                    fileOperations: r.fileOperations,
+                    summary: r.summary,
+                    keywords: r.keywords,
+                    lessons: r.lessons,
+                    importance: r.importance,
+                    stepsCount: r.stepsCount,
+                    success: r.success,
+                    artifacts: r.artifacts
                 }))
             };
 
@@ -7183,6 +7291,8 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         this.responses = [];
         this.currentSessionId = null;
+        this.currentSessionType = 'chat';
+        this.currentSessionCreatedAt = null;
         this.currentSystemInstructions = ''; 
 
         
@@ -7215,6 +7325,67 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             
             setIcon(btn, 'wrench');
         }
+
+        this.updateNavRail();
+        this.updateJumpButton();
+    }
+
+    private setNavOpen(open: boolean): void {
+        if (this.navOpenTimer !== null) {
+            window.clearTimeout(this.navOpenTimer);
+            this.navOpenTimer = null;
+        }
+        this.navRailEl?.toggleClass('is-open', open);
+    }
+
+    private scheduleNavClose(): void {
+        if (this.navOpenTimer !== null) {
+            window.clearTimeout(this.navOpenTimer);
+        }
+        this.navOpenTimer = window.setTimeout(() => this.setNavOpen(false), 220);
+    }
+
+    private truncateQuery(text: string): string {
+        const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
+        if (!cleaned) return '';
+        const words = cleaned.split(' ');
+        const trimmed = words.slice(0, 5).join(' ');
+        const truncated = trimmed.length > 34 ? trimmed.slice(0, 34).replace(/\s+\S*$/, '') : trimmed;
+        const shortened = truncated.length < cleaned.length ? `${truncated.replace(/[.,;:]+$/, '')}…` : truncated;
+        return shortened || cleaned.slice(0, 34) + '…';
+    }
+
+    private updateNavRail(): void {
+        if (!this.navRailEl || !this.navListEl || !this.contentContainer) return;
+        const listEl = this.navListEl;
+        listEl.empty();
+        const items = Array.from(this.contentContainer.querySelectorAll('.response-item'));
+        this.navRailEl.toggleClass('is-hidden', items.length === 0);
+        items.forEach((el, index) => {
+            const question = this.responses[index]?.question ?? '';
+            if (!question.trim()) return;
+            const row = listEl.createDiv({ cls: 'agent-nav-rail-item' });
+            const dot = row.createDiv({ cls: 'agent-nav-rail-item-dot' });
+            if (index === items.length - 1 && el.querySelector('.response-progress-text')) {
+                dot.setAttr('data-running', 'true');
+            }
+            const labelEl = row.createDiv({ cls: 'agent-nav-rail-item-text' });
+            labelEl.setText(this.truncateQuery(question));
+            labelEl.setAttr('title', question);
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                this.setNavOpen(false);
+            });
+        });
+    }
+
+    private updateJumpButton(): void {
+        const btn = this.jumpBtnEl;
+        const container = this.contentContainer;
+        if (!btn || !container) return;
+        const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 80;
+        btn.toggleClass('is-visible', this.responses.length > 0 && !atBottom && container.scrollHeight > container.clientHeight);
     }
 
     private createQuestionActions(questionEl: HTMLElement, question: string) {
@@ -7305,7 +7476,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         this.closeContextMenu();
         this.contextMenuOpenFromMore = fromMore;
         
-        const menu = this.activeDocument.createElement('div');
+        const menu = createDetached(this.activeDocument, 'div');
         menu.className = 'context-file-menu';
         
         const rect = anchorEl.getBoundingClientRect();
@@ -7314,14 +7485,14 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         menu.addClass('nl-z-index-9999');
         menu.addClass('nl-min-width-260px');
         
-        const searchInput = this.activeDocument.createElement('input');
+        const searchInput = createDetached(this.activeDocument, 'input');
         searchInput.type = 'text';
         searchInput.className = 'context-file-menu-search';
         searchInput.placeholder = 'Search files directly by name, use / for folders';
         menu.appendChild(searchInput);
         this.contextMenuInput = searchInput;
         
-        const listContainer = this.activeDocument.createElement('div');
+        const listContainer = createDetached(this.activeDocument, 'div');
         listContainer.className = 'context-file-menu-list';
         menu.appendChild(listContainer);
         
@@ -7419,7 +7590,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         this.closeContextMenu();
         this.contextMenuOpenFromMore = fromMore;
 
-        const menu = this.activeDocument.createElement('div');
+        const menu = createDetached(this.activeDocument, 'div');
         menu.className = 'context-file-menu';
 
         
@@ -7430,7 +7601,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         menu.addClass('nl-min-width-260px');
 
         
-        const listContainer = this.activeDocument.createElement('div');
+        const listContainer = createDetached(this.activeDocument, 'div');
         listContainer.className = 'context-file-menu-list';
         menu.appendChild(listContainer);
 
@@ -7465,7 +7636,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
             { label: '@flash', value: '@flash ', action: 'prefix', description: 'Fast BM25 keyword search', hasToggle: true },
             { label: '@vault', value: '@vault ', action: 'prefix', hasToggle: true },
             { label: '@web', value: '@web ', action: 'prefix' },
-            ...(!Platform.isMobile ? [{ label: '@mcp', value: '@mcp ', action: 'prefix', description: 'Use MCP servers and tools' }] : []),
+            { label: '@mcp', value: '@mcp ', action: 'prefix', description: 'Use MCP servers and tools' },
             { label: '@create', value: '@create ', action: 'prefix', description: 'Create files (canvas/excalidraw/markdown)' },
             
             { label: '@webpage', value: '@webpage', action: 'modal', modalType: 'webpage' },
@@ -7480,15 +7651,15 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         if (matchingPrefixes.length > 0) {
             matchingPrefixes.forEach((opt, index) => {
-                const item = this.activeDocument.createElement('div');
+                const item = createDetached(this.activeDocument, 'div');
                 item.className = 'context-file-menu-item';
 
                 
                 if ('badge' in opt && opt.badge) {
-                    const labelSpan = this.activeDocument.createElement('span');
+                    const labelSpan = createDetached(this.activeDocument, 'span');
                     labelSpan.textContent = opt.label;
 
-                    const badgeSpan = this.activeDocument.createElement('span');
+                    const badgeSpan = createDetached(this.activeDocument, 'span');
                     badgeSpan.className = 'feature-badge beta-badge';
                     badgeSpan.textContent = opt.badge!;
                     badgeSpan.addClass('nl-css-text-remaining-14');
@@ -7523,20 +7694,22 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         if (matchingPrefixes.length === 0 && searchTerm.length > 0) {
-            const files = this.app.vault.getMarkdownFiles();
+            const files = this.app.vault.getFiles().filter(file =>
+                isExtractable(file.name) || isMultimodalSupported(file.name)
+            );
             const matchingFiles = files.filter(file =>
                 file.basename.toLowerCase().includes(lowerSearch) ||
                 file.path.toLowerCase().includes(lowerSearch)
             ).slice(0, 10); 
 
             if (matchingFiles.length > 0) {
-                const fileHeader = this.activeDocument.createElement('div');
+                const fileHeader = createDetached(this.activeDocument, 'div');
                 fileHeader.className = 'context-file-menu-section-header';
                 fileHeader.textContent = 'Files';
                 container.appendChild(fileHeader);
 
                 matchingFiles.forEach((file, index) => {
-                    const item = this.activeDocument.createElement('div');
+                    const item = createDetached(this.activeDocument, 'div');
                     item.className = 'context-file-menu-item';
 
                     const iconSpan = item.createSpan();
@@ -7573,7 +7746,7 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
                     container.appendChild(item);
                 });
             } else {
-                const noResults = this.activeDocument.createElement('div');
+                const noResults = createDetached(this.activeDocument, 'div');
                 noResults.className = 'context-file-menu-item';
                 noResults.textContent = 'No matches found';
                 noResults.addClass('nl-opacity-05');
@@ -7663,7 +7836,6 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         
         if (opt.action === 'prefix' && opt.value === '@mcp ') {
-            if (Platform.isMobile) return;
             
             if (this.queryInput && atIndex !== -1) {
                 const value = this.queryInput.value;
@@ -7870,11 +8042,13 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
 
         try {
             
-            const content = await this.app.vault.read(file);
+            const content = isExtractable(file.name)
+                ? await extractTextFromFile(this.app, file)
+                : await this.app.vault.read(file);
 
             
             if (!this.contextMenuPreviewEl) {
-                this.contextMenuPreviewEl = this.activeDocument.createElement('div');
+                this.contextMenuPreviewEl = createDetached(this.activeDocument, 'div');
                 this.contextMenuPreviewEl.className = 'context-file-preview';
                 this.activeDocument.body.appendChild(this.contextMenuPreviewEl);
             }
@@ -7940,16 +8114,16 @@ queryInput.setCssProps({ '--query-background':  `rgba(255, 255, 255, ${Math.min(
         
         if (this.contextMenuOpenFromMore && files.length > maxVisible) {
             const remaining = files.slice(maxVisible);
-            const remHeader = this.activeDocument.createElement('div');
+            const remHeader = createDetached(this.activeDocument, 'div');
             remHeader.className = 'context-file-menu-section-header';
             remHeader.textContent = 'Added files';
             container.appendChild(remHeader);
             remaining.forEach(path => {
-                const item = this.activeDocument.createElement('div');
+                const item = createDetached(this.activeDocument, 'div');
                 item.className = 'context-file-menu-item added';
 
                 
-const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)/.test(path);
+                const isYouTubeUrl = /^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(path);
                 const isWebUrl = /^https?:\/\//.test(path) && !isYouTubeUrl;
 
                 if (isYouTubeUrl) {
@@ -7985,7 +8159,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 container.appendChild(item);
             });
             
-            const divider = this.activeDocument.createElement('div');
+            const divider = createDetached(this.activeDocument, 'div');
             divider.className = 'context-file-menu-divider';
             container.appendChild(divider);
         }
@@ -7998,14 +8172,14 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             .slice()
             .sort((a, b) => b.stat.mtime - a.stat.mtime)
             .slice(0, filter ? allFiles.length : 5); 
-        const recHeader = this.activeDocument.createElement('div');
+        const recHeader = createDetached(this.activeDocument, 'div');
         recHeader.className = 'context-file-menu-section-header';
         recHeader.textContent = 'Recent files';
         container.appendChild(recHeader);
         recentFiles.forEach(file => {
             
             if (this.selectedFiles.has(file.path)) return;
-            const item = this.activeDocument.createElement('div');
+            const item = createDetached(this.activeDocument, 'div');
             item.className = 'context-file-menu-item';
             const iconSpan = item.createSpan();
             setIcon(iconSpan, this.getFileTypeIcon(file.name));
@@ -8020,7 +8194,7 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
             container.appendChild(item);
         });
         
-        const divider2 = this.activeDocument.createElement('div');
+        const divider2 = createDetached(this.activeDocument, 'div');
         divider2.className = 'context-file-menu-divider';
         container.appendChild(divider2);
         
@@ -8029,32 +8203,32 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                 { label: '@flash', value: '@flash ', action: 'prefix', description: 'Fast BM25 keyword search', hasToggle: true },
                 { label: '@vault', value: '@vault ', action: 'prefix', hasToggle: true },
                 { label: '@web', value: '@web ', action: 'prefix' },
-                ...(!Platform.isMobile ? [{ label: '@mcp', value: '@mcp ', action: 'prefix', description: 'Use MCP servers and tools', hasToggle: true }] : []),
+                { label: '@mcp', value: '@mcp ', action: 'prefix', description: 'Use MCP servers and tools', hasToggle: true },
                 { label: '@create', value: '@create ', action: 'prefix', description: 'Create files (canvas/excalidraw/markdown)' },
                 
                 { label: '@webpage', value: '@webpage', action: 'modal', modalType: 'webpage' },
                 { label: '@youtube', value: '@youtube', action: 'modal', modalType: 'youtube' }
             ];
             prefixOptions.forEach(opt => {
-                const item = this.activeDocument.createElement('div');
+                const item = createDetached(this.activeDocument, 'div');
                 item.className = 'context-file-menu-item';
 
                 
                 if (opt.hasToggle && opt.value === '@vault ') {
-                    const labelSpan = this.activeDocument.createElement('span');
+                    const labelSpan = createDetached(this.activeDocument, 'span');
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = this.activeDocument.createElement('div');
+                    const toggleContainer = createDetached(this.activeDocument, 'div');
                     toggleContainer.className = 'vault-citation-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-13');
 
                     
-                    const toggleLabel = this.activeDocument.createElement('span');
+                    const toggleLabel = createDetached(this.activeDocument, 'span');
                     toggleLabel.textContent = 'Citations';
                     toggleLabel.addClass('nl-css-text-rem-14');
 
-                    const toggleSwitch = this.activeDocument.createElement('input');
+                    const toggleSwitch = createDetached(this.activeDocument, 'input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'vault-citation-toggle';
                     toggleSwitch.checked = this.vaultInlineCitationsEnabled;
@@ -8074,19 +8248,19 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     item.addClass('nl-css-text-rem-15');
                 } else if (opt.hasToggle && opt.value === '@flash ') {
                     
-                    const labelSpan = this.activeDocument.createElement('span');
+                    const labelSpan = createDetached(this.activeDocument, 'span');
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = this.activeDocument.createElement('div');
+                    const toggleContainer = createDetached(this.activeDocument, 'div');
                     toggleContainer.className = 'flash-citation-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-16');
 
-                    const toggleLabel = this.activeDocument.createElement('span');
+                    const toggleLabel = createDetached(this.activeDocument, 'span');
                     toggleLabel.textContent = 'Citations';
                     toggleLabel.addClass('nl-css-text-rem-17');
 
-                    const toggleSwitch = this.activeDocument.createElement('input');
+                    const toggleSwitch = createDetached(this.activeDocument, 'input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'flash-citation-toggle';
                     toggleSwitch.checked = this.flashInlineCitationsEnabled;
@@ -8154,19 +8328,19 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
                     */ 
                 } else if (opt.hasToggle && opt.value === '@mcp ') {
                     
-                    const labelSpan = this.activeDocument.createElement('span');
+                    const labelSpan = createDetached(this.activeDocument, 'span');
                     labelSpan.textContent = opt.label;
                     item.appendChild(labelSpan);
 
-                    const toggleContainer = this.activeDocument.createElement('div');
+                    const toggleContainer = createDetached(this.activeDocument, 'div');
                     toggleContainer.className = 'mcp-ratelimit-toggle-container';
                     toggleContainer.addClass('nl-css-text-rem-24');
 
-                    const toggleLabel = this.activeDocument.createElement('span');
+                    const toggleLabel = createDetached(this.activeDocument, 'span');
                     toggleLabel.textContent = 'Delay Limit';
                     toggleLabel.addClass('nl-css-text-rem-25');
 
-                    const toggleSwitch = this.activeDocument.createElement('input');
+                    const toggleSwitch = createDetached(this.activeDocument, 'input');
                     toggleSwitch.type = 'checkbox';
                     toggleSwitch.className = 'mcp-ratelimit-toggle';
                     toggleSwitch.checked = this.mcpRateLimitEnabled;
@@ -8214,7 +8388,6 @@ const isYouTubeUrl = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|yout
 
                     
                     if (opt.action === 'prefix' && opt.value === '@mcp ') {
-                        if (Platform.isMobile) return;
                         if (!this.settings.mcpEnabled) {
                             new Notice('MCP support is disabled. Enable it in settings.');
                             return;
@@ -8446,204 +8619,17 @@ const availableServers = (this.settings.mcpServers || []).filter((s) => !s.disab
     }
 
     private async openSessionHistoryModal() {
-        if (this.sessionHistoryModal) {
-            this.sessionHistoryModal.remove();
-            this.sessionHistoryModal = null;
-        }
-        const modal = this.activeDocument.createElement('div');
-        modal.className = 'ai-chat-session-history-modal';
-        
-        modal.createDiv({ cls: 'modal-bg' });
-        const modalContent = modal.createDiv({ cls: 'modal-content' });
-        const modalHeader = modalContent.createDiv({ cls: 'modal-header' });
-        modalHeader.createEl('h3', { text: 'AI Chat Sessions' });
-        const closeBtn = modalHeader.createEl('button', { cls: 'close-btn', attr: { title: 'Close' } });
-        setIcon(closeBtn, 'x');
-
-        const searchContainer = modalContent.createDiv({ cls: 'session-search-container' });
-        const searchInput = searchContainer.createEl('input', { 
-            type: 'text', 
-            cls: 'session-search-input', 
-            placeholder: 'Search sessions by name or message content...' 
+        this.sessionHistoryModal = openSessionHistoryModal({
+            app: this.app,
+            aiChatSessionManager: this.aiChatSessionManager,
+            activeViewType: 'chat',
+            onLoadChatSession: async (id) => {
+                await this.loadAIChatSession(id);
+            },
+            onLoadAgentSession: async (id) => {
+                await this.loadAIChatSession(id);
+            },
         });
-        searchContainer.createSpan({ cls: 'search-icon', text: '🔍' });
-
-        const sessionList = modalContent.createDiv({ cls: 'session-list' });
-        const paginationDiv = modalContent.createDiv({ cls: 'session-pagination nl-display-none' });
-        const prevBtn = paginationDiv.createEl('button', { cls: 'prev-page-btn', text: 'Previous' });
-        const pageInfo = paginationDiv.createSpan({ cls: 'page-info' });
-        const nextBtn = paginationDiv.createEl('button', { cls: 'next-page-btn', text: 'Next' });
-
-        this.activeDocument.body.appendChild(modal);
-        this.sessionHistoryModal = modal;
-
-        closeBtn.addEventListener('click', () => {
-            modal.remove();
-            this.sessionHistoryModal = null;
-        });
-
-        let currentPage = 0;
-        const pageSize = 20;
-        let totalSessions = 0;
-        let currentSearchQuery = '';
-        let searchTimeout: number | null = null;
-
-        const loadPage = async (page: number, searchQuery: string = '') => {
-            sessionList.empty();
-            sessionList.createDiv({ cls: 'loading-sessions', text: 'Searching...' });
-            const offset = page * pageSize;
-            const { sessions, total } = await this.aiChatSessionManager.listSessionsLazy(pageSize, offset, searchQuery);
-            totalSessions = total;
-
-            sessionList.empty();
-            if (sessions.length === 0) {
-                if (searchQuery) {
-                    const noSessions = sessionList.createDiv({ cls: 'no-sessions-message' });
-                    noSessions.appendText(`No sessions found matching "${searchQuery}"`);
-                    noSessions.createEl('br');
-                    noSessions.createEl('small', { text: 'Searched in session names and all message content' });
-                } else if (page === 0) {
-                    sessionList.createDiv({ cls: 'no-sessions-message', text: 'No sessions yet.' });
-                }
-                paginationDiv.addClass('nl-display-none');
-            } else {
-                
-                const fragment = this.activeDocument.createDocumentFragment();
-                sessions.forEach(meta => {
-                    const card = this.activeDocument.createElement('div');
-                    card.className = 'session-card';
-
-                    const sessionInfo = card.createDiv({ cls: 'session-info' });
-                    const nameSpan = sessionInfo.createSpan({ cls: 'session-name' });
-
-                    
-                    if (searchQuery) {
-                        const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                        const parts = meta.name.split(regex);
-                        parts.forEach(part => {
-                            if (part.toLowerCase() === searchQuery.toLowerCase()) {
-                                nameSpan.createEl('mark', { text: part });
-                            } else {
-                                nameSpan.appendText(part);
-                            }
-                        });
-                    } else {
-                        nameSpan.textContent = meta.name;
-                    }
-
-                    
-                    if (searchQuery && meta.matchCount !== undefined) {
-                        if (meta.matchCount === -1) {
-                            const matchIndicator = sessionInfo.createSpan({ 
-                                cls: 'match-indicator name-match', 
-                                text: '📝 Name match' 
-                            });
-                            matchIndicator.setAttr('title', 'Match found in session name');
-                        } else if (meta.matchCount > 0) {
-                            const plural = meta.matchCount === 1 ? 'message' : 'messages';
-                            const matchIndicator = sessionInfo.createSpan({ 
-                                cls: 'match-indicator content-match', 
-                                text: `💬 ${meta.matchCount} ${plural}` 
-                            });
-                            matchIndicator.setAttr('title', `${meta.matchCount} ${plural} contain your search term`);
-                        }
-                    }
-
-                    card.createSpan({ 
-                        cls: 'session-date', 
-                        text: new Date(meta.updatedAt).toLocaleString() 
-                    });
-
-                    card.addEventListener('click', () => {
-                        this.loadAIChatSession(meta.id).then(() => {
-                            modal.remove();
-                            this.sessionHistoryModal = null;
-                        }).catch(console.error);
-                    });
-                    const deleteBtn = this.activeDocument.createElement('button');
-                    deleteBtn.className = 'delete-session-btn';
-                    setIcon(deleteBtn, 'trash-2');
-                    deleteBtn.title = 'Delete session';
-                    deleteBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        this.aiChatSessionManager.deleteSession(meta.id).then(() => {
-                            card.remove();
-                            totalSessions--;
-                            updatePagination();
-                            
-                            if (sessionList.querySelectorAll('.session-card').length === 0 && currentPage > 0) {
-                                currentPage--;
-                                return loadPage(currentPage, currentSearchQuery);
-                            }
-                        }).catch(console.error);
-                    });
-                    card.appendChild(deleteBtn);
-                    fragment.appendChild(card);
-                });
-                sessionList.appendChild(fragment);
-
-                
-                if (totalSessions > pageSize) {
-                    paginationDiv.addClass('nl-display-flex');
-                    updatePagination();
-                } else {
-                    paginationDiv.addClass('nl-display-none');
-                }
-            }
-        };
-
-        const updatePagination = () => {
-            const totalPages = Math.ceil(totalSessions / pageSize);
-            const searchSuffix = currentSearchQuery ? ' (filtered)' : '';
-            pageInfo.textContent = `Page ${currentPage + 1} of ${totalPages} (${totalSessions} sessions${searchSuffix})`;
-            prevBtn.disabled = currentPage === 0;
-            nextBtn.disabled = currentPage >= totalPages - 1;
-        };
-
-        
-        searchInput.addEventListener('input', () => {
-            if (searchTimeout) {
-                window.clearTimeout(searchTimeout);
-            }
-
-            searchTimeout = window.setTimeout(() => {
-                currentSearchQuery = searchInput.value.trim();
-                currentPage = 0; 
-                loadPage(currentPage, currentSearchQuery).catch(console.error);
-            }, 300); 
-        });
-
-        
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && searchInput.value) {
-                e.stopPropagation();
-                searchInput.value = '';
-                currentSearchQuery = '';
-                currentPage = 0;
-                void loadPage(currentPage, currentSearchQuery);
-            }
-        });
-
-        prevBtn.addEventListener('click', () => {
-            if (currentPage > 0) {
-                currentPage--;
-                loadPage(currentPage, currentSearchQuery).catch(console.error);
-            }
-        });
-
-        nextBtn.addEventListener('click', () => {
-            const totalPages = Math.ceil(totalSessions / pageSize);
-            if (currentPage < totalPages - 1) {
-                currentPage++;
-                loadPage(currentPage, currentSearchQuery).catch(console.error);
-            }
-        });
-
-        
-        await loadPage(0);
-
-        
-        searchInput.focus();
     }
 
     private openSystemInstructionsModal() {
@@ -8685,7 +8671,16 @@ const availableServers = (this.settings.mcpServers || []).filter((s) => !s.disab
     }
 
     private async loadAIChatSession(sessionId: string) {
-        
+        // Cross-view guardrail: block if the session is open in an Agent view
+        const agentLeaves = this.app.workspace.getLeavesOfType('NEXUS_LM_AGENT');
+        for (const leaf of agentLeaves) {
+            const view = leaf.view as { currentSessionId?: string | null } | null;
+            if (view?.currentSessionId === sessionId) {
+                new Notice('This session is already open in the Agent view.');
+                return;
+            }
+        }
+
         const existingLeaf = this.findLeafWithSession(sessionId);
         if (existingLeaf && existingLeaf !== this.leaf) {
             
@@ -8728,10 +8723,20 @@ const availableServers = (this.settings.mcpServers || []).filter((s) => !s.disab
 
                 searchMode: m.searchMode as Response['searchMode'],
 
-                vaultIndexName: m.vaultIndexName
+                vaultIndexName: m.vaultIndexName,
+
+                summary: m.summary,
+                keywords: m.keywords,
+                lessons: m.lessons,
+                importance: m.importance,
+                stepsCount: m.stepsCount,
+                success: m.success,
+                artifacts: m.artifacts
             }});
 
             this.currentSessionId = sessionId;
+            this.currentSessionType = session.sessionType ?? (session.messages?.some(m => m.isAgentResponse) ? 'agent' : 'chat');
+            this.currentSessionCreatedAt = session.createdAt || Date.now();
 
             
             this.updateContextBar();
@@ -8774,6 +8779,8 @@ const availableServers = (this.settings.mcpServers || []).filter((s) => !s.disab
                     this.renderRestoredResponse(r);
                 });
                 this.renderingRestoredSession = false;
+                this.updateNavRail();
+                this.updateJumpButton();
             }
         } else {
             // No action needed for this case
@@ -10580,6 +10587,8 @@ ${jsonContent}
 
         
         void this.saveCurrentSession();
+        this.updateNavRail();
+        this.updateJumpButton();
     }
 
     /**
@@ -10591,7 +10600,6 @@ ${jsonContent}
         autoSelectedModel: ModelSelection | null = null,
         enableRateLimit: boolean = true
     ): Promise<void> {
-        if (Platform.isMobile) return;
         this.isProcessing = true;
         this.setSendButtonState(this.stopKnowDeepBtn, 'stop');
         const startTime = Date.now();
@@ -11052,7 +11060,7 @@ ${jsonContent}
  * - Mermaid/Markdown/Dataview: live preview via Obsidian's MarkdownRenderer
  * - JSON: formatted, syntax-highlighted view
  */
-class CodeCanvasModal extends Modal {
+export class CodeCanvasModal extends Modal {
     private code: string;
     private language: string;
     private onSave?: (newCode: string) => void;
@@ -11184,7 +11192,7 @@ class CodeCanvasModal extends Modal {
             if (lang === 'json') {
                 const result = await executeCode(code, 'json');
                 if (result.isHtml && result.htmlContent) {
-                    const iframe = this.activeDocument.createElement('iframe');
+                    const iframe = createDetached(this.activeDocument, 'iframe');
                     iframe.className = 'code-exec-iframe code-canvas-iframe';
                     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
                     iframe.srcdoc = result.htmlContent;
@@ -11310,7 +11318,7 @@ class CodeCanvasModal extends Modal {
             outputArea.empty();
 
             if (result.isHtml && result.htmlContent) {
-                const iframe = this.activeDocument.createElement('iframe');
+                const iframe = createDetached(this.activeDocument, 'iframe');
                 iframe.className = 'code-exec-iframe code-canvas-iframe';
                 iframe.setAttribute('sandbox',
                     'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-modals allow-popups'

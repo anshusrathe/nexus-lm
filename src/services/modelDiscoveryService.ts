@@ -9,6 +9,7 @@ import { requestUrl } from 'obsidian';
 import { CustomModel, CustomEmbeddingModel, AISettings } from '../settings';
 import { validateOpenRouterApiKey } from './openRouterService';
 import { validateNvidiaApiKey } from './nvidiaService';
+import { normalizeOpenAIBaseUrl } from './customOpenAIProvider';
 
 export interface DiscoveredModel {
   id: string;
@@ -16,6 +17,95 @@ export interface DiscoveredModel {
   tokenLimit: number;
   isFree?: boolean;
   capabilities?: string[];
+}
+
+export interface LmStudioModelsResponse {
+  data: Array<{
+    id: string;
+    name?: string;
+    context_length?: number;
+    max_model_len?: number;
+    owned_by?: string;
+    object?: string;
+    permissions?: unknown[];
+  }>;
+}
+
+const LM_STUDIO_EMBEDDING_ID_HINTS = [
+  /embed/i,
+  /nomic-embed/i,
+  /mxbai/i,
+  /\bbge\b/i,
+  /\bgte-/i,
+  /\be5-(large|small|base)/i,
+  /instructor/i,
+  /minilm/i,
+  /snowflake/i,
+  /jina-embeddings/i,
+  /text-embedding/i
+];
+
+function isLmStudioEmbeddingModel(id: string): boolean {
+  return LM_STUDIO_EMBEDDING_ID_HINTS.some(re => re.test(id));
+}
+
+/**
+ * Fetches the list of models from an LM Studio local server
+ * (`GET {baseUrl}/v1/models` — the base URL is normalized so that
+ * `http://host:1234` and `http://host:1234/v1` both work).
+ *
+ * LM Studio lists every model that has been downloaded AND every model that
+ * is currently loaded in memory. Embedding models are detected by their id.
+ *
+ * @throws when the server is unreachable or returns a non-200 status.
+ */
+export async function fetchLmStudioModels(baseUrl: string, apiToken: string = ''): Promise<CustomModel[]> {
+  const normalized = normalizeOpenAIBaseUrl(baseUrl);
+  const headers: Record<string, string> = {};
+  if (apiToken) {
+    headers['Authorization'] = `Bearer ${apiToken}`;
+  }
+
+  const response = await requestUrl({
+    url: `${normalized}/models`,
+    method: 'GET',
+    headers,
+    throw: false
+  });
+
+  if (response.status !== 200) {
+    let errorMsg = `LM Studio API Error ${response.status}`;
+    try {
+      const data = response.json as { error?: { message?: string }; message?: string };
+      errorMsg = data?.error?.message || data?.message || errorMsg;
+    } catch {
+      // Intentionally ignored
+    }
+    throw new Error(errorMsg);
+  }
+
+  const data = response.json as LmStudioModelsResponse;
+  const models = Array.isArray(data.data) ? data.data : [];
+
+  return models.map(m => {
+    const id = String(m.id || '').trim();
+    const name = m.name && m.name.trim().length > 0 ? m.name.trim() : id;
+    const isEmbedding = isLmStudioEmbeddingModel(id);
+    const contextLength = typeof m.context_length === 'number' ? m.context_length : typeof m.max_model_len === 'number' ? m.max_model_len : 32768;
+    return {
+      provider: 'lmstudio',
+      id,
+      name,
+      tokenLimit: contextLength,
+      rank: 1,
+      enabled: true,
+      isFree: true,
+      isNew: true,
+      verificationStatus: 'unverified' as const,
+      lastVerified: 0,
+      capabilities: isEmbedding ? ['embeddings'] : ['chat']
+    };
+  }).filter(m => m.id.length > 0);
 }
 
 /**
@@ -81,6 +171,22 @@ export async function verifyModel(model: CustomModel, settings: AISettings): Pro
       messages: [{ role: 'user', content: '.' }],
       max_tokens: 1
     };
+  } else if (provider === 'lmstudio') {
+    // LM Studio needs no API key by default; an optional token is passed through
+    const baseUrl = normalizeOpenAIBaseUrl(settings.lmStudioBaseUrl || 'http://localhost:1234');
+    if (settings.lmStudioApiToken) {
+      headers['Authorization'] = `Bearer ${settings.lmStudioApiToken}`;
+    }
+    if (model.capabilities?.includes('embeddings') && !model.capabilities.includes('chat')) {
+      return { success: true }; // Embedding-only model — verified via the embeddings endpoint
+    }
+    url = `${baseUrl}/chat/completions`;
+    body = {
+      model: model.id,
+      messages: [{ role: 'user', content: '.' }],
+      max_tokens: 1,
+      stream: false
+    };
   } else {
     // Check if it's a custom provider
     const customProvider = settings.customProviders?.find(cp => cp.id === provider);
@@ -109,9 +215,12 @@ export async function verifyModel(model: CustomModel, settings: AISettings): Pro
       throw: false
     });
 
-    // Add a 10s timeout to verification requests
+    // Add a timeout to verification requests.
+    // LM Studio loads models lazily — a cold load of a large model can take
+    // well over 10s, so give local servers a much longer window.
+    const timeoutMs = provider === 'lmstudio' ? 45000 : 10000;
     const timeoutPromise = new Promise<never>((_, reject) => 
-      window.setTimeout(() => reject(new Error('Request timed out')), 10000)
+      window.setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
     );
 
     const response = await Promise.race([requestPromise, timeoutPromise]);
@@ -172,6 +281,17 @@ export async function verifyEmbeddingModel(model: CustomEmbeddingModel, settings
     };
   } else if (provider === 'ollama') {
     return { success: true }; // Skip verification for Ollama local
+  } else if (provider === 'lmstudio') {
+    // LM Studio embedding models — optional token passed through
+    const baseUrl = normalizeOpenAIBaseUrl(settings.lmStudioBaseUrl || 'http://localhost:1234');
+    if (settings.lmStudioApiToken) {
+      headers['Authorization'] = `Bearer ${settings.lmStudioApiToken}`;
+    }
+    url = `${baseUrl}/embeddings`;
+    body = {
+      model: model.id,
+      input: "ping"
+    };
   } else {
     // Check if it's a custom provider
     const customProvider = settings.customProviders?.find(cp => cp.id === provider);
@@ -198,9 +318,10 @@ export async function verifyEmbeddingModel(model: CustomEmbeddingModel, settings
       throw: false
     });
 
-    // Add a 10s timeout to verification requests
+    // LM Studio loads models lazily — give local servers a longer window
+    const timeoutMs = provider === 'lmstudio' ? 45000 : 10000;
     const timeoutPromise = new Promise<never>((_, reject) => 
-      window.setTimeout(() => reject(new Error('Request timed out')), 10000)
+      window.setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
     );
 
     const response = await Promise.race([requestPromise, timeoutPromise]);

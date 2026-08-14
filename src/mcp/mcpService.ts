@@ -159,8 +159,10 @@ export class MCPService {
     }
 
     private async _connectServerInternal(config: MCPServerConfig): Promise<void> {
-                
         if (config.transport === 'stdio') {
+            if (Platform.isMobile) {
+                throw new Error(`MCP server "${config.name}" uses stdio transport which is not supported on mobile devices. Please use an HTTPS (SSE) transport server.`);
+            }
             return this._connectStdio(config);
         } else if (config.transport === 'sse') {
             return this._connectSSE(config);
@@ -622,7 +624,7 @@ export class MCPService {
                             throw new Error(`HTTP ${response.status} - ${response.text}`);
         }
 
-        const contentType = response.headers['content-type'] || '';
+        const contentType = (response.headers['content-type'] || response.headers['Content-Type'] || '').toLowerCase();
 
         
         if (contentType.includes('text/event-stream')) {

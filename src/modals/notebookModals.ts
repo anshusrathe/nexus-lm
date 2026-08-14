@@ -2,6 +2,7 @@ import { App, Modal, Setting, ButtonComponent, Notice } from 'obsidian';
 import { Notebook, NotebookMode } from '../managers/notebookManager';
 import { NoteSuggester, FolderSuggester } from '../views/view'; // Import FolderSuggester
 import AIPlugin from '../main';
+import { createDetached } from '../utils/domUtils';
 
 interface NotebookFormSettings {
   name: string;
@@ -96,6 +97,12 @@ export class NotebookFormModal extends Modal {
       this.customInstruction = (e.target as HTMLTextAreaElement).value;
     });
 
+    // Supported file types note
+    scrollableContainer.createEl('p', {
+      cls: 'notebook-supported-types-note',
+      text: 'Supported file types: Markdown, TXT, JSON, XML, CSV, HTML, CSS, JS, TS, TSX, JSX, Python, Java, C, C++, YAML, YML, PDF, DOCX, XLSX, XLS, and PPTX.'
+    });
+
     scrollableContainer.createEl('h3', { text: 'Select Source Notes' });
     const noteSuggesterContainer = scrollableContainer.createDiv({ cls: 'notebook-note-suggester-container' });
 
@@ -113,7 +120,8 @@ export class NotebookFormModal extends Modal {
       noteSuggesterContainer,
       (paths: string[]) => {
         this.selectedSourcePaths = paths;
-      }
+      },
+      true 
     );
     this.noteSuggester.setInitialSelectedPaths(initialPaths);
 
@@ -149,7 +157,7 @@ export class NotebookFormModal extends Modal {
         const row = webList.createDiv({ cls: 'web-context-row' });
         row.createSpan({ text: src.name, cls: 'web-context-name' });
         // --- MAKE URL CLICKABLE ---
-        const urlLink = this.containerEl.ownerDocument.createElement('a');
+        const urlLink = createDetached(this.containerEl.ownerDocument, 'a');
         urlLink.href = src.url;
         urlLink.textContent = src.url;
         urlLink.target = '_blank';

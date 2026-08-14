@@ -1,14 +1,52 @@
+# Version 2.0
+
+## What's New?
+
+### Nexus-LM Agent
+
+- **Read, write, edit** everything natively.
+- **Leveraging Obsidian-CLI** to perform vault related tasks.
+- Using **MCP** and **Skills** to produce better results. It can **create and use skills autonomously**.
+- **SUB-AGENTS:** Delegates complex task to subagents that works independently with individual context windows.
+- **Search through your saved RSS-feeds** and fetch info to help manage current info.
+- **Iterative reasoning through attached embeddings database, semantically**, to provide deep insights.
+- **Web fetching** of any webpage using obsidian native tools. **Can also fetch scanned online PDFs.**
+- Summarize **YouTube videos** with just a link.
+- Automatically routes to the best models upon selected model failures. *Depending on your pool of free-models from enabled providers.*
+
+### Multiple file-types support
+
+- The plugin now handles multiple file types via **embedding, indexing or directly being added as context** across features: **Notebooks, AI chat, Agent, Study materials generator**. The file types supported are- 
+	1. **Documents & Office Files** 
+		- **PDF Documents**: `.pdf` 
+		- **Word Documents**: `.docx` 
+		- **Excel Spreadsheets**: `.xlsx`, `.xls`
+		- **PowerPoint Presentations**: `.pptx` 
+	2. **Notes, Data & Plain Text**
+		- **Text**: `.txt`
+		- **Structured Data**: `.json`, `.xml`, `.csv`, `.yaml`, `.yml`
+	3. **Code & Web Files** 
+		- **Web**: `.html`, `.css`
+		- **JavaScript / TypeScript**: `.js`, `.ts`, `.jsx`, `.tsx`
+		- **Python**: `.py`
+		- **Java**: `.java`
+		- **C / C++**: `.c`, `.cpp`, `.h`, `.hpp`
+
+
+
+https://github.com/user-attachments/assets/c03d0001-ec02-4625-9e4c-42863a5068eb
+
+
+
+https://github.com/user-attachments/assets/dbce6649-867c-44ce-aa92-c0a4257b501d
+
 
 
 ![Main Wallpaper](Assets/Main%20wallpaper%20of%20the%20plugin.png)
 
-> **Supercharge your workspace with 100+ free models:** Chat with your notes, auto-generate interactive study tools, run local or cloud LLMs, manage RSS feeds, and execute code—all without ever leaving Obsidian.
+>Nexus-LM helps you chat with your notes, auto-generate interactive study tools, run local or cloud LLMs, manage RSS feeds, and execute code—all without ever leaving Obsidian.
 
-Nexus-LM is the ultimate AI-powered workspace designed exclusively for Obsidian. Instead of just storing your notes, Nexus-LM turns them into an active, conversational partner. Whether you are a researcher, student, developer, or power-user, Nexus-LM bridges the gap between your local knowledge base and state-of-the-art artificial intelligence.
-
----
-
-## 🚀 Quick Start
+## Quick Start
 
 1.  **Install** from the Obsidian Community Plugins store (search for `nexus-lm`).
 2.  **Configure Your Keys**: Go to **Settings → Nexus-LM → Basic** and add an API key from any of our supported providers (Gemini, Groq, OpenRouter, OpenCode, Nvidia, Mistral, Cohere, or Ollama for local models).
@@ -17,14 +55,14 @@ Nexus-LM is the ultimate AI-powered workspace designed exclusively for Obsidian.
 
 ---
 
-## 🛠️ Custom Model Configuration
+## Custom Model Configuration
 Take full control over which models are active in your selector. Enable, disable, and configure custom model endpoints in settings.
 
 ![Settings Page](Assets/Settings%20page%20custom%20model%20screenshot.png)
 
 ---
 
-## 🗺️ Visual Walkthrough & Core Views
+## Visual Walkthrough & Core Views
 
 The **Nexus-LM Hub** is your central command center. From here, you can jump directly into specialized views tailored to your workflow.
 
@@ -45,12 +83,12 @@ Type prefixes or click the `+` button to dynamically inject external context int
 | **Web Pages**     | `@webpage` | Inject full page content from raw URLs.                                                   |
 | **Attach File**   | `@file`    | Add multimodal attachments (Images, PDFs, Audio).                                         |
 
-#### ⚡ Flash Search in Action
+#### Flash Search in Action
 Need a quick lookup without waiting for embeddings? Use `@flash` for blazing-fast BM25 keyword matching.
 
 ![Flash Search](Assets/flash%20search%20example.png)
 
-#### 🔌 MCP (Model Context Protocol) Support
+#### MCP (Model Context Protocol) Support
 Extend your chat's capabilities using local or remote MCP servers. Connect over `stdio` or `sse` to allow the AI to add context from any MCP server, interact with local APIs, or use custom developer tools.
 
 ![MCP Query](Assets/mcp%20query%20example.png)
@@ -60,22 +98,22 @@ Extend your chat's capabilities using local or remote MCP servers. Connect over 
 ### 2. Nexus Tutor (Your Personal AI Study Environment)
 Transform static notes into interactive learning experiences. Select your notes or entire folders, track live token usage against your model's context window, and generate study material instantly.
 
-#### 📝 Q&A Sessions
+#### Q&A Sessions
 Test your comprehension with AI-generated questions based directly on your selected notes. Type your answers and receive instant, color-coded **relevance scoring (0-100%)** alongside constructive, detailed feedback.
 
 ![Q&A Example](Assets/QnA%20example.png)
 
-#### 📊 MCQ Sessions
+#### MCQ Sessions
 Generate customizable multiple-choice quizzes with timed sessions. When you submit, get an instant grade breakdown and step-by-step explanations for any incorrect answers.
 
 ![MCQ Example](Assets/MCQ%20example.png)
 
-#### 🕸️ Interactive Concept Maps
+#### Interactive Concept Maps
 Analyze your notes to generate a gorgeous, interactive SVG concept map. Easily zoom, pan, and click nodes to explore core themes, related topics, and labeled connections.
 
 ![Concept Map](Assets/concept%20map%20example.png)
 
-#### 🎭 Zen Slideshows
+#### Zen Slideshows
 Reorganize complex topics into beautiful, structured slideshows. Each slide comes with AI-generated narration read aloud via browser Text-to-Speech (TTS) with adjustable speed and auto-advance.
 
 ![Slideshow Example](Assets/slideshow%20example.png)
@@ -105,9 +143,9 @@ Keep up with your favorite blogs, journals, and news directly inside Obsidian. O
 
 ---
 
-## 🛠️ Advanced Tools & Utilities
+## Advanced Tools & Utilities
 
-### 💻 Code Execution & Rich Rendering
+### Code Execution & Rich Rendering
 Nexus-LM doesn't just display code—it runs it. Code blocks in chat responses feature context-aware execution buttons:
 *   **Run Sandboxed**: Execute JavaScript and TypeScript in a secure Web Worker.
 *   **Interactive Previews**: Render HTML, CSS, SVG, and Mermaid diagrams directly inside the chat.
@@ -116,7 +154,7 @@ Nexus-LM doesn't just display code—it runs it. Code blocks in chat responses f
 
 ![Canvas Example](Assets/canvas%20example.png)
 
-### 📂 File Creation via Chat
+### File Creation via Chat
 When the AI proposes creating files in your vault, Nexus-LM opens a **File Creation Review Modal**. Preview the proposed folder structure, accept/reject files individually, or apply Obsidian templates before writing to disk.
 
 ![Create Tool Example](Assets/create%20tool%20example.png)
@@ -126,19 +164,19 @@ You can also leverage AI to create new Excalidraw diagrams or Canvas files direc
 ![Create Excalidraw](Assets/create%20excalidraw%20example.png)
 ![Create Canvas](Assets/create%20canvas%20example.png)
 
-### 📄 PDF Text Extraction
+### PDF Text Extraction
 Extract text from any open PDF file. Choose custom page ranges and immediately save the formatted text as a clean markdown file.
 
 ![PDF Extraction](Assets/PDF%20extraction%20example.png)
 
-### ✍️ Edit Selection
+### Edit Selection
 Easily modify selected text within your notes. Highlight any text and use this tool to ask the AI to summarize, rephrase, translate, or perform other text manipulations.
 
 ![Edit Selection](Assets/edit%20selection%20example.png)
 
 ---
 
-## ⚙️ Provider & Model Support
+## Provider & Model Support
 
 Nexus-LM is highly flexible, supporting both local offline models and industry-leading cloud APIs. Configure feature-specific models independently to optimize speed, cost, and context size.
 
@@ -150,15 +188,47 @@ Nexus-LM is highly flexible, supporting both local offline models and industry-l
 | **Ollama (Local/Cloud)**    | ✅   | ✅    | ✅       | ✅         | ✅ (GPT-OSS) | ✅            | ✅ (Transcript) |
 | **NVIDIA NIM**              | ✅   | ✅    | ✅       | ✅         | ❌       | ❌            | ✅ (Transcript) |
 | **OpenCode Zen**            | ✅   | ✅    | ✅       | ❌         | ❌       | ❌            | ✅ (Transcript) |
+| **LM Studio (Local)**       | ✅   | ✅    | ✅       | ✅         | ✅ (Model-dependent) | ❌    | ✅ (Transcript) |
 | **Custom OpenAI-Compatible**| ✅   | ✅    | ✅       | ✅         | ❌       | ❌            | ✅ (Transcript) |
 
 ---
 
-## ⚙️ Settings Reference
+## LM Studio (Local Server)
+
+Run fully local models on your own hardware. LM Studio is detected as a native provider — no API key required.
+
+### Quick Start
+
+1.  Open **LM Studio** and load (or download) a model in the **My Models** screen.
+2.  Go to **Developer → Start Server** (bottom panel, ▶ button). The address is shown next to the port, e.g. `http://localhost:1234`.
+3.  In Nexus-LM: **Settings → AI Assistant → Basic → AI provider → LM Studio**.
+4.  Click **Test connection** (or "Refresh models" / "Verify models" in the Custom AI models section) to load the model list.
+5.  Select the model in the model picker and chat.
+
+> **URL format**: Enter the address *without* `/v1` (e.g. `http://localhost:1234`). The `/v1` suffix is added automatically; if you already included a path, it is respected as-is.
+
+### Using LM Studio on Another Computer (LAN)
+
+1.  In LM Studio: **Settings → Developer → Enable "Serve on Local Network"**, then restart the server.
+2.  Find the machine's IP (`ipconfig` on Windows), e.g. `192.168.100.6`.
+3.  In Nexus-LM settings, set the server URL to `http://<that-IP>:1234` and click **Test connection**.
+4.  If the test fails: allow LM Studio through **Windows Firewall** (Private networks) and make sure both devices are on the same network.
+
+### Notes
+
+*   **No API key needed** — the token field is optional (only required if you enable "API key required" in LM Studio Settings → Developer).
+*   **JIT loading**: LM Studio loads models on demand, so the *first* request to a cold model can take a while. Verification requests wait up to 45s.
+*   **Embeddings**: models like `nomic-embed-text` are detected by their id and enabled for vault indexing automatically (Embeddings table in settings).
+*   **Tool calling, streaming and vision** work when the loaded model supports them.
+
+---
+
+## Settings Reference
 
 ### Basic Configuration
 *   **AI Provider**: Toggle your primary provider.
 *   **API Key**: Secure input validation for your provider keys.
+*   **LM Studio server URL**: Address of the local LM Studio server (default `http://localhost:1234`) plus an optional API token; a **Test connection** button fetches the available models.
 *   **Model Discovery**: Plugin tries to fetch the provided models and enable the ones available as per the user API key (Verify Models).
 
 ### Vault Chat Settings
@@ -173,7 +243,7 @@ Nexus-LM is highly flexible, supporting both local offline models and industry-l
 
 ---
 
-## 🔒 Security & Privacy Disclosures
+## Security & Privacy Disclosures
 
 *   **Local Indexing**: All file indexing (Embeddings & BM25) happens **entirely locally on your device**.
 *   **Data Transmission**: Nexus-LM only transmits your note content to external APIs that you explicitly configure and authorize via your API keys. Your files are never uploaded to third-party servers.

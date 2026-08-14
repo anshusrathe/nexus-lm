@@ -1,7 +1,7 @@
 import { requestUrl } from 'obsidian';
 import { BaseProvider, UnifiedMessage, UnifiedGenerationOptions, UnifiedResponse } from './unifiedProviderManager';
 import { RateLimitManager } from '../utils/rateLimitManager';
-import { simulatedStream, fetchStream, createSSEParser } from '../utils/streamingUtils';
+import { simulatedStream, fetchStream, createSSEParser, PartialStreamError } from '../utils/streamingUtils';
 
 interface OpenCodeRequestBody {
     model: string;
@@ -83,7 +83,8 @@ export class OpenCodeProvider extends BaseProvider {
                 promptTokens: data.usage.prompt_tokens!,
                 completionTokens: data.usage.completion_tokens!,
                 totalTokens: data.usage.total_tokens!
-            } : undefined
+            } : undefined,
+            finishReason: data.choices?.[0]?.finish_reason
         };
     }
 
@@ -118,9 +119,11 @@ export class OpenCodeProvider extends BaseProvider {
 
         const parser = createSSEParser();
         let fullContent = '';
+        let finishReason: string | undefined;
         const callbacks = {
             onChunk: (text: string) => { fullContent += text; onChunk(text); },
-            onThinking
+            onThinking,
+            onFinish: (reason: string) => { finishReason = reason; }
         };
 
         // Primary: native fetch streaming (true token-level streaming)
@@ -133,8 +136,9 @@ export class OpenCodeProvider extends BaseProvider {
                 callbacks,
                 options?.abortSignal
             );
-            return { text: fullContent };
-        } catch {
+            return { text: fullContent, finishReason };
+        } catch (error) {
+            if (error instanceof PartialStreamError) throw error;
             // API call failed - fallback logic follows
         }
 
@@ -151,7 +155,7 @@ export class OpenCodeProvider extends BaseProvider {
         const headersObj = new Headers();
         Object.entries(respHeaders).forEach(([key, value]) => headersObj.set(key, Array.isArray(value) ? value.join(', ') : value));
         RateLimitManager.getInstance().updateFromHeaders(this.id, modelId, headersObj);
-        return { text: fullContent };
+        return { text: fullContent, finishReason };
     }
 
     async generateContentWithTools(
@@ -259,5 +263,74 @@ export class OpenCodeProvider extends BaseProvider {
             break;
         }
         return { content: fullContent, totalTokens };
+    }
+
+    /**
+     * Single-round native tool calling: one request, returns tool calls without executing them.
+     * The caller owns the tool execution loop.
+     */
+    async generateContentWithToolsOnce(
+        modelId: string,
+        messages: UnifiedMessage[],
+        tools: Record<string, unknown>[],
+        options: UnifiedGenerationOptions & { toolChoice?: string }
+    ): Promise<{ content: string; finishReason?: string; toolCalls?: Array<Record<string, unknown>>; thinking?: string }> {
+        if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+        await RateLimitManager.getInstance().waitForClearance(this.id, modelId, 1000);
+
+        const requestBody: OpenCodeRequestBody = {
+            model: modelId,
+            messages,
+            stream: false
+        };
+        if (options.temperature !== undefined) requestBody.temperature = options.temperature;
+        if (options.topP !== undefined) requestBody.top_p = options.topP;
+        if (options.maxTokens !== undefined) requestBody.max_tokens = options.maxTokens;
+
+        if (tools && tools.length > 0) {
+            requestBody.tools = tools;
+            requestBody.tool_choice = options.toolChoice ?? 'auto';
+        }
+
+        const response = await requestUrl({
+            url: `${this.baseUrl}/chat/completions`,
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://obsidian.md',
+                'X-Title': 'Nexus-LM'
+            },
+            body: JSON.stringify(requestBody),
+            throw: false
+        });
+
+        if (response.status >= 400) {
+            const errorData = (typeof response.json === 'object' ? response.json : {}) as { error?: { message?: string } };
+            throw new Error(`OpenCode API error: ${response.status} ${errorData.error?.message || 'Request failed'}`);
+        }
+
+        const headersObj = new Headers();
+        Object.entries(response.headers).forEach(([key, value]) => {
+            headersObj.set(key, Array.isArray(value) ? value.join(', ') : value);
+        });
+        RateLimitManager.getInstance().updateFromHeaders(this.id, modelId, headersObj);
+
+        const data = response.json as OpenAIChatCompletionResponse;
+        if (data.usage) {
+            RateLimitManager.getInstance().recordApiCall(this.id, modelId, data.usage.total_tokens ?? 0);
+        }
+
+        const message = data.choices?.[0]?.message;
+        if (!message) return { content: '' };
+
+        return {
+            content: typeof message.content === 'string' ? message.content : '',
+            finishReason: data.choices?.[0]?.finish_reason,
+            toolCalls: (message.tool_calls as Array<Record<string, unknown>> | undefined) ?? undefined,
+            thinking: typeof message.reasoning_content === 'string' && (message.reasoning_content).length > 0
+                ? (message.reasoning_content)
+                : undefined,
+        };
     }
 }

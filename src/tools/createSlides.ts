@@ -6,6 +6,8 @@ import { OpenRouterService, ChatMessage as OpenRouterChatMessage } from '../serv
 import { OllamaService, ChatMessage as OllamaChatMessage } from '../services/ollamaService';
 import { NvidiaService, ChatMessage as NvidiaChatMessage } from '../services/nvidiaService';
 import { UnifiedProviderManager } from '../services/unifiedProviderManager';
+import { createDetached } from '../utils/domUtils';
+import { extractTextFromFile } from '../utils/localFileExtractor';
 
 export interface SavedSlideshow {
   id: string;
@@ -255,7 +257,7 @@ export class SlideManager {
     for (const path of notePaths) {
       const file = this.app.vault.getFileByPath(path);
       if (file) {
-        const content = await this.app.vault.read(file);
+        const content = await extractTextFromFile(this.app, file);
         combinedContent += `\n\n--- ${file.basename} ---\n\n${content}`;
       }
     }
@@ -711,7 +713,7 @@ export class SlideshowSettingsModal extends Modal {
     let defaultVoice = this.availableVoices.find(v => v.default) || this.availableVoices[0];
     
     for (const voice of this.availableVoices) {
-      const option = this.containerEl.ownerDocument.createElement('option');
+      const option = createDetached(this.containerEl.ownerDocument, 'option');
       option.value = voice.name;
       option.textContent = this.formatVoiceName(voice);
       if (voice.default) {
@@ -926,7 +928,7 @@ export class SlideshowVoiceSettingsModal extends Modal {
     }
     
     for (const voice of this.availableVoices) {
-      const option = this.containerEl.ownerDocument.createElement('option');
+      const option = createDetached(this.containerEl.ownerDocument, 'option');
       option.value = voice.name;
       option.textContent = this.formatVoiceName(voice);
       this.voiceSelectDropdown.appendChild(option);
@@ -1214,7 +1216,7 @@ export class ZenSlideshowModal extends Modal {
   }
 
   private renderMindmapNode(parent: HTMLElement, node: ZenHeadingNode, isRoot: boolean): HTMLElement {
-    const nodeEl = parent.createEl('div', { 
+    const nodeEl = parent.createDiv({ 
       cls: `zen-node zen-node-h${node.level}`,
       attr: { 'data-level': node.level, 'data-node-id': this.getNodeId(node) }
     });

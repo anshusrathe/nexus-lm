@@ -3,6 +3,8 @@ import nodeResolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import webWorkerLoader from 'rollup-plugin-web-worker-loader';
+import svelte from 'rollup-plugin-svelte';
+import sveltePreprocess from 'svelte-preprocess';
 
 export default {
   input: 'src/main.ts',
@@ -12,7 +14,7 @@ export default {
     sourcemap: true,
     inlineDynamicImports: true
   },
-  external: ['obsidian'],
+  external: ['obsidian', 'child_process', 'fs', 'http', 'https', 'mammoth'],
   plugins: [
     webWorkerLoader({
       targetPlatform: 'browser',
@@ -32,6 +34,21 @@ export default {
         }),
         commonjs()
       ]
+    }),
+    svelte({
+      emitCss: false,
+      preprocess: sveltePreprocess({
+        typescript: {
+          compilerOptions: {
+            verbatimModuleSyntax: true,
+          },
+        },
+      }),
+      compilerOptions: {
+        compatibility: {
+          componentApi: 4
+        }
+      }
     }),
     typescript(),
     nodeResolve({ 

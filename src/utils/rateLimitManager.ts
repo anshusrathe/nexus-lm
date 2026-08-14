@@ -274,16 +274,20 @@ export class RateLimitManager {
         
         // Check token limit
         if (state.currentTokenCount + estimatedTokens > state.limits.tokensPerMinute) {
-            const timeElapsed = now - state.lastResetTime;
-            const timeLeft = oneMinute - timeElapsed;
-            delayNeeded = Math.max(delayNeeded, timeLeft);
+            if (state.currentTokenCount > 0) {
+                const timeElapsed = now - state.lastResetTime;
+                const timeLeft = oneMinute - timeElapsed;
+                delayNeeded = Math.max(delayNeeded, timeLeft);
+            }
         }
         
         // Check request limit
         if (state.currentRequestCount + 1 > state.limits.requestsPerMinute) {
-            const timeElapsed = now - state.lastResetTime;
-            const timeLeft = oneMinute - timeElapsed;
-            delayNeeded = Math.max(delayNeeded, timeLeft);
+            if (state.currentRequestCount > 0) {
+                const timeElapsed = now - state.lastResetTime;
+                const timeLeft = oneMinute - timeElapsed;
+                delayNeeded = Math.max(delayNeeded, timeLeft);
+            }
         }
         
         return Math.max(0, delayNeeded);

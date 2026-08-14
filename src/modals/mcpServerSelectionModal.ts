@@ -1,4 +1,4 @@
-import { App, Modal, setIcon } from 'obsidian';
+import { App, Modal, setIcon, Platform } from 'obsidian';
 import { MCPServerConfig } from '../settings';
 import { MCPService, MCPResource, MCPTool } from '../mcp/mcpService';
 
@@ -27,7 +27,7 @@ export class MCPServerSelectionModal extends Modal {
     constructor(app: App, mcpService: MCPService, availableServers: MCPServerConfig[], onSubmit: (selection: MCPServerSelection) => void, mcpAutoConnect = true) {
         super(app);
         this.mcpService = mcpService;
-        this.availableServers = availableServers.filter(s => !s.disabled);
+        this.availableServers = availableServers.filter(s => !s.disabled && (!Platform.isMobile || s.transport === 'sse'));
         this.onSubmit = onSubmit;
         this.mcpAutoConnect = mcpAutoConnect;
     }
@@ -88,7 +88,7 @@ export class MCPServerSelectionModal extends Modal {
             label.addClass('mcp-server-label');
 
             const isConnected = this.mcpService.isServerConnected(server.id);
-            const statusBadge = serverHeader.createEl('span', {
+            const statusBadge = serverHeader.createSpan({
                 cls: `mcp-status-badge ${isConnected ? 'connected' : 'disconnected'}`,
                 text: isConnected ? '● Connected' : '○ Disconnected'
             });
@@ -117,7 +117,7 @@ export class MCPServerSelectionModal extends Modal {
                             connectBtn.removeClass('mcp-connect-btn--loading');
                             setIcon(connectBtn, 'refresh-cw');
                             connectBtn.addClass('mcp-connect-btn--error');
-                            const errorDiv = serverHeader.createEl('span', { cls: 'mcp-connect-error', text: `Failed to connect` });
+                            const errorDiv = serverHeader.createSpan({ cls: 'mcp-connect-error', text: `Failed to connect` });
                             window.setTimeout(() => errorDiv.remove(), 4000);
                         }
                     })();

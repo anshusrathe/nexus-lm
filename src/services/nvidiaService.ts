@@ -6,7 +6,7 @@
  */
 
 import { requestUrl } from 'obsidian';
-import { simulatedStream, fetchStream, createSSEParser } from '../utils/streamingUtils';
+import { simulatedStream, fetchStream, createSSEParser, PartialStreamError } from '../utils/streamingUtils';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -103,7 +103,8 @@ export class NvidiaService {
   async generateContent(
     model: string,
     messages: ChatMessage[],
-    options?: GenerationOptions
+    options?: GenerationOptions,
+    onFinish?: (finishReason: string) => void
   ): Promise<string> {
     const requestBody = {
       model,
@@ -145,8 +146,11 @@ export class NvidiaService {
       }
 
       const data = response.json as NvidiaChatCompletionResponse;
+      const finishReason = data.choices?.[0]?.finish_reason;
+      if (finishReason && onFinish) onFinish(finishReason);
       return data.choices?.[0]?.message?.content || '';
     } catch (error) {
+      if (error instanceof PartialStreamError) throw error;
       if (error instanceof NvidiaApiError) throw error;
       // Convert fetch errors to NvidiaApiError
       throw new NvidiaApiError(`Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 0);
@@ -167,7 +171,8 @@ export class NvidiaService {
     messages: ChatMessage[],
     options: GenerationOptions | undefined,
     onChunk: (chunk: string) => void,
-    onThinking?: (thinking: string) => void
+    onThinking?: (thinking: string) => void,
+    onFinish?: (finishReason: string) => void
   ): Promise<string> {
     const buildBody = (stream: boolean) => ({
       model,
@@ -192,7 +197,7 @@ export class NvidiaService {
 
     const parser = createSSEParser();
     let fullContent = '';
-    const callbacks = { onChunk: (text: string) => { fullContent += text; onChunk(text); }, onThinking };
+    const callbacks = { onChunk: (text: string) => { fullContent += text; onChunk(text); }, onThinking, onFinish };
 
     // Primary: native fetch streaming (true token-level streaming when available)
     try {
@@ -206,6 +211,7 @@ export class NvidiaService {
       );
       return fullContent;
     } catch (error) {
+      if (error instanceof PartialStreamError) throw error;
       if (error instanceof NvidiaApiError) throw error;
           }
 
@@ -345,6 +351,71 @@ export class NvidiaService {
     }
 
     return { content: finalContent, totalTokens };
+  }
+
+  /**
+   * Single-round native tool calling: one request, returns tool calls without executing them.
+   * The caller owns the tool execution loop.
+   */
+  async generateContentWithToolsOnce(
+    model: string,
+    messages: ChatMessage[],
+    tools: ToolDefinition[],
+    options: GenerationOptions | undefined
+  ): Promise<{ content: string; finishReason?: string; toolCalls?: Array<Record<string, unknown>>; thinking?: string }> {
+    if (options?.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+    const requestBody = {
+      model,
+      messages,
+      temperature: options?.temperature ?? 0.7,
+      top_p: options?.topP ?? 0.95,
+      tools: tools.length > 0 ? tools : undefined,
+      tool_choice: tools.length > 0 ? (options?.toolChoice ?? 'auto') : undefined,
+      max_tokens: options?.maxTokens ?? 8192,
+      stream: false
+    };
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://obsidian.md',
+      'X-Title': 'Obsidian AI Tutor'
+    };
+
+    const response = await requestUrl({
+      url: `${this.baseUrl}/v1/chat/completions`,
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      throw: false
+    });
+
+    if (response.status >= 400) {
+      const errorData = (typeof response.json === 'object' ? response.json : { error: { message: `HTTP ${response.status}: Request failed`, type: 'api_error' } }) as NvidiaErrorResponse;
+      throw new NvidiaApiError(errorData.error?.message || `HTTP ${response.status}: API request failed`, response.status);
+    }
+
+    if (this.onHeadersReceived && response.headers) {
+      const headersObj = new Headers();
+      Object.entries(response.headers).forEach(([key, value]) => {
+        headersObj.set(key, value);
+      });
+      this.onHeadersReceived(headersObj);
+    }
+
+    const data = response.json as NvidiaChatCompletionResponse;
+    const message = data.choices?.[0]?.message;
+    if (!message) return { content: '' };
+
+    return {
+      content: typeof message.content === 'string' ? message.content : '',
+      finishReason: data.choices?.[0]?.finish_reason,
+      toolCalls: (message.tool_calls as Array<Record<string, unknown>> | undefined) ?? undefined,
+      thinking: typeof message.reasoning_content === 'string' && (message.reasoning_content).length > 0
+        ? (message.reasoning_content)
+        : undefined,
+    };
   }
 
   /**

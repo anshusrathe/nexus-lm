@@ -2,7 +2,7 @@
  * OpenRouter Service - Handles API calls to OpenRouter's API
  */
 import { requestUrl, type RequestUrlResponse } from 'obsidian';
-import { simulatedStream, fetchStream, createSSEParser } from '../utils/streamingUtils';
+import { simulatedStream, fetchStream, createSSEParser, PartialStreamError } from '../utils/streamingUtils';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -73,7 +73,8 @@ export class OpenRouterService {
   async generateContent(
     model: string,
     messages: ChatMessage[],
-    options?: GenerationOptions
+    options?: GenerationOptions,
+    onFinish?: (finishReason: string) => void
   ): Promise<string> {
     const body: Record<string, unknown> = {
       model,
@@ -113,7 +114,10 @@ export class OpenRouterService {
       this.onHeadersReceived(headersObj);
     }
 
-    return (response.json as OpenAIChatCompletionResponse).choices?.[0]?.message?.content || '';
+    const data = response.json as OpenAIChatCompletionResponse;
+    const finishReason = data.choices?.[0]?.finish_reason;
+    if (finishReason && onFinish) onFinish(finishReason);
+    return data.choices?.[0]?.message?.content || '';
   }
 
   async generateContentStream(
@@ -121,7 +125,8 @@ export class OpenRouterService {
     messages: ChatMessage[],
     options: GenerationOptions | undefined,
     onChunk: (chunk: string) => void,
-    onThinking?: (thinking: string) => void
+    onThinking?: (thinking: string) => void,
+    onFinish?: (finishReason: string) => void
   ): Promise<string> {
     const fullHeaders: Record<string, string> = {
       'Authorization': `Bearer ${this.apiKey}`,
@@ -146,7 +151,7 @@ export class OpenRouterService {
 
     const parser = createSSEParser();
     let fullContent = '';
-    const callbacks = { onChunk: (text: string) => { fullContent += text; onChunk(text); }, onThinking };
+    const callbacks = { onChunk: (text: string) => { fullContent += text; onChunk(text); }, onThinking, onFinish };
 
     // Primary: native fetch streaming (true token-level streaming)
     try {
@@ -160,6 +165,7 @@ export class OpenRouterService {
       );
       return fullContent;
     } catch (error) {
+      if (error instanceof PartialStreamError) throw error;
       if (error instanceof OpenRouterApiError) throw error;
           }
 
@@ -295,5 +301,78 @@ export class OpenRouterService {
     }
 
     return { content: fullContent, totalTokens };
+  }
+
+  /**
+   * Single-round native tool calling: one request, returns tool calls without executing them.
+   * The caller owns the tool execution loop.
+   */
+  async generateContentWithToolsOnce(
+    model: string,
+    messages: ConversationMessage[],
+    tools: Record<string, unknown>[],
+    options: GenerationOptions
+  ): Promise<{ content: string; finishReason?: string; toolCalls?: Array<Record<string, unknown>>; thinking?: string }> {
+    if (options.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+    const body: Record<string, unknown> = {
+      model,
+      messages,
+      temperature: options.temperature ?? 0.7,
+      top_p: options.topP ?? 1,
+      stream: false
+    };
+
+    if (options.maxTokens !== undefined) {
+      body.max_tokens = options.maxTokens;
+    }
+
+    if (tools && tools.length > 0) {
+      body.tools = tools;
+      body.tool_choice = options.toolChoice ?? 'auto';
+    }
+
+    const response = await requestUrl({
+      url: `${this.baseUrl}/chat/completions`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://obsidian.md',
+        'X-Title': 'Nexus-LM'
+      },
+      body: JSON.stringify(body),
+      throw: false
+    });
+
+    if (response.status >= 400) await this.handleRequestUrlError(response);
+
+    if (this.onHeadersReceived) {
+      const h = new Headers();
+      Object.entries(response.headers).forEach(([k, v]) => {
+          h.set(k, Array.isArray(v) ? v.join(', ') : v);
+      });
+      this.onHeadersReceived(h);
+    }
+
+    const data = response.json as OpenAIChatCompletionResponse;
+    const message = data.choices?.[0]?.message;
+    if (!message) return { content: '' };
+
+    const reasoning = message.reasoning;
+    const thinking = typeof message.reasoning_content === 'string' && (message.reasoning_content).length > 0
+      ? (message.reasoning_content)
+      : typeof reasoning === 'string' && reasoning.length > 0
+        ? reasoning
+        : typeof reasoning === 'object' && reasoning !== null && typeof reasoning.content === 'string' && (reasoning.content).length > 0
+          ? (reasoning.content)
+          : undefined;
+
+    return {
+      content: typeof message.content === 'string' ? message.content : '',
+      finishReason: data.choices?.[0]?.finish_reason,
+      toolCalls: (message.tool_calls as Array<Record<string, unknown>> | undefined) ?? undefined,
+      thinking,
+    };
   }
 }

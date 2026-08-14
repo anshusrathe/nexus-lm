@@ -79,14 +79,14 @@ export class BookmarkView extends ItemView {
             const metadataLine = content.createDiv({ cls: 'entry-metadata-line' });
             
             if (entry.author) {
-                metadataLine.createEl('span', { text: entry.author, cls: 'entry-author' });
+                metadataLine.createSpan({ text: entry.author, cls: 'entry-author' });
             }
 
             if (entry.pubDate) {
                 try {
                     const date = new Date(entry.pubDate);
                     if (!isNaN(date.getTime())) {
-                        metadataLine.createEl('span', { 
+                        metadataLine.createSpan({ 
                             text: date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }), 
                             cls: 'entry-date' 
                         });
@@ -95,7 +95,7 @@ export class BookmarkView extends ItemView {
                   // Failed to parse - keep previous value
                 }
             } else if (!entry.author) {
-                metadataLine.createEl('span', { text: 'No Date', cls: 'entry-date' });
+                metadataLine.createSpan({ text: 'No Date', cls: 'entry-date' });
             }
 
             

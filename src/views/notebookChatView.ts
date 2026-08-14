@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf, Notice, TFile, ButtonComponent, TextAreaComponent, setIcon, Platform, App, type ViewStateResult } from 'obsidian';
 import { MarkdownRenderer, Component } from 'obsidian';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { AISettings, Provider, getModelsGroupedByProvider, getModelDisplayName, getModelTemperature, getModelTopP } from '../settings';
+import { AISettings, getModelsGroupedByProvider, getModelDisplayName, getModelTemperature, getModelTopP, getModelZapColor } from '../settings';
 import { Notebook, NotebookChatHistoryManager, NotebookChatSession, NotebookChatSessionMeta } from '../managers/notebookManager';
 import AIPlugin from '../main';
 import { Modal, Setting } from 'obsidian';
@@ -24,6 +24,9 @@ import {
   FlashcardState
 } from '../managers/notebookQuizFlashcards';
 import { NotebookBM25Manager, NotebookSourceStatus as BM25SourceStatus } from '../managers/notebookBM25Manager';
+import { createDetached } from '../utils/domUtils';
+import { extractTextFromFile, isExtractable } from '../utils/localFileExtractor';
+import { buildWebpageContext } from '../utils/webpageContext';
 
 export const VIEW_TYPE_NOTEBOOK_CHAT = 'notebook-chat-view';
 
@@ -83,11 +86,9 @@ export class NotebookChatView extends ItemView {
   private ragSettingsContainer!: HTMLElement;
   private isIndexing: boolean = false;
 
-  
   private dynamicTokens: number = 0; 
   private cagHistoryContextLength: number = 0; 
 
-  
   private isMobile: boolean = Platform.isMobile;
   private mobileActiveTab: 'sources' | 'chat' = 'chat';
   private mobileTabRow!: HTMLElement;
@@ -97,22 +98,18 @@ export class NotebookChatView extends ItemView {
   private isGenerating: boolean = false;
   private tokenBarResetTimeout: number | null = null;
 
-  
   private contextCache: {
     context: string;
     noteMeta: { path: string; mtime: number }[];
     sourcePaths: string[];
   } | null = null;
 
-  
   private cacheDir: string = '.Nexus-LM-data/notebook-cache';
 
-  
   private getCacheFilePath(): string {
     return normalizePath(`${this.cacheDir}/${this.notebook.id}.json`);
   }
 
-  
   private async loadPersistentCache(): Promise<void> {
     try {
       const cachePath = this.getCacheFilePath();
@@ -126,11 +123,8 @@ export class NotebookChatView extends ItemView {
     }
   }
 
-  
-
   private async savePersistentCache(): Promise<void> {
     try {
-      
       const exists = await this.app.vault.adapter.exists(this.cacheDir);
       if (!exists) {
         await this.app.vault.adapter.mkdir(this.cacheDir);
@@ -142,11 +136,7 @@ export class NotebookChatView extends ItemView {
     }
   }
 
-  
-
-  
   private async getCachedContext(): Promise<string> {
-    
     const effectivePaths = this.getEffectiveSourcePaths();
     const selectedPaths = effectivePaths.filter(p => this.selectedSourcePaths.has(p));
     
@@ -165,10 +155,7 @@ export class NotebookChatView extends ItemView {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (file instanceof TFile) {
           try {
-            const content = await this.app.vault.read(file);
-            
-            
-            
+            const content = await extractTextFromFile(this.app, file);
             fileContents.push(`--- File: ${file.basename} ---\n${content}\n`);
             noteMeta.push({ path, mtime: file.stat.mtime });
           } catch {
@@ -176,7 +163,6 @@ export class NotebookChatView extends ItemView {
           }
         }
       }
-      
       
       const context = fileContents.join('\n');
       this.contextCache = {
@@ -189,14 +175,11 @@ export class NotebookChatView extends ItemView {
     return this.contextCache.context;
   }
 
-  
   private async getContextForExplanation(question: string): Promise<string> {
-    
     if (this.notebook.mode === 'rag' && this.notebookBM25Manager) {
       try {
         const isIndexed = await this.notebookBM25Manager.isIndexed();
         if (isIndexed) {
-          
           const effectivePaths = this.getEffectiveSourcePaths();
           const selectedPaths = effectivePaths.filter(p => this.selectedSourcePaths.has(p));
           if (selectedPaths.length > 0) {
@@ -226,8 +209,6 @@ export class NotebookChatView extends ItemView {
     return await this.getCachedContext();
   }
 
-  
-
   /**
    * Expand user query using LLM to improve retrieval
    * Generates paraphrases, sub-queries, and key terms
@@ -240,9 +221,7 @@ export class NotebookChatView extends ItemView {
       keyTerms: []
     };
 
-    
     if (query.length < 15 || query.split(/\s+/).length < 4) {
-      
       result.keyTerms = this.extractKeyTerms(query);
       result.expanded = query;
       return result;
@@ -548,7 +527,6 @@ Rules:
   private currentSourceMapping: string[] = []; 
   private sourceViewMode: 'notes' | 'web' = 'notes'; 
   private effectiveWebSourcesCache: { url: string; name: string }[] = []; 
-  private previousModel: { modelId: string; provider: Provider } | null = null; 
 
   constructor(leaf: WorkspaceLeaf, settings: AISettings, plugin: AIPlugin) {
     super(leaf);
@@ -579,8 +557,8 @@ Rules:
         const folder = this.app.vault.getAbstractFileByPath(folderPath);
         if (folder && 'children' in folder) {
           
-          const files = this.app.vault.getMarkdownFiles().filter((file: TFile) =>
-            file.path.startsWith(folderPath + '/')
+          const files = this.app.vault.getFiles().filter((file: TFile) =>
+            file.path.startsWith(folderPath + '/') && isExtractable(file.name)
           );
           files.forEach((file: TFile) => paths.add(file.path));
         }
@@ -752,7 +730,7 @@ Rules:
     this.sessionListContainer.empty();
     const sessions = await this.chatHistoryManager.listSessions(this.notebook.id);
     if (sessions.length === 0) {
-      this.sessionListContainer.createEl('div', { text: 'No sessions yet. Start a new one!', cls: 'no-sessions-message' });
+      this.sessionListContainer.createDiv({ text: 'No sessions yet. Start a new one!', cls: 'no-sessions-message' });
       return;
     }
     sessions.forEach(meta => {
@@ -1013,7 +991,7 @@ Rules:
     sendBtn.addEventListener('click', () => void this.handleSendMessage());
 
     this.chatInput.inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !Platform.isMobile) {
         e.preventDefault();
         void this.handleSendMessage();
       }
@@ -1149,7 +1127,7 @@ Rules:
     sendBtn.addEventListener('click', () => void this.handleSendMessage());
 
     this.chatInput.inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !Platform.isMobile) {
         e.preventDefault();
         void this.handleSendMessage();
       }
@@ -1327,17 +1305,6 @@ Rules:
     notesButton.addEventListener('click', () => { void (async () => {
       if (this.sourceViewMode !== 'notes') {
         this.sourceViewMode = 'notes';
-        
-        
-        if (this.previousModel) {
-          this.settings.notebookModel = this.previousModel.modelId;
-          this.settings.notebookProvider = this.previousModel.provider;
-          await this.plugin.saveSettings();
-          this.modelSelectButton.setButtonText(getModelDisplayName(this.settings.notebookModel, this.settings));
-          void this.updateContextBar();
-          this.previousModel = null; 
-        }
-        
         this.renderMobileSourcesPanel();
       }
     })(); });
@@ -1345,35 +1312,6 @@ Rules:
     webButton.addEventListener('click', () => { void (async () => {
       if (this.sourceViewMode !== 'web') {
         this.sourceViewMode = 'web';
-
-        const currentModelId = this.settings.notebookModel;
-        const currentProvider = this.settings.notebookProvider;
-        
-        if (currentProvider !== 'gemini' && currentProvider !== 'ollama') {
-          this.previousModel = {
-            modelId: currentModelId,
-            provider: currentProvider
-          };
-          
-          const webCapableModels = this.settings.customModels.filter(m => 
-            (m.provider === 'gemini' || m.provider === 'ollama') && m.enabled !== false
-          );
-
-          if (webCapableModels.length > 0) {
-            this.settings.notebookModel = webCapableModels[0].id;
-            this.settings.notebookProvider = webCapableModels[0].provider;
-            await this.plugin.saveSettings();
-            this.modelSelectButton.setButtonText(getModelDisplayName(this.settings.notebookModel, this.settings));
-            void void this.updateContextBar();
-
-            
-            new Notice(`Switched to ${webCapableModels[0].name} (Web sources require Gemini or Ollama models)`);
-          } else {
-            
-            new Notice('⚠️ Web sources require Gemini or Ollama models. Please configure these models in settings.', 5000);
-          }
-        }
-
         this.renderMobileSourcesPanel();
       }
     })(); });
@@ -1474,7 +1412,7 @@ Rules:
         const fileName = file instanceof TFile ? file.basename : path.split('/').pop();
         const row = list.createDiv({ cls: 'source-row' });
         const label = row.createEl('label', { cls: 'source-label' });
-        const checkbox = this.activeDocument.createElement('input');
+        const checkbox = createDetached(this.activeDocument, 'input');
         checkbox.type = 'checkbox';
         checkbox.checked = this.selectedSourcePaths.has(path);
         if (anyWebChecked) checkbox.disabled = true;
@@ -1489,7 +1427,7 @@ Rules:
           void this.updateContextBar();
         });
         label.appendChild(checkbox);
-        const nameSpan = this.activeDocument.createElement('span');
+        const nameSpan = createDetached(this.activeDocument, 'span');
         nameSpan.textContent = ' ' + fileName;
         nameSpan.addClass('nl-font-weight-bold');
         label.appendChild(nameSpan);
@@ -1499,12 +1437,12 @@ Rules:
           const sourceStatus = this.sourceStatuses.find(s => s.path === path);
           if (sourceStatus) {
             if (sourceStatus.hasChanges) {
-              const glowDot = this.activeDocument.createElement('span');
+              const glowDot = createDetached(this.activeDocument, 'span');
               glowDot.className = 'source-change-indicator';
               glowDot.title = 'Source has changed since last indexing';
               row.appendChild(glowDot);
             } else if (!sourceStatus.isIndexed) {
-              const notIndexedDot = this.activeDocument.createElement('span');
+              const notIndexedDot = createDetached(this.activeDocument, 'span');
               notIndexedDot.className = 'source-not-indexed-indicator';
               notIndexedDot.title = 'Source not indexed yet';
               row.appendChild(notIndexedDot);
@@ -1521,7 +1459,7 @@ Rules:
           const webKey = `web:${web.url}`;
           const row = list.createDiv({ cls: 'source-row web-source-row' });
           const label = row.createEl('label', { cls: 'source-label web-source-label' });
-          const checkbox = this.activeDocument.createElement('input');
+          const checkbox = createDetached(this.activeDocument, 'input');
           checkbox.type = 'checkbox';
           checkbox.checked = this.selectedSourcePaths.has(webKey);
           if (anyNoteChecked) checkbox.disabled = true;
@@ -1536,7 +1474,7 @@ Rules:
             this.renderMobileSourcesPanel();
           });
           label.appendChild(checkbox);
-          const nameSpan = this.activeDocument.createElement('span');
+          const nameSpan = createDetached(this.activeDocument, 'span');
           nameSpan.textContent = ' ' + web.name;
           nameSpan.className = 'web-source-name';
           label.appendChild(nameSpan);
@@ -1550,7 +1488,7 @@ Rules:
   private openPrefixMenu(anchorEl: HTMLElement) {
     this.closePrefixMenu();
 
-    const menu = this.activeDocument.createElement('div');
+    const menu = createDetached(this.activeDocument, 'div');
     menu.className = 'context-file-menu notebook-prefix-menu';
 
     const rect = anchorEl.getBoundingClientRect();
@@ -1567,15 +1505,15 @@ Rules:
     ];
 
     prefixOptions.forEach(opt => {
-      const item = this.activeDocument.createElement('div');
+      const item = createDetached(this.activeDocument, 'div');
       item.className = 'context-file-menu-item';
 
-      const labelSpan = this.activeDocument.createElement('span');
+      const labelSpan = createDetached(this.activeDocument, 'span');
       labelSpan.textContent = opt.label;
       labelSpan.addClass('nl-font-weight-500');
       item.appendChild(labelSpan);
 
-      const descSpan = this.activeDocument.createElement('span');
+      const descSpan = createDetached(this.activeDocument, 'span');
       descSpan.textContent = opt.description;
       descSpan.addClass('nl-css-text-remaining-7');
       item.appendChild(descSpan);
@@ -1634,6 +1572,12 @@ Rules:
 
   private renderSourcesPanel() {
     
+    if (this.isMobile) {
+      this.renderMobileSourcesPanel();
+      return;
+    }
+
+    
     const contextBar = this.contextBarContainer;
     const sessionBar = this.sourcesContainer.querySelector('.session-bar');
     this.sourcesContainer.empty();
@@ -1648,7 +1592,7 @@ Rules:
     
     if (!this.effectiveWebSourcesCache || (this.notebook.mode === 'rag' && !this.notebookBM25Manager)) {
       const loadingDiv = this.sourcesContainer.createDiv({ cls: 'sources-loading' });
-      loadingDiv.createEl('div', { text: 'Loading sources...', cls: 'sources-loading-text' });
+      loadingDiv.createDiv({ text: 'Loading sources...', cls: 'sources-loading-text' });
       return;
     }
 
@@ -1682,17 +1626,6 @@ Rules:
     notesButton.addEventListener('click', () => { void (async () => {
       if (this.sourceViewMode !== 'notes') {
         this.sourceViewMode = 'notes';
-        
-        
-        if (this.previousModel) {
-          this.settings.notebookModel = this.previousModel.modelId;
-          this.settings.notebookProvider = this.previousModel.provider;
-          await this.plugin.saveSettings();
-          this.modelSelectButton.setButtonText(getModelDisplayName(this.settings.notebookModel, this.settings));
-          void this.updateContextBar();
-          this.previousModel = null; 
-        }
-        
         this.renderSourcesPanel();
       }
     })(); });
@@ -1700,39 +1633,6 @@ Rules:
     webButton.addEventListener('click', () => { void (async () => {
       if (this.sourceViewMode !== 'web') {
         this.sourceViewMode = 'web';
-
-        
-        const currentModelId = this.settings.notebookModel;
-        const currentProvider = this.settings.notebookProvider;
-        
-        if (currentProvider !== 'gemini' && currentProvider !== 'ollama') {
-          
-          this.previousModel = {
-            modelId: currentModelId,
-            provider: currentProvider
-          };
-          
-          
-          const webCapableModels = this.settings.customModels.filter(m => 
-            (m.provider === 'gemini' || m.provider === 'ollama') && m.enabled !== false
-          );
-
-          if (webCapableModels.length > 0) {
-            
-            this.settings.notebookModel = webCapableModels[0].id;
-            this.settings.notebookProvider = webCapableModels[0].provider;
-            await this.plugin.saveSettings();
-            this.modelSelectButton.setButtonText(getModelDisplayName(this.settings.notebookModel, this.settings));
-            void this.updateContextBar();
-
-            
-            new Notice(`Switched to ${webCapableModels[0].name} (Web sources require Gemini or Ollama models)`);
-          } else {
-            
-            new Notice('⚠️ Web sources require Gemini or Ollama models. Please configure these models in settings.', 5000);
-          }
-        }
-
         this.renderSourcesPanel();
       }
     })(); });
@@ -1876,7 +1776,7 @@ Rules:
         const fileName = file instanceof TFile ? file.basename : path.split('/').pop();
         const row = list.createDiv({ cls: 'source-row' });
         const label = row.createEl('label', { cls: 'source-label' });
-        const checkbox = this.activeDocument.createElement('input');
+        const checkbox = createDetached(this.activeDocument, 'input');
         checkbox.type = 'checkbox';
         checkbox.checked = this.selectedSourcePaths.has(path);
         if (anyWebChecked) checkbox.disabled = true;
@@ -1891,7 +1791,7 @@ Rules:
         });
         label.appendChild(checkbox);
         
-        const nameSpan = this.activeDocument.createElement('span');
+        const nameSpan = createDetached(this.activeDocument, 'span');
         nameSpan.textContent = ' ' + fileName;
         nameSpan.addClass('nl-font-weight-bold');
         label.appendChild(nameSpan);
@@ -1901,13 +1801,13 @@ Rules:
           const sourceStatus = this.sourceStatuses.find(s => s.path === path);
           if (sourceStatus) {
             if (sourceStatus.hasChanges) {
-              const glowDot = this.activeDocument.createElement('span');
+              const glowDot = createDetached(this.activeDocument, 'span');
               glowDot.className = 'source-change-indicator';
               glowDot.title = 'Source has changed since last indexing. Click to refresh.';
               glowDot.addEventListener('click', (e) => { e.stopPropagation(); void this.refreshSourceEmbedding(path); });
               row.appendChild(glowDot);
             } else if (!sourceStatus.isIndexed) {
-              const notIndexedDot = this.activeDocument.createElement('span');
+              const notIndexedDot = createDetached(this.activeDocument, 'span');
               notIndexedDot.className = 'source-not-indexed-indicator';
               notIndexedDot.title = 'Source not indexed yet. Click to index.';
               notIndexedDot.addEventListener('click', (e) => { e.stopPropagation(); void this.refreshSourceEmbedding(path); });
@@ -1925,7 +1825,7 @@ Rules:
           const webKey = `web:${web.url}`;
           const row = list.createDiv({ cls: 'source-row web-source-row' });
           const label = row.createEl('label', { cls: 'source-label web-source-label' });
-          const checkbox = this.activeDocument.createElement('input');
+          const checkbox = createDetached(this.activeDocument, 'input');
           checkbox.type = 'checkbox';
           checkbox.checked = this.selectedSourcePaths.has(webKey);
           if (anyNoteChecked) checkbox.disabled = true;
@@ -1939,18 +1839,13 @@ Rules:
             void this.updateContextBar();
           });
           label.appendChild(checkbox);
-          const nameSpan = this.activeDocument.createElement('span');
+          const nameSpan = createDetached(this.activeDocument, 'span');
           nameSpan.textContent = ' ' + web.name;
           nameSpan.className = 'web-source-name';
           label.appendChild(nameSpan);
           row.appendChild(label);
         });
       }
-    }
-
-    
-    if (this.isMobile) {
-      this.renderMobileSourcesPanel();
     }
   }
 
@@ -1980,7 +1875,7 @@ Rules:
 
         
         const header = this.ragSettingsContainer.createDiv({ cls: 'rag-settings-header' });
-        header.createEl('span', { text: '⚡ Keyword Index', cls: 'rag-settings-title' });
+        header.createSpan({ text: '⚡ Keyword Index', cls: 'rag-settings-title' });
 
         
         const statusActionsContainer = this.ragSettingsContainer.createDiv({ cls: 'rag-status-actions-container' });
@@ -1998,7 +1893,7 @@ Rules:
           progressBarInner.addClass('nl-width-0');
 
           
-          progressContainer.createEl('span', { text: '0%', cls: 'rag-progress-text' });
+          progressContainer.createSpan({ text: '0%', cls: 'rag-progress-text' });
 
         } else {
           
@@ -2013,12 +1908,12 @@ Rules:
 
           
           if (chunkCount === 0) {
-            buildContainer.createEl('span', {
+            buildContainer.createSpan({
               text: 'Index not built yet',
               cls: 'rag-status-hint'
             });
           } else if (hasChanges) {
-            buildContainer.createEl('span', {
+            buildContainer.createSpan({
               text: `Changes detected in sources`,
               cls: 'rag-status-hint rag-status-warning'
             });
@@ -2834,7 +2729,8 @@ Rules:
           const groqMessages: GroqChatMessage[] = [];
 
           
-          const systemContent = this.buildGroqSystemPrompt(cachedContext);
+          const webSourceContext = await this.buildWebSourcesContext(selectedWebs);
+          const systemContent = this.buildGroqSystemPrompt(cachedContext) + webSourceContext;
           groqMessages.push({
             role: 'system',
             content: systemContent
@@ -2886,7 +2782,8 @@ Rules:
           const openRouterMessages: OpenRouterChatMessage[] = [];
 
           
-          const systemContent = this.buildGroqSystemPrompt(cachedContext);
+          const webSourceContext = await this.buildWebSourcesContext(selectedWebs);
+          const systemContent = this.buildGroqSystemPrompt(cachedContext) + webSourceContext;
           openRouterMessages.push({
             role: 'system',
             content: systemContent
@@ -2937,29 +2834,11 @@ Rules:
           );
 
           
-          let webSourceContext = '';
-          if (selectedWebs.length > 0) {
-            if (!this.settings.ollamaApiKey) {
-              new Notice('Ollama web source fetching requires an API key. Please add your Ollama API key in settings.');
-            } else {
-              const fetchedPages: { title: string; url: string; content: string }[] = [];
-              for (const web of selectedWebs) {
-                try {
-                  const pageData = await ollamaService.webFetch(web.url);
-                  fetchedPages.push({ title: pageData.title, url: web.url, content: pageData.content });
-                                  } catch (fetchError) {
-                                    new Notice(`Failed to fetch ${web.url}: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
-                }
-              }
-              if (fetchedPages.length > 0) {
-                webSourceContext = '\n\n--- WEB SOURCES ---\n\n';
-                fetchedPages.forEach((page, idx) => {
-                  webSourceContext += `--- Web Source [${idx + 1}]: ${page.title} (${page.url}) ---\n`;
-                  webSourceContext += `${page.content.substring(0, 5000)}\n\n`;
-                });
-              }
-            }
-          }
+          // Primary: Ollama's web fetch API. Fallback: requestUrl mechanism for failed/keyless fetches.
+          const webSourceContext = await this.buildWebSourcesContext(
+            selectedWebs,
+            this.settings.ollamaApiKey ? (url) => ollamaService.webFetch(url) : undefined
+          );
 
           
           const ollamaMessages: OllamaChatMessage[] = [];
@@ -3011,10 +2890,7 @@ Rules:
           
           
           
-          let webSourceContext = '';
-          if (selectedWebs.length > 0) {
-            new Notice(`${this.settings.notebookProvider} web source fetching requires enabling web search. Use @web prefix.`);
-          }
+          const webSourceContext = await this.buildWebSourcesContext(selectedWebs);
 
           if (this.settings.notebookProvider === 'nvidia') {
               const nvidiaService = new NvidiaService(
@@ -3026,7 +2902,7 @@ Rules:
               const nvidiaMessages: NvidiaChatMessage[] = [];
 
               
-              const systemContent = this.buildGroqSystemPrompt(cachedContext);
+              const systemContent = this.buildGroqSystemPrompt(cachedContext) + webSourceContext;
               nvidiaMessages.push({
                 role: 'system',
                 content: systemContent
@@ -3072,7 +2948,7 @@ Rules:
               const unifiedProvider = UnifiedProviderManager.getInstance().getProvider(this.settings.notebookProvider)!;
               
               const unifiedMessages: UnifiedMessage[] = [
-                { role: 'system', content: this.buildGroqSystemPrompt(cachedContext) + (webSourceContext || '') },
+                { role: 'system', content: this.buildGroqSystemPrompt(cachedContext) + webSourceContext },
                 ...this.messages.slice(-(this.notebook.contextLength !== undefined ? this.notebook.contextLength : 3)).map((m): UnifiedMessage => ({
                     role: m.role === 'user' ? 'user' : 'assistant',
                     content: m.content
@@ -3368,6 +3244,52 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     prompt += `CURRENT QUESTION:\nUser: ${userQuery}\n\nAssistant:`;
 
     return prompt;
+  }
+
+  /**
+   * Fetches selected web sources and formats them into a system-prompt context block.
+   * Uses the provided primary fetcher (e.g. Ollama's web fetch API) when given and
+   * falls back to the plugin's requestUrl mechanism (NativeFetchProvider, PDF.js for
+   * online PDFs) for any URL the primary fetcher could not retrieve.
+   */
+  private async buildWebSourcesContext(
+    selectedWebs: { url: string; name: string }[],
+    primaryFetch?: (url: string) => Promise<{ title: string; content: string }>
+  ): Promise<string> {
+    if (selectedWebs.length === 0) return '';
+
+    const primaryPages: { url: string; title: string; content: string }[] = [];
+    if (primaryFetch) {
+      for (const web of selectedWebs) {
+        try {
+          const page = await primaryFetch(web.url);
+          if (page.content && page.content.trim().length > 0) {
+            primaryPages.push({ url: web.url, title: page.title, content: page.content });
+          }
+        } catch (err: unknown) {
+          console.warn(`[NexusLM] Primary web fetch failed for ${web.url}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+
+    const primaryUrlSet = new Set(primaryPages.map(p => p.url));
+    const fallbackWebs = selectedWebs.filter(w => !primaryUrlSet.has(w.url));
+
+    let context = '';
+    if (primaryPages.length > 0) {
+      context += '\n\n--- WEB SOURCES ---\n\n';
+      primaryPages.forEach((page, index) => {
+        context += `--- Web Source [${index + 1}]: ${page.title} (${page.url}) ---\n`;
+        context += `${page.content.substring(0, 5000)}\n\n`;
+      });
+    }
+
+    if (fallbackWebs.length > 0) {
+      const fallback = await buildWebpageContext(this.plugin.webSearchService, fallbackWebs.map(w => w.url));
+      context += fallback.context;
+    }
+
+    return context;
   }
 
   /**
@@ -3689,7 +3611,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         }
 
         if (targetEl) {
-          const tooltip = this.activeDocument.createElement('div');
+          const tooltip = createDetached(this.activeDocument, 'div');
           tooltip.classList.add('footnote-tooltip');
           tooltip.addClass('footnote-tooltip-style');
 
@@ -3741,7 +3663,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         const id = itemEl.getAttribute('id');
 
         if (id) {
-          const backArrow = this.activeDocument.createElement('a');
+          const backArrow = createDetached(this.activeDocument, 'a');
           backArrow.classList.add('footnote-backref');
           backArrow.textContent = ' ↩';
           backArrow.setAttribute('aria-label', 'Back to content');
@@ -3777,14 +3699,14 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     }
     const modelBtn = this.modelSelectButton.buttonEl;
     if (!modelBtn) return;
-    const menuEl = this.activeDocument.createElement('div');
+    const menuEl = createDetached(this.activeDocument, 'div');
     menuEl.className = 'model-select-menu';
 
     
-    const searchContainer = this.activeDocument.createElement('div');
+    const searchContainer = createDetached(this.activeDocument, 'div');
     searchContainer.className = 'model-search-container';
 
-    const searchInput = this.activeDocument.createElement('input');
+    const searchInput = createDetached(this.activeDocument, 'input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Search models...';
     searchInput.className = 'model-search-input';
@@ -3800,40 +3722,9 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
     let modelGroups = getModelsGroupedByProvider(this.settings);
 
     
-    if (this.sourceViewMode === 'web') {
-      modelGroups = modelGroups.filter(group => group.provider === 'gemini' || group.provider === 'ollama' || group.provider === 'nvidia');
-
-      
-      if (modelGroups.length === 0) {
-        const noticeEl = this.activeDocument.createElement('div');
-        noticeEl.className = 'model-select-menu-notice';
-        noticeEl.textContent = '⚠️ Web sources require Gemini, Ollama, or NVIDIA models. Please configure these models in settings.';
-        menuEl.appendChild(noticeEl);
-
-        this.activeDocument.body.appendChild(menuEl);
-        const btnRect = modelBtn.getBoundingClientRect();
-        const menuRect = menuEl.getBoundingClientRect();
-        menuEl.setCssProps({ '--menu-left':  `${btnRect.left}px` });
-        menuEl.setCssProps({ '--menu-top':  `${btnRect.top - menuRect.height - 8}px` });
-
-        window.setTimeout(() => {
-          this.activeDocument.addEventListener('click', closeMenuNotice);
-        }, 0);
-
-        const closeMenuNotice = (event: MouseEvent) => {
-          if (!menuEl.contains(event.target as Node) && event.target !== modelBtn) {
-            menuEl.remove();
-            this.activeDocument.removeEventListener('click', closeMenuNotice);
-          }
-        };
-        return;
-      }
-    }
-
-    
     modelGroups.forEach((group, groupIndex) => {
       
-      const headerEl = this.activeDocument.createElement('div');
+      const headerEl = createDetached(this.activeDocument, 'div');
       headerEl.className = 'model-select-menu-header';
       headerEl.textContent = group.label;
       menuEl.appendChild(headerEl);
@@ -3844,15 +3735,23 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
 
       
       group.models.forEach(model => {
-        const menuItem = this.activeDocument.createElement('div');
+        const menuItem = createDetached(this.activeDocument, 'div');
         menuItem.className = 'model-select-menu-item';
         groupItems.push(menuItem);
         itemsToFilter.push({ itemEl: menuItem, name: model.name.toLowerCase() });
         
         
-        const textSpan = this.activeDocument.createElement('span');
+        const textSpan = createDetached(this.activeDocument, 'span');
         textSpan.textContent = model.name;
-        menuItem.appendChild(textSpan);
+        
+        const iconsContainer = createDetached(this.activeDocument, 'span');
+        iconsContainer.className = 'model-icons-container';
+        
+        const zapSpan = createDetached(this.activeDocument, 'span');
+        zapSpan.className = 'model-zap-icon';
+        setIcon(zapSpan, 'zap');
+        zapSpan.style.color = getModelZapColor(this.settings, model.provider, model.id);
+        iconsContainer.appendChild(zapSpan);
         
         
         const webCapableModels = [
@@ -3866,11 +3765,14 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
         const isWebCapable = model.provider === 'ollama' || webCapableModels.includes(model.id);
         
         if (isWebCapable) {
-          const iconSpan = this.activeDocument.createElement('span');
+          const iconSpan = createDetached(this.activeDocument, 'span');
           iconSpan.className = 'model-web-icon';
           setIcon(iconSpan, 'globe');
-          menuItem.appendChild(iconSpan);
+          iconsContainer.appendChild(iconSpan);
         }
+        
+        menuItem.appendChild(textSpan);
+        menuItem.appendChild(iconsContainer);
         
         if (model.id === this.settings.notebookModel) {
           menuItem.classList.add('is-active');
@@ -3888,7 +3790,7 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
 
       
       if (groupIndex < modelGroups.length - 1) {
-        const separator = this.activeDocument.createElement('div');
+        const separator = createDetached(this.activeDocument, 'div');
         separator.className = 'model-select-menu-separator';
         menuEl.appendChild(separator);
         headerObj.separatorEl = separator;
@@ -3908,12 +3810,13 @@ CRITICAL CITATION REQUIREMENTS (YOU MUST FOLLOW THESE):
       });
     });
 
-    this.activeDocument.body.appendChild(menuEl);
+    this.container.appendChild(menuEl);
     
     const btnRect = modelBtn.getBoundingClientRect();
+    const containerRect = this.container.getBoundingClientRect();
     const menuRect = menuEl.getBoundingClientRect();
-    menuEl.setCssProps({ '--menu-left':  `${btnRect.left}px` });
-    menuEl.setCssProps({ '--menu-top':  `${btnRect.top - menuRect.height - 8}px` });
+    menuEl.setCssProps({ '--menu-right':  `${containerRect.right - btnRect.right}px` });
+    menuEl.setCssProps({ '--menu-top':  `${btnRect.top - containerRect.top - menuRect.height - 8}px` });
     window.setTimeout(() => {
       this.activeDocument.addEventListener('click', closeMenu);
     }, 0);

@@ -6,7 +6,8 @@ import { GroqService, ChatMessage } from '../services/groqService';
 import { OpenRouterService, ChatMessage as OpenRouterChatMessage } from '../services/openRouterService';
 import { OllamaService, ChatMessage as OllamaChatMessage } from '../services/ollamaService';
 import { NvidiaService, ChatMessage as NvidiaChatMessage } from '../services/nvidiaService';
-import { MultimodalInput, processFileForMultimodal, isTextFile } from '../utils/multimodalUtils';
+import { MultimodalInput, processFileForMultimodal } from '../utils/multimodalUtils';
+import { isExtractable, extractTextFromFile } from '../utils/localFileExtractor';
 import { UnifiedProviderManager } from '../services/unifiedProviderManager';
 
 interface GeminiPart {
@@ -115,9 +116,9 @@ export class QnAManager {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!file || !(file instanceof TFile)) return;
         
-        // Check if it's a text file (markdown, txt, etc.)
-        if (file.extension === 'md' || isTextFile(file.name)) {
-          const content = await this.app.vault.read(file);
+        // Check if it's an extractable text file (markdown, txt, docx, xlsx, pdf, etc.)
+        if (isExtractable(file.name)) {
+          const content = await extractTextFromFile(this.app, file);
           textContents.push({
             title: file.basename,
             content: content.trim()

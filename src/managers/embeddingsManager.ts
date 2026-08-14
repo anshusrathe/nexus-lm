@@ -1,7 +1,9 @@
-import { App, TFile, Notice, requestUrl } from 'obsidian';
+import { App, TFile, Notice, requestUrl, Platform } from 'obsidian';
 import { AISettings, getProviderForEmbeddingModel } from '../settings';
+import { normalizeOpenAIBaseUrl } from '../services/customOpenAIProvider';
 import { parseTemporalQuery } from '../utils/temporalFilter';
 import { OramaWorkerManager } from '../utils/oramaWorkerManager';
+import { extractTextFromFile, SUPPORTED_EXTRACTABLE_EXTENSIONS } from '../utils/localFileExtractor';
 
 type IndexConfiguration = {
     id: string;
@@ -16,6 +18,7 @@ type IndexConfiguration = {
     buildError?: string;
     excludedFolders?: string[];
     excludedFiles?: string[];
+    indexAllFileTypes?: boolean;
 };
 
 interface OramaHitDocument {
@@ -23,6 +26,8 @@ interface OramaHitDocument {
     chunkIndex: number;
     content?: string;
     lastModified: number;
+    lineStart?: number;
+    lineEnd?: number;
 }
 
 interface DocumentChunk {
@@ -32,6 +37,8 @@ interface DocumentChunk {
     embedding: number[];
     lastModified: number;
     hasEmbedding?: boolean;
+    lineStart?: number;  // 1-indexed line where this chunk begins in the source file
+    lineEnd?: number;    // 1-indexed line where this chunk ends in the source file
     metadata?: {
         title?: string;
         headings?: string;
@@ -541,7 +548,7 @@ export class EmbeddingsManager {
      * @param content - The content to split
      * @param chunkSize - Optional chunk size in characters (defaults based on provider)
      */
-    private splitIntoChunks(content: string, chunkSize?: number): string[] {
+    private splitIntoChunks(content: string, chunkSize?: number): Array<{ text: string; lineStart: number; lineEnd: number }> {
         if (!content || content.trim().length === 0) {
             return [];
         }
@@ -570,14 +577,35 @@ export class EmbeddingsManager {
         const overlap = provider === 'ollama'
             ? EmbeddingsManager.CHUNK_OVERLAP_CHARS_OLLAMA
             : Math.floor(chunkSize * 0.1);
-        
+
+        // Pre-compute line start positions for O(1) line number lookups
+        // lineStartOffsets[i] = character offset where line (i+1) starts
+        const lineStartOffsets: number[] = [0]; // Line 1 starts at offset 0
+        for (let k = 0; k < content.length; k++) {
+            if (content[k] === '\n') {
+                lineStartOffsets.push(k + 1);
+            }
+        }
+        const totalLines = lineStartOffsets.length;
+
+        // Helper: given a character offset, return 1-indexed line number
+        const getLineNumber = (charOffset: number): number => {
+            // Binary search for the largest lineStartOffsets[i] <= charOffset
+            let lo = 0, hi = lineStartOffsets.length - 1;
+            while (lo < hi) {
+                const mid = (lo + hi + 1) >> 1;
+                if (lineStartOffsets[mid] <= charOffset) lo = mid;
+                else hi = mid - 1;
+            }
+            return lo + 1; // 1-indexed
+        };
         
         // If content is smaller than chunk size, return as single chunk
         if (content.length <= chunkSize) {
-            return [content.trim()];
+            return [{ text: content.trim(), lineStart: 1, lineEnd: totalLines }];
         }
 
-        const chunks: string[] = [];
+        const chunks: Array<{ text: string; lineStart: number; lineEnd: number }> = [];
         let startIndex = 0;
         while (startIndex < content.length) {
             let endIndex = Math.min(startIndex + chunkSize, content.length);
@@ -601,7 +629,10 @@ export class EmbeddingsManager {
 
             const chunk = content.substring(startIndex, endIndex).trim();
             if (chunk.length > 0) {
-                chunks.push(chunk);
+                const lineStart = getLineNumber(startIndex);
+                // endIndex points past the chunk; the last char of the chunk is at endIndex-1
+                const lineEnd = getLineNumber(Math.max(startIndex, endIndex - 1));
+                chunks.push({ text: chunk, lineStart, lineEnd });
             }
 
             // Move start index, accounting for overlap
@@ -615,6 +646,7 @@ export class EmbeddingsManager {
 
         return chunks;
     }
+
 
     async getEmbedding(text: string, isQuery: boolean = false): Promise<number[]> {
         try {
@@ -638,6 +670,8 @@ export class EmbeddingsManager {
                 if (!this.settings.nvidiaApiKey || this.settings.nvidiaApiKey.trim() === '') {
                                         throw new Error('NVIDIA API key is required for NVIDIA embeddings. Please configure your NVIDIA API key in settings.');
                 }
+            } else if (provider === 'lmstudio') {
+                // LM Studio requires no API key (optional token only)
                             } else {
                 // Check if it's a custom provider
                 const customProvider = this.settings.customProviders?.find(p => p.id === provider);
@@ -661,7 +695,7 @@ export class EmbeddingsManager {
                 ? EmbeddingsManager.MAX_EMBEDDING_CHARS_OPENROUTER 
                 : provider === 'ollama'
                 ? EmbeddingsManager.MAX_EMBEDDING_CHARS_OLLAMA
-                : provider === 'nvidia'
+                : provider === 'nvidia' || provider === 'lmstudio'
                 ? EmbeddingsManager.MAX_EMBEDDING_CHARS_NVIDIA
                 : EmbeddingsManager.MAX_EMBEDDING_CHARS_GEMINI;
             
@@ -679,6 +713,8 @@ export class EmbeddingsManager {
                                 return await this.getOllamaEmbedding(contentForEmbedding, embeddingModel);
             } else if (provider === 'nvidia') {
                                 return await this.getNvidiaEmbedding(contentForEmbedding, embeddingModel, this.settings.nvidiaApiKey, isQuery);
+            } else if (provider === 'lmstudio') {
+                                return await this.getLmStudioEmbedding(contentForEmbedding, embeddingModel);
             } else {
                 // Check if it's a custom provider
                 const customProvider = this.settings.customProviders?.find(p => p.id === provider);
@@ -720,6 +756,8 @@ export class EmbeddingsManager {
                 return await this.getOllamaEmbeddingBatch(texts, embeddingModel);
             } else if (provider === 'nvidia') {
                 return await this.getNvidiaEmbeddingBatch(texts, embeddingModel, nvidiaApiKey, isQuery);
+            } else if (provider === 'lmstudio') {
+                return await this.getLmStudioEmbeddingBatch(texts, embeddingModel);
             } else {
                 // Check if it's a custom provider
                 const customProvider = this.settings.customProviders?.find(p => p.id === provider);
@@ -808,6 +846,30 @@ export class EmbeddingsManager {
             }
             
             return resJson.data.map((item: { embedding: number[] }) => item.embedding);
+    }
+
+    /**
+     * Get embedding from LM Studio's local server (OpenAI-compatible /embeddings)
+     */
+    private async getLmStudioEmbedding(text: string, modelId: string): Promise<number[]> {
+        const lmProvider: Record<string, unknown> = {
+            name: 'LM Studio',
+            baseUrl: normalizeOpenAIBaseUrl(this.settings.lmStudioBaseUrl || 'http://localhost:1234'),
+            apiKey: this.settings.lmStudioApiToken || ''
+        };
+        return await this.getCustomProviderEmbedding(text, modelId, lmProvider);
+    }
+
+    /**
+     * Get embeddings from LM Studio's local server in batch
+     */
+    private async getLmStudioEmbeddingBatch(texts: string[], modelId: string): Promise<number[][]> {
+        const lmProvider: Record<string, unknown> = {
+            name: 'LM Studio',
+            baseUrl: normalizeOpenAIBaseUrl(this.settings.lmStudioBaseUrl || 'http://localhost:1234'),
+            apiKey: this.settings.lmStudioApiToken || ''
+        };
+        return await this.getCustomProviderEmbeddingBatch(texts, modelId, lmProvider);
     }
 
     /**
@@ -1154,16 +1216,26 @@ export class EmbeddingsManager {
      */
     async getEmbeddedFileCount(indexId?: string): Promise<number> {
         try {
-            // Load the specific index
             await this.loadIndex(indexId);
 
-            const uniqueFilesWithEmbeddings = new Set(
-                this.index.documents.map(doc => doc.path)
-            );
+            const indexConfig = this.settings.indexConfigurations.find(c => c.id === indexId);
+            const includeAllFileTypes = indexConfig?.indexAllFileTypes === true;
+
+            const uniqueFilesWithEmbeddings = new Set<string>();
+            for (const doc of this.index.documents) {
+                if (doc.path && !this.isFileExcluded(doc.path, indexId)) {
+                    const ext = doc.path.split('.').pop()?.toLowerCase() || '';
+                    if (ext === 'md' || (includeAllFileTypes && !Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(ext))) {
+                        uniqueFilesWithEmbeddings.add(doc.path);
+                    }
+                }
+            }
 
             // Include empty/no-content files so the count matches total eligible files
-            const allMdFiles = this.app.vault.getMarkdownFiles();
-            for (const f of allMdFiles) {
+            const allEligibleFiles = (includeAllFileTypes && !Platform.isMobile)
+                ? this.app.vault.getFiles().filter(f => SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(f.extension.toLowerCase()))
+                : this.app.vault.getMarkdownFiles();
+            for (const f of allEligibleFiles) {
                 if (!uniqueFilesWithEmbeddings.has(f.path) && !this.isFileExcluded(f.path, indexId) && (f.stat?.size || 0) === 0) {
                     uniqueFilesWithEmbeddings.add(f.path);
                 }
@@ -1171,7 +1243,7 @@ export class EmbeddingsManager {
 
             return uniqueFilesWithEmbeddings.size;
         } catch {
-                        return 0;
+            return 0;
         }
     }
     /**
@@ -1184,20 +1256,33 @@ export class EmbeddingsManager {
             const targetId = indexId || this.loadedIndexId || 'default-bm25';
             const metadata = await OramaWorkerManager.getInstance().getMetadata(targetId) as { documents?: Array<{ path: string }> } | undefined;
             const docs = metadata?.documents || [];
-            const uniquePaths = new Set(docs.map((d: { path: string }) => d.path));
+
+            const indexConfig = this.settings.indexConfigurations.find(c => c.id === indexId);
+            const includeAllFileTypes = indexConfig?.indexAllFileTypes === true;
+
+            const uniquePaths = new Set<string>();
+            for (const d of docs) {
+                if (d.path && !this.isFileExcluded(d.path, indexId)) {
+                    const ext = d.path.split('.').pop()?.toLowerCase() || '';
+                    if (ext === 'md' || (includeAllFileTypes && !Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(ext))) {
+                        uniquePaths.add(d.path);
+                    }
+                }
+            }
 
             // Include empty/no-content files so the count matches total eligible files
-            const allMdFiles = this.app.vault.getMarkdownFiles();
-            for (const f of allMdFiles) {
-                // BM25 uses global exclusions
-                if (!uniquePaths.has(f.path) && !this.isFileExcluded(f.path, undefined) && (f.stat?.size || 0) === 0) {
+            const allEligibleFiles = (includeAllFileTypes && !Platform.isMobile)
+                ? this.app.vault.getFiles().filter(f => SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(f.extension.toLowerCase()))
+                : this.app.vault.getMarkdownFiles();
+            for (const f of allEligibleFiles) {
+                if (!uniquePaths.has(f.path) && !this.isFileExcluded(f.path, indexId) && (f.stat?.size || 0) === 0) {
                     uniquePaths.add(f.path);
                 }
             }
 
             return uniquePaths.size;
         } catch {
-                        return 0;
+            return 0;
         }
     }
 
@@ -1260,13 +1345,21 @@ export class EmbeddingsManager {
             const useBatchProcessing = true;
             
             try {
-                // Get all markdown files, respecting per-index exclusions
+                // Get all files, respecting per-index exclusions and file type preference
                 const allFiles = this.app.vault.getFiles();
-                const allMarkdownFiles = allFiles.filter(file => file.extension === 'md' && !this.isFileExcluded(file.path, indexId));
+                const indexConfig = this.settings.indexConfigurations.find(c => c.id === indexId);
+                const includeAllFileTypes = indexConfig?.indexAllFileTypes === true;
 
-                // Avoid reading file content in this pre-pass — let the batch/sequential
-                // methods handle content reading and empty-file filtering inline.
-                const filesToProcess: TFile[] = allMarkdownFiles;
+                const eligibleFiles = allFiles.filter(file => {
+                    if (this.isFileExcluded(file.path, indexId)) return false;
+                    if (file.extension === 'md') return true;
+                    if (includeAllFileTypes && !Platform.isMobile) {
+                        return SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(file.extension);
+                    }
+                    return false;
+                });
+
+                const filesToProcess: TFile[] = eligibleFiles;
 
                 const total = filesToProcess.length;
                 let processed = 0;
@@ -1421,7 +1514,11 @@ export class EmbeddingsManager {
             // Read file content
             let content = '';
             try {
-                content = await this.app.vault.read(file);
+                if (file.extension === 'md') {
+                    content = await this.app.vault.read(file);
+                } else {
+                    content = await extractTextFromFile(this.app, file);
+                }
             } catch {
                 processed++;
                 continue;
@@ -1448,16 +1545,18 @@ export class EmbeddingsManager {
                 const chunk = chunks[i];
 
                 try {
-                    const embedding = await this.getEmbedding(chunk);
+                    const embedding = await this.getEmbedding(chunk.text);
 
                     // Create new chunk with embedding
                     const doc: DocumentChunk = {
                         path: file.path,
                         chunkIndex: i,
-                        content: chunk,
+                        content: chunk.text,
                         embedding,
                         lastModified: stats.mtime,
                         hasEmbedding: true,
+                        lineStart: chunk.lineStart,
+                        lineEnd: chunk.lineEnd,
                         metadata: {
                             isFirstChunk: i === 0,
                             title: file.basename
@@ -1492,7 +1591,9 @@ export class EmbeddingsManager {
                         tags: meta.tags || '',
                         content: doc.content,
                         embedding: doc.embedding,
-                        lastModified: doc.lastModified
+                        lastModified: doc.lastModified,
+                        lineStart: doc.lineStart || 0,
+                        lineEnd: doc.lineEnd || 0
                     };
                 });
                 await OramaWorkerManager.getInstance().insertBatch(indexId, oramaDocs);
@@ -1549,6 +1650,8 @@ export class EmbeddingsManager {
             chunkIndex: number;
             content: string;
             stats: import('obsidian').Stat;
+            lineStart?: number;
+            lineEnd?: number;
         }
         
         const chunksToProcess: ChunkToProcess[] = [];
@@ -1588,7 +1691,11 @@ export class EmbeddingsManager {
             // Read file content
             let content = '';
             try {
-                content = await this.app.vault.read(file);
+                if (file.extension === 'md') {
+                    content = await this.app.vault.read(file);
+                } else {
+                    content = await extractTextFromFile(this.app, file);
+                }
             } catch {
                 processed++;
                 continue;
@@ -1606,8 +1713,10 @@ export class EmbeddingsManager {
                 chunksToProcess.push({
                     file,
                     chunkIndex: i,
-                    content: chunks[i],
-                    stats
+                    content: chunks[i].text,
+                    stats,
+                    lineStart: chunks[i].lineStart,
+                    lineEnd: chunks[i].lineEnd
                 });
             }
         }
@@ -1645,6 +1754,8 @@ export class EmbeddingsManager {
                         embedding,
                         lastModified: item.stats.mtime,
                         hasEmbedding: true,
+                        lineStart: item.lineStart,
+                        lineEnd: item.lineEnd,
                         metadata: {
                             isFirstChunk: item.chunkIndex === 0,
                             title: item.file.basename
@@ -1673,7 +1784,9 @@ export class EmbeddingsManager {
 
                             content: doc.content,
                             embedding: doc.embedding,
-                            lastModified: doc.lastModified
+                            lastModified: doc.lastModified,
+                            lineStart: doc.lineStart || 0,
+                            lineEnd: doc.lineEnd || 0
                         };
                     });
                     await OramaWorkerManager.getInstance().insertBatch(indexId, oramaDocs);
@@ -1766,16 +1879,14 @@ export class EmbeddingsManager {
             }
             this.updateBuildNotice('BM25 Indexing started...');
 
-            // Get all markdown files
+            // Get all files eligible for BM25 indexing
             // BM25 indexes the whole vault — no exclusions applied
             const allFiles = this.app.vault.getFiles();
-            const allMarkdownFiles = allFiles.filter(file =>
-                file.extension === 'md'
-            );
-
-            // Avoid reading file content in this pre-pass — let the main processing loop
-            // handle content reading and empty-file filtering inline.
-            const filesToProcess: TFile[] = allMarkdownFiles;
+            const filesToProcess = allFiles.filter(file => {
+                if (file.extension === 'md') return true;
+                if (file.extension === 'pdf' || (!Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(file.extension))) return true;
+                return false;
+            });
 
             const total = filesToProcess.length;
             let processed = 0;
@@ -1806,7 +1917,7 @@ export class EmbeddingsManager {
             for (const file of filesToProcess) {
                 // Check for pause request
                 if (this.pausedIndexIds.has(bm25IndexId)) {
-                                        await this.saveIndex(bm25IndexId);
+                    await this.saveIndex(bm25IndexId);
                     this.activeBuilds.delete(bm25IndexId);
                     this.updateBuildNotice('BM25 Indexing paused', true);
                     this.notifyBuildCallbacks(bm25IndexId, `PAUSED`);
@@ -1826,7 +1937,7 @@ export class EmbeddingsManager {
                     processed++;
                     if (wrappedCallback) {
                         const percentage = Math.round((processed / total) * 100);
-                                                wrappedCallback(`BM25:${percentage}:${processed}/${total}`);
+                        wrappedCallback(`BM25:${percentage}:${processed}/${total}`);
                     }
                     continue;
                 }
@@ -1834,9 +1945,13 @@ export class EmbeddingsManager {
             // Read file content
             let content = '';
             try {
-                content = await this.app.vault.read(file);
+                if (file.extension === 'md') {
+                    content = await this.app.vault.read(file);
+                } else {
+                    content = await extractTextFromFile(this.app, file);
+                }
             } catch {
-                                processed++;
+                processed++;
                 continue;
             }
 
@@ -1866,9 +1981,11 @@ export class EmbeddingsManager {
                     const doc: DocumentChunk = {
                         path: file.path,
                         chunkIndex: i,
-                        content: chunk,
+                        content: chunk.text,
                         embedding: [], // Empty embedding
                         lastModified: stats.mtime,
+                        lineStart: chunk.lineStart,
+                        lineEnd: chunk.lineEnd,
                         metadata: {
                             isFirstChunk: i === 0,
                             title: file.basename
@@ -1896,7 +2013,9 @@ export class EmbeddingsManager {
                             tags: meta.tags || '',
 
                             content: doc.content,
-                            lastModified: doc.lastModified
+                            lastModified: doc.lastModified,
+                            lineStart: doc.lineStart || 0,
+                            lineEnd: doc.lineEnd || 0
                         };
                     });
                     await OramaWorkerManager.getInstance().insertBatch(bm25IndexId, oramaDocs);
@@ -1962,7 +2081,9 @@ export class EmbeddingsManager {
             // Otherwise, we'd need to parse the binary, which we want to avoid on the UI thread.
             if (this.loadedIndexId === indexId && this.index && this.index.documents) {
                 for (const doc of this.index.documents) {
-                    if (!doc.path.endsWith('.md')) continue;
+                    const ext = doc.path.split('.').pop()?.toLowerCase() || '';
+                    const isIndexedExt = ext === 'md' || (isBM25 && (ext === 'pdf' || (!Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(ext))));
+                    if (!isIndexedExt) continue;
                     if (!indexedFilesMap.has(doc.path) || doc.lastModified > indexedFilesMap.get(doc.path)!) {
                         indexedFilesMap.set(doc.path, doc.lastModified);
                     }
@@ -1973,7 +2094,9 @@ export class EmbeddingsManager {
                     const previousLoadedId = this.loadedIndexId;
                     await this.loadIndex(indexId);
                     for (const doc of this.index.documents) {
-                        if (!doc.path.endsWith('.md')) continue;
+                        const ext = doc.path.split('.').pop()?.toLowerCase() || '';
+                        const isIndexedExt = ext === 'md' || (isBM25 && (ext === 'pdf' || (!Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(ext))));
+                        if (!isIndexedExt) continue;
                         if (!indexedFilesMap.has(doc.path) || doc.lastModified > indexedFilesMap.get(doc.path)!) {
                             indexedFilesMap.set(doc.path, doc.lastModified);
                         }
@@ -1995,7 +2118,12 @@ export class EmbeddingsManager {
             const indexableFiles: TFile[] = [];
 
             for (const file of allFiles) {
-                if (file.extension !== 'md') continue;
+                const embIndexConfig = this.settings.indexConfigurations.find(c => c.id === indexId);
+                const embIncludeAll = embIndexConfig?.indexAllFileTypes === true;
+                const isFileExt = file.extension === 'md' 
+                    || (isBM25 && (file.extension === 'pdf' || (!Platform.isMobile && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(file.extension))))
+                    || (!Platform.isMobile && !isBM25 && embIncludeAll && SUPPORTED_EXTRACTABLE_EXTENSIONS.includes(file.extension));
+                if (!isFileExt) continue;
                 // BM25 indexes everything; embedding respects per-index exclusions
                 if (!isBM25 && this.isFileExcluded(file.path, indexId)) continue;
                 
@@ -2051,7 +2179,7 @@ export class EmbeddingsManager {
      * BM25-only search for @flash prefix (fast keyword search without embeddings)
      * This is used for quick searches that don't require semantic understanding
      */
-    async findSimilarContentBM25Only(query: string, limit: number = 5): Promise<{results: Array<{path: string, content: string, similarity: number, chunkIndex?: number}>, temporalContext?: {startDate: number | null, endDate: number | null, cleanQuery: string}}> {
+    async findSimilarContentBM25Only(query: string, limit: number = 5, maxChunksPerFile: number = 5): Promise<{results: Array<{path: string, content: string, similarity: number, chunkIndex?: number, lineStart?: number, lineEnd?: number}>, temporalContext?: {startDate: number | null, endDate: number | null, cleanQuery: string}}> {
         try {
             // Load the BM25 index if needed
             const selectedBM25Id = this.settings.selectedBM25IndexId;
@@ -2085,13 +2213,13 @@ export class EmbeddingsManager {
                 properties: ['title', 'headings', 'tags', 'content'],
                 where: Object.keys(where).length > 0 ? where : undefined,
                 boost: {
-                    title: this.settings.bm25TitleBoost || 3.0,
-                    headings: this.settings.bm25HeadingBoost || 2.0,
-                    tags: this.settings.bm25TagBoost || 1.5,
+                    title: 1.0,
+                    headings: 1.0,
+                    tags: 1.0,
                     content: 1.0
                 },
-                tolerance: 1,
-                limit: limit * 5
+                tolerance: 0,
+                limit: limit * 10
             }) as { results?: { hits?: Array<{ 'document': OramaHitDocument; score: number }> } } | undefined;
 
             const bm25Results = (bm25SearchResponse!.results?.hits || []).map((hit: { 'document': OramaHitDocument; score: number }) => ({
@@ -2099,43 +2227,23 @@ export class EmbeddingsManager {
                 chunkIndex: hit['document'].chunkIndex,
                 content: hit['document'].content || '',
                 similarity: hit.score,
-                lastModified: hit['document'].lastModified
+                lastModified: hit['document'].lastModified,
+                lineStart: hit['document'].lineStart,
+                lineEnd: hit['document'].lineEnd
             }));
 
-            // Group by file
-            const fileChunksMap = new Map<string, Array<{chunkIndex: number, content: string, similarity: number, lastModified: number}>>();
-            for (const result of bm25Results) {
-                if (!fileChunksMap.has(result.path)) {
-                    fileChunksMap.set(result.path, []);
-                }
-                fileChunksMap.get(result.path)!.push({
-                    chunkIndex: result.chunkIndex,
-                    content: result.content,
-                    similarity: result.similarity,
-                    lastModified: result.lastModified
-                });
-            }
+            // Sort passage hits strictly by relevance score (similarity) descending
+            bm25Results.sort((a, b) => b.similarity - a.similarity);
 
-            const results: Array<{path: string, content: string, similarity: number, chunkIndex?: number}> = [];
-            const sortedEntries = Array.from(fileChunksMap.entries()).sort((a, b) => {
-                const maxSimA = Math.max(...a[1].map(c => c.similarity));
-                const maxSimB = Math.max(...b[1].map(c => c.similarity));
-                if (maxSimA !== maxSimB) return maxSimB - maxSimA;
-                return Math.max(...b[1].map(c => c.lastModified)) - Math.max(...a[1].map(c => c.lastModified));
-            });
-
-            for (const [filePath, chunks] of sortedEntries) {
-                chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
-                const topChunks = chunks.slice(0, 5);
-                const combinedContent = topChunks.map(c => c.content).join('\n\n...\n\n');
-                results.push({
-                    path: filePath,
-                    content: combinedContent,
-                    similarity: chunks[0].similarity,
-                    chunkIndex: chunks[0].chunkIndex
-                });
-                if (results.length >= limit) break;
-            }
+            // Take top N passage hits directly across the vault
+            const results: Array<{path: string, content: string, similarity: number, chunkIndex?: number, lineStart?: number, lineEnd?: number}> = bm25Results.slice(0, limit).map(item => ({
+                path: item.path,
+                content: item.content,
+                similarity: item.similarity,
+                chunkIndex: item.chunkIndex,
+                lineStart: item.lineStart,
+                lineEnd: item.lineEnd
+            }));
 
             return {
                 results,
@@ -2363,7 +2471,7 @@ export class EmbeddingsManager {
                 await adapter.mkdir(indexDir);
             }
 
-            await adapter.writeBinary(indexPath, compressed.buffer as ArrayBuffer);
+            await adapter.writeBinary(indexPath, compressed.buffer);
                     } catch {
                         // File may not exist or be accessible - safe to ignore
                     }
@@ -2431,7 +2539,7 @@ export class EmbeddingsManager {
 
                 // If embedding-only (no BM25 selected, or hybrid disabled by user)
                 if (useEmbeddingOnly) {
-                    const embeddingResults = await this.findSimilarContentEmbeddingOnly(query, limit);
+                    const embeddingResults = await this.findSimilarContentSingleIndex(query, limit, undefined, false);
                     return {
                         results: embeddingResults,
                         temporalContext: temporalQuery.hasTemporalFilter ? {
@@ -2546,7 +2654,7 @@ export class EmbeddingsManager {
                     },
                     where: Object.keys(where).length > 0 ? where : undefined,
                     limit: limit * 5,
-                    similarity: 0.4
+                    similarity: 0.1
                 }) as { results?: { hits?: Array<{ 'document': OramaHitDocument; score: number }> } } | undefined;
 
                 const fusedResults = (hybridSearchResponse!.results?.hits || []).map((hit: { 'document': OramaHitDocument; score: number }) => ({
@@ -2554,13 +2662,15 @@ export class EmbeddingsManager {
                     chunkIndex: hit['document'].chunkIndex,
                     content: hit['document'].content || '',
                     similarity: hit.score,
-                    lastModified: hit['document'].lastModified
+                    lastModified: hit['document'].lastModified,
+                    lineStart: hit['document'].lineStart,
+                    lineEnd: hit['document'].lineEnd
                 }));
 
                 // ==================== PROCESS RESULTS ====================
 
                 // Group chunks by file
-                const fileChunksMap = new Map<string, Array<{chunkIndex: number, content: string, similarity: number, lastModified: number}>>();
+                const fileChunksMap = new Map<string, Array<{chunkIndex: number, content: string, similarity: number, lastModified: number, lineStart?: number, lineEnd?: number}>>();
                 
                 for (const hit of fusedResults) {
                     if (!fileChunksMap.has(hit.path)) {
@@ -2570,7 +2680,9 @@ export class EmbeddingsManager {
                         chunkIndex: hit.chunkIndex,
                         content: hit.content,
                         similarity: hit.similarity,
-                        lastModified: hit.lastModified
+                        lastModified: hit.lastModified,
+                        lineStart: hit.lineStart,
+                        lineEnd: hit.lineEnd
                     });
                 }
 
@@ -2578,7 +2690,7 @@ export class EmbeddingsManager {
                 const sortedFiles = Array.from(fileChunksMap.entries())
                     .sort((a, b) => Math.max(...b[1].map(c => c.similarity)) - Math.max(...a[1].map(c => c.similarity)));
 
-                const results: Array<{path: string, content: string, similarity: number, chunkIndex?: number, lastModified?: number}> = [];
+                const results: Array<{path: string, content: string, similarity: number, chunkIndex?: number, lastModified?: number, lineStart?: number, lineEnd?: number}> = [];
 
                 for (const [filePath, chunks] of sortedFiles) {
                     // Take up to 5 chunks per file (matching RAG Notebooks)
@@ -2592,15 +2704,22 @@ export class EmbeddingsManager {
                     const combinedContent = topChunks.map(c => c.content).join('\n\n...\n\n');
                     const maxSimilarity = Math.max(...topChunks.map(c => c.similarity));
                     
-                results.push({
-                    path: filePath,
-                    content: combinedContent,
-                    similarity: maxSimilarity,
-                    chunkIndex: topChunks[0].chunkIndex,
-                    lastModified: topChunks[0].lastModified
-                });
-                
-                if (results.length >= limit) break;
+                    const validLineStarts = topChunks.map(c => c.lineStart).filter((l): l is number => l !== undefined && l > 0);
+                    const validLineEnds = topChunks.map(c => c.lineEnd).filter((l): l is number => l !== undefined && l > 0);
+                    const lineStart = validLineStarts.length > 0 ? Math.min(...validLineStarts) : undefined;
+                    const lineEnd = validLineEnds.length > 0 ? Math.max(...validLineEnds) : undefined;
+
+                    results.push({
+                        path: filePath,
+                        content: combinedContent,
+                        similarity: maxSimilarity,
+                        chunkIndex: topChunks[0].chunkIndex,
+                        lastModified: topChunks[0].lastModified,
+                        lineStart,
+                        lineEnd
+                    });
+                    
+                    if (results.length >= limit) break;
                 }
                 
                 return {
@@ -2623,7 +2742,13 @@ export class EmbeddingsManager {
         }
     }
 
-    private async findSimilarContentEmbeddingOnly(query: string, limit: number = 5): Promise<Array<{path: string, content: string, similarity: number, chunkIndex?: number}>> {
+    private async findSimilarContentSingleIndex(
+        query: string, 
+        limit: number = 5,
+        indexId?: string,
+        hybrid: boolean = false
+    ): Promise<Array<{path: string, content: string, similarity: number, chunkIndex?: number}>> {
+        const actualIndexId = indexId || this.settings.selectedEmbeddingIndexId || this.loadedIndexId || 'default-embedding';
         try {
             // Parse temporal query to extract date filters (supports all providers)
             const temporalQuery = await parseTemporalQuery(query, new Date(), this.settings);
@@ -2652,7 +2777,7 @@ export class EmbeddingsManager {
             // Get the selected embedding index configuration to use its model
             let embeddingModel = this.settings.embeddingModel; // Fallback
             const selectedEmbeddingIndex = this.settings.indexConfigurations?.find(
-                idx => idx.id === this.settings.selectedEmbeddingIndexId && idx.type === 'embedding'
+                idx => idx.id === actualIndexId && idx.type === 'embedding'
             );
             if (selectedEmbeddingIndex?.model) {
                 embeddingModel = selectedEmbeddingIndex.model;
@@ -2680,16 +2805,24 @@ export class EmbeddingsManager {
                     }
                 }
 
-                // Offload vector search to Orama Worker
+                // Offload search to Orama Worker
                 const vectorSearchResponse = await OramaWorkerManager.getInstance().search(targetId, {
-                    mode: 'vector',
+                    mode: hybrid ? 'hybrid' : 'vector',
+                    term: hybrid ? searchQuery : undefined,
                     vector: {
                         value: queryEmbedding,
                         property: 'embedding'
                     },
+                    properties: hybrid ? ['title', 'headings', 'tags', 'content'] : undefined,
+                    boost: hybrid ? {
+                        title: this.settings.bm25TitleBoost || 3.0,
+                        headings: this.settings.bm25HeadingBoost || 2.0,
+                        tags: this.settings.bm25TagBoost || 1.5,
+                        content: 1.0
+                    } : undefined,
                     where: Object.keys(where).length > 0 ? where : undefined,
                     limit: 100, // Get enough candidates for filtering/grouping
-                    similarity: 0.4
+                    similarity: 0.1
                 }) as { results?: { hits?: Array<{ 'document': OramaHitDocument; score: number }> } } | undefined;
 
                 const vectorResults: Array<{path: string, chunkIndex: number, content: string, similarity: number, lastModified: number}> = 
@@ -2764,5 +2897,40 @@ export class EmbeddingsManager {
 
 
 
+
+    /** Search explicitly selected embedding indexes without changing the user's saved selection. */
+    public async searchEmbeddingIndexes(
+        query: string,
+        indexIds: string[],
+        limit: number = 5,
+    ): Promise<Array<{ path: string; content: string; similarity: number; chunkIndex?: number; indexName: string }>> {
+        const uniqueIds = [...new Set(indexIds)];
+        const originalLoadedId = this.loadedIndexId;
+        const results: Array<{ path: string; content: string; similarity: number; chunkIndex?: number; indexName: string }> = [];
+
+        // Check if user has both embedding and BM25 index enabled in settings
+        const doHybrid = (this.settings.selectedBM25IndexId !== null) && (this.settings.selectedEmbeddingIndexId !== null);
+
+        try {
+            for (const indexId of uniqueIds) {
+                const config = this.settings.indexConfigurations?.find(
+                    index => index.id === indexId && index.type === 'embedding'
+                );
+                if (!config) continue;
+
+                await this.loadIndex(indexId);
+                const indexResults = await this.findSimilarContentSingleIndex(query, limit, indexId, doHybrid);
+                results.push(...indexResults.map(result => ({ ...result, indexName: config.name })));
+            }
+        } finally {
+            if (originalLoadedId) {
+                await this.loadIndex(originalLoadedId).catch(() => undefined);
+            }
+        }
+
+        return results
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, Math.max(1, limit * Math.max(1, uniqueIds.length)));
+    }
 
 }

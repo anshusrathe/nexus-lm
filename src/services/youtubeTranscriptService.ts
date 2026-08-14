@@ -42,18 +42,21 @@ export class YouTubeTranscriptService {
     }
 
     private extractVideoId(url: string): string | null {
-        const standardMatch = url.match(/[?&]v=([^&]+)/);
+        if (!url) return null;
+        const cleaned = url.trim().replace(/[),.;:!?]+$/, '');
+        const standardMatch = cleaned.match(/[?&]v=([^&#]+)/);
         if (standardMatch) return standardMatch[1];
-        const shortMatch = url.match(/youtu\.be\/([^?&]+)/);
+        const shortMatch = cleaned.match(/youtu\.be\/([^?#]+)/);
         if (shortMatch) return shortMatch[1];
-        const liveMatch = url.match(/youtube\.com\/live\/([^/?&]+)/);
-        if (liveMatch) return liveMatch[1];
+        const pathMatch = cleaned.match(/(?:youtube\.com|youtu\.be)\/(?:live|shorts|embed|v)\/([^/?&]+)/);
+        if (pathMatch) return pathMatch[1];
         return null;
     }
 
     isValidYouTubeUrl(url: string): boolean {
         if (!url) return false;
-        return /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|live\/)|youtu\.be\/)/.test(url);
+        const cleaned = url.trim().replace(/[),.;:!?]+$/, '');
+        return /^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)\//i.test(cleaned);
     }
 
     /**

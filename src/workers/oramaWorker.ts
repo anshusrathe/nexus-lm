@@ -8,6 +8,8 @@ interface ShadowDoc {
     lastModified: number;
     hasEmbedding: boolean;
     content: string;
+    lineStart?: number;
+    lineEnd?: number;
 }
 
 interface LegacyDoc {
@@ -110,7 +112,9 @@ function buildSchema(dimension: number = 0) {
         headings: 'string',
         tags: 'string',
         content: 'string',
-        lastModified: 'number'
+        lastModified: 'number',
+        lineStart: 'number',
+        lineEnd: 'number'
     };
     if (dimension > 0) schema.embedding = `vector[${dimension}]`;
     return schema as AnySchema;
@@ -143,9 +147,9 @@ ctx.addEventListener('message', (event: MessageEvent<OramaWorkerMessage>) => {
                 try {
                     let binaryData: ArrayBuffer | Array<Record<string, unknown>> | undefined = payload.data;
                     if (payload.compressed) {
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- fflate.unzlibSync returns any
+                         
                         const decompressed: Uint8Array = fflate.unzlibSync(new Uint8Array(binaryData as ArrayBuffer));
-                        binaryData = decompressed.buffer as ArrayBuffer;
+                        binaryData = decompressed.buffer;
                     }
                     
                     let decoded: DecodedLoadPayload;
@@ -306,7 +310,9 @@ ctx.addEventListener('message', (event: MessageEvent<OramaWorkerMessage>) => {
                         chunkIndex: Number(doc.chunkIndex || 0),
                         lastModified: Number(doc.lastModified || 0),
                         hasEmbedding: doc.embedding ? true : false,
-                        content: String(doc.content || '')
+                        content: String(doc.content || ''),
+                        lineStart: Number(doc.lineStart || 0),
+                        lineEnd: Number(doc.lineEnd || 0)
                     });
                 }
                 shadowDocsMap.set(instanceId, currentShadow);

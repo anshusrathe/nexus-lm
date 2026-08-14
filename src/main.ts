@@ -1,10 +1,11 @@
 import { Plugin, Notice, TFile, WorkspaceLeaf, Editor, Platform, Modal, requestUrl, normalizePath } from 'obsidian';
-import { AISettingTab, AISettings, DEFAULT_SETTINGS, Provider, migrateSettings } from './settings';
+import { AISettingTab, AISettings, DEFAULT_SETTINGS, Provider, migrateSettings, getDefaultAgentDenyList } from './settings';
 import { AITutorView, VIEW_TYPE_NEXUS_TUTOR } from './views/view';
 import { ResponseView, VIEW_TYPE_NEXUS_CHAT } from './views/responseView';
 import { LandingView, VIEW_TYPE_LANDING } from './views/landingView';
 import { EmbeddingsManager } from './managers/embeddingsManager';
-import { PdfExtractOptionsModal, extractTextFromPdf } from './utils/pdfExtractor';
+import { PdfExtractOptionsModal, extractTextFromPdf, getPdfjsLib } from './utils/pdfExtractor';
+import type { PdfDocumentProxy } from './types/pdf';
 import { VIEW_TYPE_NEXUS_FEED, FeedView } from './views/feedView';
 import { FeedEntryView, VIEW_TYPE_NEXUS_FEED_ENTRIES } from './views/feedEntryView';
 import { ParsedFeedEntry } from './parsing/feedParsing';
@@ -19,11 +20,28 @@ import { RateLimitManager } from './utils/rateLimitManager';
 import { MCPService } from './mcp/mcpService';
 import { MCPToolCallingService } from './mcp/mcpToolCalling';
 import { IndexStatusModal } from './modals/indexStatusModal';
-import { verifyModel, verifyEmbeddingModel, discoverModels, toCustomModels } from './services/modelDiscoveryService';
+import { verifyModel, verifyEmbeddingModel, discoverModels, toCustomModels, fetchLmStudioModels } from './services/modelDiscoveryService';
 import { UnifiedProviderManager } from './services/unifiedProviderManager';
 import { OpenCodeProvider } from './services/openCodeService';
 import { CustomOpenAIProvider } from './services/customOpenAIProvider';
+import { LmStudioProvider } from './services/lmStudioProvider';
 import { openEditSelectionModal } from './editSelection';
+import { AgentView, VIEW_TYPE_AGENT } from './views/agentView';
+import { ToolRegistry } from './agent/toolRegistry';
+import { SafetyLayer } from './agent/safetyLayer';
+import { AgentOrchestrator } from './agent/agentOrchestrator';
+import { AgentMemory } from './agent/agentMemory';
+import { createVaultNativeTools } from './agent/agentTools';
+import { createCLITools } from './agent/cliTools';
+import type { AgentConfig, AgentEvent } from './agent/types';
+import { registerMCPTools } from './agent/mcpToolBridge';
+import { SkillRegistry } from './agent/skills/skillRegistry';
+import { WebSearchService, type WebSearchConfig } from './services/webSearchService';
+import { createWebSearchTool, createWebFetchTool, createPdfFetchTool } from './agent/webTools';
+import { createFeedTools, syncSavedFeedsJson } from './agent/feedTools';
+import { StaticRules } from './agent/staticRules';
+import { YouTubeTranscriptService } from './services/youtubeTranscriptService';
+import { createYouTubeTranscriptTool } from './agent/youtubeTools';
 
 
 
@@ -38,6 +56,13 @@ export default class AIPlugin extends Plugin {
     public verifyingProviders: Set<Provider> = new Set();
     public verifyingEmbeddingProviders: Set<Provider> = new Set();
     private currentViewMode: string = 'landing';
+    public agentRegistry!: ToolRegistry;
+    public agentSafety!: SafetyLayer;
+    public agentOrchestrator!: AgentOrchestrator;
+    public agentMemory!: AgentMemory;
+    public skillRegistry!: SkillRegistry;
+    public webSearchService!: WebSearchService;
+    public youtubeTranscriptService!: YouTubeTranscriptService;
 
     async onload() {
         await this.loadSettings();
@@ -63,6 +88,11 @@ export default class AIPlugin extends Plugin {
                 new OpenCodeProvider(this.settings.openCodeApiKey)
             );
         }
+        // LM Studio is always registered (it needs no API key) — re-registering
+        // is idempotent and keeps the base URL/token settings fresh.
+        UnifiedProviderManager.getInstance().registerProvider(
+            new LmStudioProvider(this.settings.lmStudioBaseUrl, this.settings.lmStudioApiToken)
+        );
         this.registerCustomProviders();
 
         
@@ -84,8 +114,114 @@ export default class AIPlugin extends Plugin {
         this.notebookManager = new NotebookManager(this.app);
 
         
+        const webSearchConfig: WebSearchConfig = {
+          exaApiKey: this.settings.agentExaApiKey ?? '',
+          defaultNumResults: this.settings.agentWebSearchDefaultResults ?? 5,
+          contentMode: this.settings.agentWebSearchMode ?? 'highlights',
+          cacheEnabled: this.settings.agentWebSearchCache ?? true,
+          tokenBudget: this.settings.agentWebSearchTokenBudget ?? 'medium',
+        };
+        this.webSearchService = new WebSearchService(webSearchConfig);
+
+        this.skillRegistry = new SkillRegistry(this.app, this.manifest?.dir || '');
+        void this.skillRegistry.discover();
+        this.skillRegistry.startWatcher();
+        if (this.settings.agentSkillsEnabled ?? false) {
+            this.skillRegistry.setEnabledList(this.settings.agentEnabledSkills ?? []);
+        }
+
+        this.agentMemory = new AgentMemory(this.app);
+        void this.agentMemory.initialize();
+
+        this.agentRegistry = new ToolRegistry();
+        this.agentRegistry.registerBatch(createVaultNativeTools());
+
+        this.agentRegistry.registerBatch(
+          createCLITools(this.settings.agentEnableCLI ?? false)
+        );
+
+        if (this.settings.agentWebSearchEnabled ?? true) {
+            this.agentRegistry.registerBatch([
+                createWebSearchTool(this.webSearchService),
+                createWebFetchTool(this.webSearchService),
+                createPdfFetchTool(this.webSearchService)
+            ]);
+        }
+
+        this.youtubeTranscriptService = new YouTubeTranscriptService();
+        this.agentRegistry.registerBatch([
+            createYouTubeTranscriptTool(this.youtubeTranscriptService)
+        ]);
+
+        this.agentRegistry.registerBatch(
+          createFeedTools(this.app, this)
+        );
+
+        this.agentSafety = new SafetyLayer(
+          this.app,
+          this.settings.agentDenyList ?? getDefaultAgentDenyList(this.app.vault.configDir),
+          this.settings.agentApprovalMode ?? 'writes-only'
+        );
+
+        const agentConfig: AgentConfig = {
+          maxSteps: this.settings.agentMaxSteps ?? 25,
+          approvalMode: this.settings.agentApprovalMode ?? 'writes-only',
+          denyList: this.settings.agentDenyList ?? getDefaultAgentDenyList(this.app.vault.configDir),
+          enableCLI: this.settings.agentEnableCLI ?? true,
+          enableMCP: this.settings.agentEnableMCP ?? false,
+          enableSkills: this.settings.agentSkillsEnabled ?? false,
+          enabledSkills: this.settings.agentSkillsEnabled ? (this.settings.agentEnabledSkills ?? []) : [],
+          enableAutoModelChain: this.settings.agentAutoModelChain ?? false,
+          canDelegate: true,
+        };
+
+        if (this.mcpService && (this.settings.agentEnableMCP ?? false)) {
+          registerMCPTools(this.agentRegistry, this.mcpService, this.settings.agentEnabledMCPs);
+        }
+
+        this.agentOrchestrator = new AgentOrchestrator(
+          this.agentRegistry,
+          this.agentSafety,
+          this.skillRegistry,
+          {
+            app: this.app,
+            settings: { ...this.settings, ...agentConfig },
+            searchVaultBM25: (query: string, limit: number) =>
+              this.searchVaultBM25Only(query, limit, 1).then(r => r.results.map(item => ({
+                path: item.path,
+                content: item.content,
+                lineStart: item.lineStart,
+                lineEnd: item.lineEnd,
+                similarity: item.similarity,
+              }))),
+            searchEmbeddingIndexes: (query: string, indexIds: string[], limit: number) =>
+              this.embeddingsManager.searchEmbeddingIndexes(query, indexIds, limit),
+            onEvent: (event: AgentEvent) => {
+              const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_AGENT);
+              for (const leaf of leaves) {
+                const view = leaf.view;
+                if (view instanceof AgentView) {
+                  view.addEvent(event);
+                }
+              }
+              return;
+            },
+            getActiveFile: () => this.app.workspace.getActiveFile(),
+            getSetting: (key: string) => (this.settings as unknown as Record<string, unknown>)[key],
+          },
+          agentConfig
+        );
+
+        this.agentOrchestrator.setAgentMemory(this.agentMemory);
+        const staticRules = new StaticRules(this.app);
+        void staticRules.initialize().then(() => {
+          this.agentOrchestrator.setStaticRulesReader(staticRules);
+        });
+
+        
         
         this.app.workspace.onLayoutReady(() => {
+            void syncSavedFeedsJson(this.app, this.settings.savedFeeds);
             
             this.embeddingsManager.syncIndexFiles().then(async (changed) => {
                 if (changed) {
@@ -96,13 +232,20 @@ export default class AIPlugin extends Plugin {
 
             
             if (this.settings.mcpEnabled && this.settings.mcpServers && (this.settings.mcpAutoConnect ?? true)) {
-                this.settings.mcpServers
-                    .filter(server => !server.disabled)
-                    .forEach(server => {
+                const connectPromises = this.settings.mcpServers
+                    .filter(server => !server.disabled && (!Platform.isMobile || server.transport === 'sse'))
+                    .map(server =>
                         this.mcpService.connectServer(server).catch(err => {
                                                         new Notice(`Failed to connect to MCP server ${server.name}`);
-                        });
+                        })
+                    );
+                if (connectPromises.length > 0) {
+                    void Promise.all(connectPromises).finally(() => {
+                        if (this.settings.agentEnableMCP) {
+                            this.refreshAgentMCPTools();
+                        }
                     });
+                }
             }
 
             
@@ -143,6 +286,17 @@ export default class AIPlugin extends Plugin {
 
         
         this.addSettingTab(new AISettingTab(this.app, this));
+
+        // Mobile keyboard handling: track virtual keyboard height via CSS custom property
+        if (Platform.isMobile && window.visualViewport) {
+            const vv = window.visualViewport;
+            const updateKeyboardOffset = () => {
+                const offset = window.innerHeight - vv.height;
+                document.body.style.setProperty('--nexus-keyboard-offset', `${offset}px`);
+            };
+            vv.addEventListener('resize', updateKeyboardOffset);
+            this.register(() => vv.removeEventListener('resize', updateKeyboardOffset));
+        }
 
         
         this.registerView(
@@ -190,6 +344,12 @@ export default class AIPlugin extends Plugin {
         );
 
         
+        this.registerView(
+            VIEW_TYPE_AGENT,
+            (leaf) => new AgentView(leaf, this)
+        );
+
+        
         this.addRibbonIcon('loader-pinwheel', 'Open Nexus-LM', async () => {
             await this.activateView('landing');
         });
@@ -203,7 +363,16 @@ export default class AIPlugin extends Plugin {
                 await this.activateView('landing');
             }
         });
+        
+        this.addCommand({
+            id: 'open-agent',
+            name: 'Open Agent',
+            callback: async () => {
+                await this.activateView('agent');
+            }
+        });
 
+        
         this.addCommand({
             id: 'open-ai-chat',
             name: 'Open Nexus Chat',
@@ -258,30 +427,39 @@ export default class AIPlugin extends Plugin {
                                 
                                 const vault = this.app.vault;
                                 const arrayBuffer = await vault.readBinary(activeFile);
-                                const pdfjsLib = (window as { pdfjsLib?: PdfjsLib }).pdfjsLib;
-                                if (!pdfjsLib) throw new Error('PDF.js library not loaded.');
+                                const pdfjsLib = getPdfjsLib();
                                 const pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                                 const numPages = pdfDocument.numPages;
                                 
-                                const defaultDir = this.settings.pdfOutputDirectory || 'PDF-Extracted-Text';
-                                new PdfExtractOptionsModal(this.app, numPages, defaultDir, pdfDocument, (opts) => {
+                                const defaultDir = (this.settings.pdfOutputDirectory && this.settings.pdfOutputDirectory !== '/') ? this.settings.pdfOutputDirectory : 'PDF-Extracted-Text';
+                                new PdfExtractOptionsModal(this.app, numPages, defaultDir, pdfDocument as unknown as PdfDocumentProxy, (opts) => {
                                     void (async () => {
-                                        new Notice(`Extracting text from ${activeFile.name}...`);
-                                        const extractedText = await extractTextFromPdf(activeFile, vault, { from: opts.from, to: opts.to });
-                                        
-                                        const outputDir = opts.directory || defaultDir;
-                                        await vault.adapter.mkdir(outputDir);
-                                        
-                                        const fileNameWithoutExtension = activeFile.basename;
-                                        let outputFileName = '';
-                                        if (opts.full) {
-                                            outputFileName = `${fileNameWithoutExtension} text.md`;
-                                        } else {
-                                            outputFileName = `${fileNameWithoutExtension} ${opts.from}-${opts.to} text.md`;
+                                        try {
+                                            new Notice(`Extracting text from ${activeFile.name}...`);
+                                            const extractedText = await extractTextFromPdf(activeFile, vault, { from: opts.from, to: opts.to });
+                                            
+                                            const rawDir = (opts.directory !== undefined && opts.directory !== null) ? opts.directory : defaultDir;
+                                            const cleanDir = rawDir.trim().replace(/^\/+|\/+$/g, '');
+                                            if (cleanDir.length > 0) {
+                                                if (!(await vault.adapter.exists(cleanDir))) {
+                                                    await vault.adapter.mkdir(cleanDir);
+                                                }
+                                            }
+                                            
+                                            const fileNameWithoutExtension = activeFile.basename;
+                                            let outputFileName = '';
+                                            if (opts.full) {
+                                                outputFileName = `${fileNameWithoutExtension} text.md`;
+                                            } else {
+                                                outputFileName = `${fileNameWithoutExtension} ${opts.from}-${opts.to} text.md`;
+                                            }
+                                            const outputPath = cleanDir ? normalizePath(`${cleanDir}/${outputFileName}`) : normalizePath(outputFileName);
+                                            await vault.create(outputPath, extractedText);
+                                            new Notice(`Text extracted and saved to ${outputPath}`);
+                                        } catch (error) {
+                                            const message = error instanceof Error ? error.message : String(error);
+                                            new Notice(`Failed to save extracted text from PDF: ${message}`);
                                         }
-                                        const outputPath = normalizePath(`${outputDir}/${outputFileName}`);
-                                        await vault.create(outputPath, extractedText);
-                                        new Notice(`Text extracted and saved to ${outputPath}`);
                                     })();
                                 }).open();
                             } catch (error) {
@@ -446,16 +624,16 @@ export default class AIPlugin extends Plugin {
         }
 
     
-    async searchVault(query: string, limit: number = 5, hybridEnabled: boolean = true): Promise<{results: Array<{path: string, content: string, similarity: number}>, temporalContext?: {startDate: number | null, endDate: number | null, cleanQuery: string}}> {
+    async searchVault(query: string, limit: number = 5, hybridEnabled: boolean = true): Promise<{results: Array<{path: string, content: string, similarity: number, lineStart?: number, lineEnd?: number}>, temporalContext?: {startDate: number | null, endDate: number | null, cleanQuery: string}}> {
         return this.embeddingsManager.findSimilarContent(query, limit, hybridEnabled);
     }
 
     
-    async searchVaultBM25Only(query: string, limit: number = 5): Promise<{results: Array<{path: string, content: string, similarity: number}>, temporalContext?: {startDate: number | null, endDate: number | null, cleanQuery: string}}> {
-        return this.embeddingsManager.findSimilarContentBM25Only(query, limit);
+    async searchVaultBM25Only(query: string, limit: number = 5, maxChunksPerFile: number = 5): Promise<{results: Array<{path: string, content: string, similarity: number, lineStart?: number, lineEnd?: number}>, temporalContext?: {startDate: number | null, endDate: number | null, cleanQuery: string}}> {
+        return this.embeddingsManager.findSimilarContentBM25Only(query, limit, maxChunksPerFile);
     }
 
-    async activateView(mode: 'landing' | 'tutor' | 'chat' | 'feed' | 'feed-entries' | 'combined-feed' | 'bookmarks', subMode?: 'qa' | 'mcq', data?: unknown): Promise<void> {
+    async activateView(mode: 'landing' | 'tutor' | 'chat' | 'feed' | 'feed-entries' | 'combined-feed' | 'bookmarks' | 'agent', subMode?: 'qa' | 'mcq', data?: unknown): Promise<void> {
         this.currentViewMode = mode;
         let viewType: string;
         let state: Record<string, unknown> = {};
@@ -502,6 +680,9 @@ export default class AIPlugin extends Plugin {
             case 'bookmarks':
                 viewType = VIEW_TYPE_BOOKMARKS;
                 break;
+            case 'agent':
+                viewType = VIEW_TYPE_AGENT;
+                break;
             default:
                                 return;
         }
@@ -509,10 +690,14 @@ export default class AIPlugin extends Plugin {
         let leaf: WorkspaceLeaf | null = null;
         const existingLeaves = this.app.workspace.getLeavesOfType(viewType);
 
+        const openInSidebar = isMobile && (this.settings.mobileOpenInSidebar ?? false);
+
         if (existingLeaves.length > 0) {
             leaf = existingLeaves[0];
         } else {
-            leaf = isMobile ? this.app.workspace.getLeaf(true) : this.app.workspace.getRightLeaf(false);
+            leaf = (!isMobile || openInSidebar)
+                ? this.app.workspace.getRightLeaf(false)
+                : this.app.workspace.getLeaf(true);
         }
 
         if (leaf) {
@@ -549,6 +734,11 @@ export default class AIPlugin extends Plugin {
         }
 
         
+        if (this.skillRegistry) {
+            this.skillRegistry.stopWatcher();
+        }
+
+        
         const doc = (this.app.workspace.activeEditor?.editor as unknown as { view?: { containerEl?: { ownerDocument?: Document } } })?.view?.containerEl?.ownerDocument ?? activeDocument;
         const mcqOverlays = doc.body.querySelectorAll('.mcq-error-overlay');
         mcqOverlays.forEach(overlay => overlay.remove());
@@ -556,7 +746,8 @@ export default class AIPlugin extends Plugin {
         void this.notebookManager.saveNotebooks();
     }
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<AISettings>);
+        const rawData = await this.loadData() as Partial<AISettings> | null;
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, rawData);
         
         
         const { settings: migratedSettings, migrated } = migrateSettings(this.settings);
@@ -567,6 +758,11 @@ export default class AIPlugin extends Plugin {
             
             this.saveData(this.settings).catch(err => {
                             });
+        }
+        
+        
+        if (!rawData || rawData.agentDenyList === undefined) {
+            this.settings.agentDenyList = getDefaultAgentDenyList(this.app.vault.configDir);
         }
         
         
@@ -608,6 +804,7 @@ export default class AIPlugin extends Plugin {
             this.settings.bookmarkedEntries = Array.from(this.bookmarkedEntriesSet.values()).map(jsonString => JSON.parse(jsonString) as Record<string, unknown>);
         }
         await this.saveData(this.settings);
+        void syncSavedFeedsJson(this.app, this.settings.savedFeeds);
 
         
         if (this.settings.openCodeApiKey) {
@@ -615,13 +812,17 @@ export default class AIPlugin extends Plugin {
                 new OpenCodeProvider(this.settings.openCodeApiKey)
             );
         }
+        // Re-register LM Studio with the latest base URL/token
+        UnifiedProviderManager.getInstance().registerProvider(
+            new LmStudioProvider(this.settings.lmStudioBaseUrl, this.settings.lmStudioApiToken)
+        );
         this.registerCustomProviders();
     }
 
     private registerCustomProviders() {
         
         UnifiedProviderManager.getInstance().getAllProviders().forEach(p => {
-            if (p instanceof CustomOpenAIProvider) {
+            if (p instanceof CustomOpenAIProvider && p.id !== 'lmstudio') {
                 UnifiedProviderManager.getInstance().unregisterProvider(p.id);
             }
         });
@@ -640,7 +841,11 @@ export default class AIPlugin extends Plugin {
         let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_NEXUS_CHAT)[0];
         
         if (!leaf) {
-            const newLeaf = this.app.workspace.getRightLeaf(false);
+            const isMobile = Platform.isMobile;
+            const openInSidebar = isMobile && (this.settings.mobileOpenInSidebar ?? false);
+            const newLeaf = (!isMobile || openInSidebar)
+                ? this.app.workspace.getRightLeaf(false)
+                : this.app.workspace.getLeaf(true);
             if (!newLeaf) {
                 new Notice('Could not create new leaf');
                 return null;
@@ -709,6 +914,15 @@ export default class AIPlugin extends Plugin {
      * Updates the custom models list and caches results for fallback.
      * This runs in the background after plugin load to avoid slowing down startup.
      */
+    /**
+     * Fetches the list of models from the LM Studio local server.
+     * Throws when the server is unreachable (e.g. not running, wrong URL, or
+     * blocked by the Windows Firewall for LAN hosts).
+     */
+    public async fetchLmStudioModels(baseUrl: string, apiToken: string = ''): Promise<import('./settings').CustomModel[]> {
+        return fetchLmStudioModels(baseUrl, apiToken);
+    }
+
     public async refreshModelsFromProviders(force: boolean = false): Promise<void> {
         // Prevent redundant background refreshes on every app reload
         const lastFetched = this.settings.modelCache?.lastFetched || 0;
@@ -781,6 +995,30 @@ export default class AIPlugin extends Plugin {
                 }
             }
 
+            // LM Studio: fetch models from the local server (graceful failure —
+            // if the server is unreachable, keep the last known model list).
+            try {
+                const lmModels = await fetchLmStudioModels(this.settings.lmStudioBaseUrl, this.settings.lmStudioApiToken);
+                cache.lmstudio = lmModels.filter(m => !m.capabilities?.includes('embeddings'));
+                cache.lmstudioEmbeddings = lmModels
+                    .filter(m => m.capabilities?.includes('embeddings'))
+                    .map(m => ({
+                        id: m.id,
+                        name: m.name,
+                        provider: 'lmstudio',
+                        contextWindow: m.tokenLimit,
+                        enabled: m.enabled,
+                        isFree: true,
+                        isNew: m.isNew,
+                        verificationStatus: m.verificationStatus,
+                        lastVerified: m.lastVerified,
+                        verificationError: m.verificationError
+                    }));
+                hasUpdates = true;
+            } catch {
+                // Server unreachable — keep existing LM Studio models/cache
+            }
+
             
             
             
@@ -800,6 +1038,7 @@ export default class AIPlugin extends Plugin {
                     ...(cache.ollama || []),
                     ...(cache.nvidia || []),
                     ...(cache.groq || []),
+                    ...(cache.lmstudio || []),
                     ...Object.values(cache.customProviders || {}).flat()
                 ].map(m => {
                     const existing = existingModelMap.get(`${m.provider}:${m.id}`);
@@ -834,6 +1073,7 @@ export default class AIPlugin extends Plugin {
                     ...(cache.geminiEmbeddings || []),
                     ...(cache.openrouterEmbeddings || []),
                     ...(cache.nvidiaEmbeddings || []),
+                    ...(cache.lmstudioEmbeddings || []),
                     ...Object.values(cache.customProviderEmbeddings || {}).flat()
                 ];
                 
@@ -940,7 +1180,12 @@ export default class AIPlugin extends Plugin {
                         } else {
                             targetModel.verificationStatus = 'failed';
                             targetModel.verificationError = result.error;
-                            if (result.error !== 'Request timed out') {
+                            // LM Studio models are local — a failed check usually means the
+                            // server is momentarily unreachable or the model is being cold
+                            // loaded, so never disable them. Only definitive API errors
+                            // (401/403/404) for other providers disable a model.
+                            const isDefinitiveError = result.error !== 'Request timed out';
+                            if (isDefinitiveError && provider !== 'lmstudio') {
                                 targetModel.enabled = false; 
                             }
                         }
@@ -978,14 +1223,39 @@ export default class AIPlugin extends Plugin {
                     m.lastVerified = now;
                     m.verificationStatus = 'failed';
                     m.verificationError = 'Verification did not complete - model unresponsive';
-                    m.enabled = false;
+                    if (provider !== 'lmstudio') {
+                        m.enabled = false;
+                    }
                     unresponsiveCount++;
                 }
             }
             if (unresponsiveCount > 0) {
-                await this.saveSettings();
                 new Notice(`${unresponsiveCount} model(s) are unverified due to unresponsiveness, please verify availability manually for these models`, 8000);
             }
+
+            // Rearrange models for this provider in ascending order of verification latency
+            const providerModels = this.settings.customModels.filter(m => m.provider === provider);
+            providerModels.sort((a, b) => {
+              const latA = (a.verificationStatus === 'verified' && a.verificationLatency !== undefined) ? a.verificationLatency : Infinity;
+              const latB = (b.verificationStatus === 'verified' && b.verificationLatency !== undefined) ? b.verificationLatency : Infinity;
+              return latA - latB;
+            });
+
+            const newCustomModels: typeof this.settings.customModels = [];
+            let inserted = false;
+            for (const m of this.settings.customModels) {
+              if (m.provider === provider) {
+                if (!inserted) {
+                  newCustomModels.push(...providerModels);
+                  inserted = true;
+                }
+              } else {
+                newCustomModels.push(m);
+              }
+            }
+            this.settings.customModels = newCustomModels;
+            await this.saveSettings();
+
             this.verifyingProviders.delete(provider);
             if (onComplete) onComplete();
         }
@@ -1063,7 +1333,10 @@ export default class AIPlugin extends Plugin {
                         } else {
                             targetModel.verificationStatus = 'failed';
                             targetModel.verificationError = result.error;
-                            if (result.error !== 'Request timed out') {
+                            // LM Studio models are local — never disable them on a
+                            // failed check (server momentarily unreachable, cold load)
+                            const isDefinitiveError = result.error !== 'Request timed out';
+                            if (isDefinitiveError && provider !== 'lmstudio') {
                                 targetModel.enabled = false; 
                             }
                         }
@@ -1101,7 +1374,9 @@ export default class AIPlugin extends Plugin {
                     m.lastVerified = now;
                     m.verificationStatus = 'failed';
                     m.verificationError = 'Verification did not complete - model unresponsive';
-                    m.enabled = false;
+                    if (provider !== 'lmstudio') {
+                        m.enabled = false;
+                    }
                     unresponsiveCount++;
                 }
             }
@@ -1111,6 +1386,16 @@ export default class AIPlugin extends Plugin {
             }
             this.verifyingEmbeddingProviders.delete(provider);
             if (onComplete) onComplete();
+        }
+    }
+
+    refreshAgentMCPTools(): void {
+        if (this.agentRegistry && this.mcpService) {
+            const mcpTools = this.agentRegistry.getAll('mcp');
+            for (const tool of mcpTools) {
+                this.agentRegistry.removeTool(tool.definition.name);
+            }
+            registerMCPTools(this.agentRegistry, this.mcpService, this.settings.agentEnabledMCPs);
         }
     }
 }
