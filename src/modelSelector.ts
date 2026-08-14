@@ -2,6 +2,7 @@ import { AISettings, CustomModel, Provider } from './settings';
 import { TaskType } from './utils/tokenEstimator';
 import { validateNvidiaApiKey } from './services/nvidiaService';
 import { UnifiedProviderManager } from './services/unifiedProviderManager';
+import { ProviderHealthManager } from './utils/providerHealthManager';
 
 export interface TaskRequirements {
   supportsWebSearch?: boolean;
@@ -53,6 +54,46 @@ export class ModelSelector {
   }
 
   /**
+   * Parses parameter count in billions from model ID or name using regex matching
+   * (e.g. 70b -> 70, 8b -> 8, 3.7b -> 3.7, 120b -> 120, 405b -> 405).
+   * Returns number of billion parameters, or null if no tag is found.
+   */
+  private parseParameterCount(modelIdOrName: string): number | null {
+    if (!modelIdOrName) return null;
+    const match = modelIdOrName.match(/\b(\d+(?:\.\d+)?)\s*b\b/i);
+    if (match && match[1]) {
+      const val = parseFloat(match[1]);
+      return isNaN(val) ? null : val;
+    }
+    return null;
+  }
+
+  /**
+   * Returns true if model has verified latency data in Settings or live EMA metrics in ProviderHealthManager.
+   */
+  private hasLatencyData(model: CustomModel): boolean {
+    const liveEma = ProviderHealthManager.getInstance().getModelLatency(model.provider, model.id);
+    if (liveEma !== undefined && liveEma !== 1000) return true;
+    return model.verificationStatus === 'verified' && typeof model.verificationLatency === 'number' && model.verificationLatency > 0;
+  }
+
+  /**
+   * Returns effective model latency (in ms).
+   * Prioritizes real-time live EMA latency from ProviderHealthManager,
+   * falling back to saved verificationLatency from Settings, or 999999ms default.
+   */
+  private getEffectiveLatency(model: CustomModel): number {
+    const liveEma = ProviderHealthManager.getInstance().getModelLatency(model.provider, model.id);
+    if (liveEma !== undefined && liveEma !== 1000) {
+      return liveEma;
+    }
+    if (model.verificationStatus === 'verified' && model.verificationLatency !== undefined && model.verificationLatency > 0) {
+      return model.verificationLatency;
+    }
+    return 999999;
+  }
+
+  /**
    * Selects the best model for a task with fallback chain
    * Uses actual API limits and progressive fallback strategy
    * @param taskType - Type of task
@@ -78,16 +119,31 @@ export class ModelSelector {
       }
       return hasValidAuth;
     });
+
+    // Filter out models from providers currently in active cooldown/unhealthy state
+    const healthManager = ProviderHealthManager.getInstance();
+    const healthyModels = availableModels.filter(m => healthManager.isModelHealthy(m.provider, m.id));
+    if (healthyModels.length > 0) {
+      availableModels = healthyModels;
+    }
+
+    // STRICT VERIFIED-ONLY & LATENCY DATA FILTER:
+    // Only models with verified status and latency data in Settings or live EMA metrics
+    // are allowed into the auto chain. Unverified/untracked models are excluded.
+    const verifiedModelsWithLatency = availableModels.filter(m => this.hasLatencyData(m));
+    if (verifiedModelsWithLatency.length > 0) {
+      availableModels = verifiedModelsWithLatency;
+    }
     
     // Notify user about unavailable providers
     if (unavailableProviders.length > 0) {
         // Provider availability check complete
     }
 
-    // STRICT 7K TPM FLOOR — no model below this threshold enters any auto chain,
+    // STRICT 12K TPM FLOOR — no model below this threshold enters any auto chain,
     // regardless of task type. Applied before capability filtering so all modes
     // (web, vault, flash, create, MCP, etc.) are uniformly protected.
-    const MIN_GLOBAL_TPM = 7000;
+    const MIN_GLOBAL_TPM = 12000;
     const beforeFloor = availableModels.length;
     availableModels = availableModels.filter(m => this.getActualTPM(m) >= MIN_GLOBAL_TPM);
     const excludedCount = beforeFloor - availableModels.length;
@@ -156,10 +212,29 @@ export class ModelSelector {
       actualTPM: this.getActualTPM(model)
     }));
 
-    // Helper to sort models by TPM descending (no latency — verificationLatency is a
-    // stale snapshot that doesn't reflect real-time API conditions).
-    const sortByTPMOnly = (a: ModelCapability, b: ModelCapability) => {
+    // Helper to sort models primarily by LOWEST LATENCY (ms).
+    // Tie-breaker 1: Larger parameter count in billions (parsed from model ID/name)
+    // Tie-breaker 2: Higher actual TPM
+    const sortByLatencyFirst = (a: ModelCapability, b: ModelCapability) => {
+      const latA = this.getEffectiveLatency(a.model);
+      const latB = this.getEffectiveLatency(b.model);
+
+      // 1. Lowest latency (ms) first
+      if (latA !== latB) return latA - latB;
+
+      // 2. Tie-Breaker 1: More billion parameters first
+      const paramsA = this.parseParameterCount(a.model.id) ?? this.parseParameterCount(a.model.name);
+      const paramsB = this.parseParameterCount(b.model.id) ?? this.parseParameterCount(b.model.name);
+
+      if (paramsA !== null && paramsB !== null && paramsA !== paramsB) {
+        return paramsB - paramsA; // Higher billion parameters first
+      }
+      if (paramsA !== null && paramsB === null) return -1;
+      if (paramsA === null && paramsB !== null) return 1;
+
+      // 3. Tie-Breaker 2: Higher TPM first
       if (a.actualTPM !== b.actualTPM) return b.actualTPM - a.actualTPM;
+
       return a.model.id.localeCompare(b.model.id);
     };
 
@@ -172,84 +247,63 @@ export class ModelSelector {
     // CAPABLE MODELS: Those that can handle the estimated payload
     const capableEnough = modelsWithActualTPM
       .filter((m: ModelCapability) => m.actualTPM >= requiredTPM)
-      .sort(sortByTPMOnly);
+      .sort(sortByLatencyFirst);
 
     // DETERMINING THE PRIMARY MODEL (SELECTED)
-    // For biased tasks, we favor specific providers but still respect TPM within them.
-    const isBasicBiased = taskType === TaskType.BASIC_CHAT || 
-                          taskType === TaskType.VAULT_SEARCH || 
-                          taskType === TaskType.FLASH_SEARCH || 
-                          taskType === TaskType.YOUTUBE_QUERY ||
-                          taskType === TaskType.CODE_GENERATION ||
-                          taskType === TaskType.MULTIMODAL;
-    
-    const isWebBiased = taskType === TaskType.WEB_SEARCH || 
-                        taskType === TaskType.WEBPAGE_FETCH;
-
-    const isMcpBiased = taskType === TaskType.MCP_TOOL_CALLING;
-
-    const isBiasedTask = isBasicBiased || isWebBiased || isMcpBiased;
-
+    // Pure Latency-Driven Global Selection: Pick the single fastest verified capable model across all providers
     let selected: ModelCapability;
-
     if (capableEnough.length > 0) {
-      // If we have models that meet the TPM threshold, pick the fastest one among them
       selected = capableEnough[0];
     } else {
-      // Fallback: If NO model meets TPM threshold, use the largest one we have
-      selected = [...modelsWithActualTPM].sort((a: ModelCapability, b: ModelCapability) => b.actualTPM - a.actualTPM)[0];
-    }
-    
-    let providerOrder: Provider[] = ['groq', 'opencode', 'ollama', 'gemini', 'openrouter', 'nvidia'];
-    
-    if (isWebBiased) {
-      providerOrder = ['ollama', 'gemini', 'groq'];
-    } else if (isMcpBiased) {
-      providerOrder = [
-        'ollama', 'gemini', 'openrouter', 'opencode',
-        ...((this.settings.customProviders || []).map(p => p.id)),
-        'nvidia', 'groq'
-      ];
+      // Fallback: If no model meets required payload TPM, pick the model sorted by latency
+      selected = [...modelsWithActualTPM].sort(sortByLatencyFirst)[0];
     }
 
-    if (isBiasedTask) {
-      // For biased tasks, try to find a capable model from the preferred providers in order
-      for (const provider of providerOrder) {
-        let providerCandidates = capableEnough.filter((m: ModelCapability) => m.model.provider === provider);
-        
-        if (provider === 'openrouter') {
-          providerCandidates = providerCandidates.filter((m: ModelCapability) => 
-            m.model.id === 'openrouter/free' || m.model.id === 'openrouter/auto'
-          );
-        }
-
-        if (providerCandidates.length > 0) {
-          // capableEnough is already sorted by TPM
-          selected = providerCandidates[0];
-          break;
-        }
-      }
-    }
-
-    // BUILD GLOBAL PROGRESSIVE FALLBACK CHAIN
-    // We unify all models into a single global pool to ensure we never "de-escalate" 
-    // to a lower TPM model just because it belongs to the same provider.
-    const fallbacks: Array<{ provider: Provider; modelId: string; modelName: string }> = [];
-
-    // 1. Primary Fallbacks: Models that meet the TPM threshold, sorted globally by TPM
+    // BUILD INTERLEAVED CROSS-PROVIDER FALLBACK CHAIN
+    // Group candidates by provider and interleave round-robin to ensure fast cross-provider failover
     const primaryFallbacks = modelsWithActualTPM
       .filter((m: ModelCapability) => m.model.id !== selected.model.id && m.actualTPM >= requiredTPM)
-      .sort(sortByTPMOnly);
+      .sort(sortByLatencyFirst);
 
-    // 2. Secondary Fallbacks: Models that don't meet the TPM threshold (last resort), 
-    // sorted primarily by highest capacity (TPM) to give the best chance of success.
     const secondaryFallbacks = modelsWithActualTPM
       .filter((m: ModelCapability) => m.model.id !== selected.model.id && m.actualTPM < requiredTPM)
-      .sort((a, b) => b.actualTPM - a.actualTPM);
+      .sort(sortByLatencyFirst);
 
-    // Combine them into the final chain (max 10)
-    const globalChain = [...primaryFallbacks, ...secondaryFallbacks];
+    const interleaveByProvider = (list: ModelCapability[], primaryProvider: Provider): ModelCapability[] => {
+      const byProvider: Map<string, ModelCapability[]> = new Map();
+      for (const item of list) {
+        const p = item.model.provider;
+        if (!byProvider.has(p)) byProvider.set(p, []);
+        byProvider.get(p)!.push(item);
+      }
+      
+      // Order provider queues so that alternative providers come BEFORE primaryProvider
+      const providerKeys = Array.from(byProvider.keys());
+      const distinctKeys = providerKeys.filter(p => p !== primaryProvider);
+      const orderedKeys = providerKeys.includes(primaryProvider)
+        ? [...distinctKeys, primaryProvider]
+        : distinctKeys;
 
+      const result: ModelCapability[] = [];
+      let added = true;
+      while (added) {
+        added = false;
+        for (const p of orderedKeys) {
+          const queue = byProvider.get(p);
+          if (queue && queue.length > 0) {
+            result.push(queue.shift()!);
+            added = true;
+          }
+        }
+      }
+      return result;
+    };
+
+    const interleavedPrimary = interleaveByProvider(primaryFallbacks, selected.model.provider);
+    const interleavedSecondary = interleaveByProvider(secondaryFallbacks, selected.model.provider);
+    const globalChain = [...interleavedPrimary, ...interleavedSecondary];
+
+    const fallbacks: Array<{ provider: Provider; modelId: string; modelName: string }> = [];
     for (const m of globalChain) {
       if (fallbacks.length >= 10) break;
       fallbacks.push({ provider: m.model.provider, modelId: m.model.id, modelName: m.model.name });

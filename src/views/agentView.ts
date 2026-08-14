@@ -12,6 +12,7 @@ import { AIChatSessionManager, type AIChatSession } from '../managers/aiChatSess
 import { ModelSelector, type ModelSelection } from '../modelSelector';
 import { TokenEstimator, TaskType } from '../utils/tokenEstimator';
 import { RateLimitManager } from '../utils/rateLimitManager';
+import { ProviderHealthManager } from '../utils/providerHealthManager';
 import { PartialStreamError } from '../utils/streamingUtils';
 import { extractTextFromFile, isExtractable } from '../utils/localFileExtractor';
 import { openSessionHistoryModal } from '../modals/sessionHistoryModal';
@@ -1695,6 +1696,19 @@ export class AgentView extends ItemView {
     };
   }
 
+  private sanitizeMessagesForProvider(messages: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+    return messages.map((m) => {
+      const role = m.role as string;
+      if (role === 'assistant' && typeof m === 'object' && m !== null) {
+        const cleaned = { ...m };
+        delete cleaned.reasoning_content;
+        delete cleaned.thought;
+        return cleaned;
+      }
+      return m;
+    });
+  }
+
   private async callProviderImpl(
     providerId: string,
     modelId: string,
@@ -1704,13 +1718,16 @@ export class AgentView extends ItemView {
     tools?: ToolDefinition[],
     thinkingAcc?: { value: string }
   ): Promise<{ content: string; finishReason?: string; toolCalls?: ToolCall[] }> {
+    const sanitizedMessages = this.sanitizeMessagesForProvider(messages);
     const providerTools = tools && tools.length > 0 ? buildProviderTools(tools) : undefined;
-    const plainMessages = messages.map((m) => ({
+    const plainMessages = sanitizedMessages.map((m) => ({
       role: (m.role as 'system' | 'user' | 'assistant') || 'user',
       content: String(m.content ?? ''),
     }));
 
-    const baseOpts = { temperature: 0.3, maxTokens: 8192 };
+    const isCap4096Provider = providerId === 'cohere' || modelId.toLowerCase().includes('cohere') || modelId.toLowerCase().includes('aya');
+    const configuredMaxTokens = isCap4096Provider ? 4096 : 8192;
+    const baseOpts = { temperature: 0.3, maxTokens: configuredMaxTokens };
     const thinkingOpts = this.getAgentThinkingOptions(providerId, modelId);
 
     let accumulatedThinking = '';
@@ -2167,18 +2184,44 @@ export class AgentView extends ItemView {
     if (userModel && modelChain) {
       primaryProvider = userProvider;
       primaryModel = userModel;
-      fallbacks = [
+      const candidateList = [
         { provider: modelChain.provider, modelId: modelChain.modelId, modelName: modelChain.modelName },
         ...modelChain.fallbacks,
       ];
+      const seen = new Set<string>([`${userProvider}:${userModel}`]);
+      fallbacks = [];
+      for (const item of candidateList) {
+        const key = `${item.provider}:${item.modelId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          fallbacks.push(item);
+        }
+      }
     } else if (modelChain) {
       primaryProvider = modelChain.provider;
       primaryModel = modelChain.modelId;
-      fallbacks = modelChain.fallbacks;
+      const seen = new Set<string>([`${primaryProvider}:${primaryModel}`]);
+      fallbacks = [];
+      for (const item of modelChain.fallbacks) {
+        const key = `${item.provider}:${item.modelId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          fallbacks.push(item);
+        }
+      }
     } else {
       primaryProvider = userProvider;
       primaryModel = userModel;
       fallbacks = [];
+    }
+
+    // Force strict cross-provider round-robin: ensure fallbacks[0] comes from a DIFFERENT provider than primaryProvider
+    if (fallbacks.length > 0 && fallbacks[0].provider === primaryProvider) {
+      const distinctProviderIdx = fallbacks.findIndex(f => f.provider !== primaryProvider);
+      if (distinctProviderIdx > 0) {
+        const [diffModel] = fallbacks.splice(distinctProviderIdx, 1);
+        fallbacks.unshift(diffModel);
+      }
     }
 
     if (!primaryModel) {
@@ -2193,6 +2236,10 @@ export class AgentView extends ItemView {
     this.currentModelProvider = primaryProvider;
 
     let providerCalls = 0;
+    let activeModelIndex = 0; // Sticky active model index across multi-step ReAct loop turns
+    let failedProvidersCount = 0;
+    const MAX_PROVIDER_FAILOVERS = 3;
+
     const providerCall = async (messages: Array<Record<string, unknown>>, onToken?: (chunk: string) => void, onThinking?: (thinking: string) => void, tools?: ToolDefinition[]): Promise<{
       content?: string;
       toolCalls?: ToolCall[];
@@ -2208,9 +2255,37 @@ export class AgentView extends ItemView {
 
       const isMidway = providerCalls > 1;
       let lastError: Error | null = null;
+      const healthManager = ProviderHealthManager.getInstance();
 
-      for (let i = 0; i < allModels.length; i++) {
+      console.log(`[AgentOrchestrator] Step ${providerCalls} - Executing model chain (Primary: ${primaryProvider}/${primaryModel}, Fallbacks: ${fallbacks.length})`);
+
+      // Start search at activeModelIndex (sticky for task session)
+      let i = activeModelIndex;
+      let attempts = 0;
+
+      while (attempts < allModels.length) {
+        if (failedProvidersCount >= MAX_PROVIDER_FAILOVERS) {
+          console.warn(`[AgentOrchestrator] Max provider failover cap (${MAX_PROVIDER_FAILOVERS}) reached. Stopping fallback chain search.`);
+          throw lastError || new Error(`Max provider failovers (${MAX_PROVIDER_FAILOVERS}) reached. Please check your API keys or endpoint settings.`);
+        }
+
+        if (i >= allModels.length) {
+          i = 0; // Wrap around if needed
+        }
+
         const { provider, modelId } = allModels[i];
+
+        // Skip models/providers currently cooling down (unless it's the primary user model on first call)
+        if (providerCalls > 1 && !healthManager.isModelHealthy(provider, modelId)) {
+          console.info(`[AgentOrchestrator] Skipping cooling-down model/provider: ${provider}/${modelId}`);
+          i++;
+          attempts++;
+          continue;
+        }
+
+        console.log(`[AgentOrchestrator] [Attempt ${attempts + 1}/${allModels.length}] Trying model: ${provider}/${modelId}`);
+
+        const callStartTime = Date.now();
         try {
           const estimatedTokens = this.estimateAgentTokens(messages);
           if (modelChain) {
@@ -2219,10 +2294,15 @@ export class AgentView extends ItemView {
 
           const { content: text, finishReason, toolCalls: nativeToolCalls, thinking } = await this.callProvider(provider, modelId, messages, onToken, onThinking, tools);
 
+          const elapsedMs = Date.now() - callStartTime;
+          healthManager.recordSuccess(provider, modelId, elapsedMs);
+
           if (modelChain) {
             RateLimitManager.getInstance().recordApiCall(provider, modelId, estimatedTokens);
           }
 
+          // Update sticky session index to working model
+          activeModelIndex = i;
           this.currentModelId = modelId;
           this.currentModelProvider = provider;
 
@@ -2239,6 +2319,8 @@ export class AgentView extends ItemView {
             throw new Error('Model ' + provider + '/' + modelId + ' returned empty content');
           }
 
+          console.log(`[AgentOrchestrator] [Success] Model ${provider}/${modelId} succeeded in ${elapsedMs}ms.`);
+
           this.addEvent({
             type: 'model_status',
             data: { status: '', isMidway, autoModelEnabled: Boolean(modelChain) },
@@ -2248,14 +2330,24 @@ export class AgentView extends ItemView {
           return { content: resolvedContent, toolCalls: toolCalls.length > 0 ? toolCalls : undefined, finishReason, thinking };
         } catch (error: unknown) {
           if (error instanceof PartialStreamError) throw error;
+          
+          const classification = healthManager.recordFailure(provider, modelId, error);
           lastError = error instanceof Error ? error : new Error(String(error));
 
-          const autoModelEnabled = Boolean(this.plugin.settings.agentAutoModelChain);
-          const hasNextModel = i < allModels.length - 1;
+          console.warn(`[AgentOrchestrator] [Failure] Model ${provider}/${modelId} failed. Domain: ${classification.domain}, Reason: "${classification.reason}". Error:`, lastError);
 
-          const statusMsg = (autoModelEnabled && hasNextModel)
-            ? 'your selected model failed, trying the next model'
-            : 'your selected model failed, try with a better one';
+          const autoModelEnabled = Boolean(this.plugin.settings.agentAutoModelChain);
+          const hasNextModel = attempts < allModels.length - 1;
+
+          let statusMsg = (autoModelEnabled && hasNextModel)
+            ? `Model/Provider issue (${classification.reason}), trying next available model...`
+            : `Selected model failed (${classification.reason}). Try another model.`;
+
+          if (classification.domain === 'PROVIDER_LEVEL') {
+            failedProvidersCount++;
+            statusMsg = `Provider ${provider} failed (${classification.reason}). Switching to next provider...`;
+            console.warn(`[AgentOrchestrator] [Provider Failover] Fast-forwarding: skipping remaining models for provider "${provider}". Switching to next provider...`);
+          }
 
           this.addEvent({
             type: 'model_status',
@@ -2267,10 +2359,21 @@ export class AgentView extends ItemView {
             },
             timestamp: Date.now(),
           });
+
+          if (classification.domain === 'PROVIDER_LEVEL') {
+            const currentFailingProvider = provider;
+            while (i < allModels.length && allModels[i].provider === currentFailingProvider) {
+              i++;
+              attempts++;
+            }
+          } else {
+            i++;
+            attempts++;
+          }
         }
       }
 
-      throw lastError || new Error('All models in the auto-model chain failed.');
+      throw lastError || new Error('All models in the auto-model chain failed or are currently unavailable.');
     };
 
     const onToken = (chunk: string) => {

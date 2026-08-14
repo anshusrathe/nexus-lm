@@ -67,8 +67,7 @@ interface ExecProxy {
 function loadExec(): ExecProxy | null {
   if (!Platform.isDesktop) return null;
   try {
-    const nodeRequire = (window as unknown as { require?: (module: string) => ExecProxy }).require
-      ?? (globalThis as unknown as { require?: (module: string) => ExecProxy }).require;
+    const nodeRequire = (window as unknown as { require?: (module: string) => ExecProxy }).require;
     if (typeof nodeRequire === 'function') {
       return nodeRequire('child_process');
     }

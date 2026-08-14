@@ -314,7 +314,7 @@ function showInlineDiff(
  * Create the inline diff widget HTML structure
  */
 function createInlineDiffWidget(originalText: string, editedText: string, diffId: string, doc?: Document): HTMLElement {
-    const wrapper = (doc ?? activeDocument).createDiv();
+    const wrapper = (doc ?? activeDocument).createElement('div');
     
     // Add header
     const header = wrapper.createDiv({ cls: 'edit-selection-diff-header' });
@@ -369,23 +369,19 @@ function injectFloatingDiffWidget(
     // Use the document that the view belongs to (important for pop-out windows)
     const viewDoc = view.containerEl.doc;
     
+    // Add backdrop
+    const backdrop = viewDoc.body.createDiv({
+        cls: 'edit-selection-diff-backdrop nexus-backdrop'
+    });
+    
     // Create overlay container
-    const overlay = viewDoc.createDiv();
-    overlay.addClass('edit-selection-diff-overlay');
-    overlay.addClass('nexus-overlay');
-    overlay.setAttribute('data-diff-id', diffId);
+    const overlay = viewDoc.body.createDiv({
+        cls: 'edit-selection-diff-overlay nexus-overlay',
+        attr: { 'data-diff-id': diffId }
+    });
     
     // Add the diff widget to the overlay
     overlay.appendChild(diffHtml);
-    
-    // Add backdrop
-    const backdrop = viewDoc.createDiv();
-    backdrop.addClass('edit-selection-diff-backdrop');
-    backdrop.addClass('nexus-backdrop');
-    
-    // Append to view's document body
-    viewDoc.body.appendChild(backdrop);
-    viewDoc.body.appendChild(overlay);
     
     // Setup button handlers
     const acceptBtn = diffHtml.querySelector('.edit-selection-accept-btn') as HTMLButtonElement;

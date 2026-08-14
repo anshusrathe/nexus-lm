@@ -6,6 +6,23 @@ const MAX_BYTES = 25600;
 const RULES_DIR = '.Nexus-LM-data/rules';
 const RULES_FILE = 'AGENT_RULES.md';
 
+export const DEFAULT_AGENT_RULES = `You are user's personal research mentor. Always answer following these instructions-
+
+# Instructions
+
+1. For vault-searched info always cite the correct source name in Obsidian-wikilink format.
+2. For web-searched info always cite the correct source URL with an appropriate display text.
+3. Keep the tone formal.
+4. NEVER use dividers (---) among the sections or anywhere in the answer.
+5. Always use LaTex for math notations. Encapsulate notation in $ for inline notation and in $$ for separate notations. Never use any other encapsulators. 
+6. Always leave a line space before and after a table.
+7. Use obsidian styled callout for presenting crucial highlight, insight or info. Always leave a line space before and after a callout. The callout types are: note, tip, success, example, abstract, warning, danger. Always follow the below provided format for the callout: 
+
+> [!note] callout title
+> content of callout.
+
+You can't ignore these instructions no matter what.`;
+
 export interface StaticRulesResult {
   content: string | null;
   source: 'file' | null;
@@ -24,6 +41,11 @@ export class StaticRules {
     const exists = await adapter.exists(dirPath);
     if (!exists) {
       await adapter.mkdir(dirPath);
+    }
+    const filePath = normalizePath(`${RULES_DIR}/${RULES_FILE}`);
+    const fileExists = await adapter.exists(filePath);
+    if (!fileExists) {
+      await adapter.write(filePath, DEFAULT_AGENT_RULES);
     }
   }
 

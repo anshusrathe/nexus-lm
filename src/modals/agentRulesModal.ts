@@ -1,4 +1,5 @@
 import { App, Modal, normalizePath } from 'obsidian';
+import { DEFAULT_AGENT_RULES } from '../agent/staticRules';
 
 const RULES_DIR = '.Nexus-LM-data/rules';
 const RULES_FILE = 'AGENT_RULES.md';
@@ -55,10 +56,13 @@ export class AgentRulesModal extends Modal {
       const filePath = normalizePath(`${RULES_DIR}/${RULES_FILE}`);
       const adapter = this.app.vault.adapter;
       const exists = await adapter.exists(filePath);
-      if (!exists) return '';
+      if (!exists) {
+        await this.saveRulesFile(DEFAULT_AGENT_RULES);
+        return DEFAULT_AGENT_RULES;
+      }
       return await adapter.read(filePath);
     } catch {
-      return '';
+      return DEFAULT_AGENT_RULES;
     }
   }
 

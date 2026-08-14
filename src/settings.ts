@@ -410,12 +410,12 @@ customModels: [
   // Agent quick prompts defaults
   agentQuickPromptsVisible: true,
   agentQuickPrompts: [
-    'Create a new note on [topic] with a structured outline',
-    'Search my vault for notes related to [topic] and summarize the key ideas',
-    'Use web search to find the latest information on [topic] and summarize it',
-    'Extract the main takeaways from the PDF at [path]',
-    'Brainstorm 5 ideas for [goal] and save them to a new note',
-    'Review the note at [path] and suggest concrete improvements',
+    'What did we do last week?',
+    'Search the vault for the [[topic]] and provide missing gaps in info from web.',
+    'Create a new note on the [[topic]]. Search deeply across web for the info.',
+    'Edit the file containing info on [[topic]] with the recent updates from the web.',
+    'Search deeply through the attached [[database]] to gain cross-connections across the sources.',
+    "Summarize the [[excel/word/ppt/pdf/code file]] in crisp bullets. Bolden what's important.",
   ],
 };
 
