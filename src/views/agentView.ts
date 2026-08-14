@@ -2257,8 +2257,6 @@ export class AgentView extends ItemView {
       let lastError: Error | null = null;
       const healthManager = ProviderHealthManager.getInstance();
 
-      console.log(`[AgentOrchestrator] Step ${providerCalls} - Executing model chain (Primary: ${primaryProvider}/${primaryModel}, Fallbacks: ${fallbacks.length})`);
-
       // Start search at activeModelIndex (sticky for task session)
       let i = activeModelIndex;
       let attempts = 0;
@@ -2277,13 +2275,10 @@ export class AgentView extends ItemView {
 
         // Skip models/providers currently cooling down (unless it's the primary user model on first call)
         if (providerCalls > 1 && !healthManager.isModelHealthy(provider, modelId)) {
-          console.info(`[AgentOrchestrator] Skipping cooling-down model/provider: ${provider}/${modelId}`);
           i++;
           attempts++;
           continue;
         }
-
-        console.log(`[AgentOrchestrator] [Attempt ${attempts + 1}/${allModels.length}] Trying model: ${provider}/${modelId}`);
 
         const callStartTime = Date.now();
         try {
@@ -2318,8 +2313,6 @@ export class AgentView extends ItemView {
           if (!hasContent && toolCalls.length === 0) {
             throw new Error('Model ' + provider + '/' + modelId + ' returned empty content');
           }
-
-          console.log(`[AgentOrchestrator] [Success] Model ${provider}/${modelId} succeeded in ${elapsedMs}ms.`);
 
           this.addEvent({
             type: 'model_status',
