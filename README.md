@@ -32,9 +32,15 @@
 		- **Java**: `.java`
 		- **C / C++**: `.c`, `.cpp`, `.h`, `.hpp`
 
-![Demo Video 1](Assets/demo1.mp4)
 
-![Demo Video 2](Assets/demo2.mp4)
+
+https://github.com/user-attachments/assets/c03d0001-ec02-4625-9e4c-42863a5068eb
+
+
+
+https://github.com/user-attachments/assets/dbce6649-867c-44ce-aa92-c0a4257b501d
+
+
 
 ![Main Wallpaper](Assets/Main%20wallpaper%20of%20the%20plugin.png)
 
