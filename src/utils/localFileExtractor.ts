@@ -1,7 +1,7 @@
 import { App, TFile } from 'obsidian';
 import { extractTextFromPdf } from './pdfExtractor';
 import * as XLSX from 'xlsx';
-import JSZip from 'jszip';
+import { unzipSync } from 'fflate';
 import { isTextFile } from './multimodalUtils';
 
 interface MammothModule {
@@ -84,11 +84,11 @@ export async function extractTextFromFile(app: App, file: TFile): Promise<string
     // 5. PowerPoint Presentations (PPTX)
     if (ext === 'pptx') {
       const arrayBuffer = await app.vault.readBinary(file);
-      const zip = new JSZip();
-      await zip.loadAsync(arrayBuffer);
+      const zip = unzipSync(new Uint8Array(arrayBuffer));
+      const decoder = new TextDecoder();
       let text = '';
       const slideRegex = /^ppt\/slides\/slide\d+\.xml$/;
-      const slideFiles = Object.keys(zip.files).filter(name => slideRegex.test(name));
+      const slideFiles = Object.keys(zip).filter(name => slideRegex.test(name));
       
       // Sort slides by number
       slideFiles.sort((a, b) => {
@@ -98,7 +98,7 @@ export async function extractTextFromFile(app: App, file: TFile): Promise<string
       });
 
       for (const slideFile of slideFiles) {
-        const content = await zip.files[slideFile].async('string');
+        const content = decoder.decode(zip[slideFile]);
         // Simple regex to extract text inside <a:t> tags
         const matches = content.match(/<a:t>([\s\S]*?)<\/a:t>/g);
         if (matches) {

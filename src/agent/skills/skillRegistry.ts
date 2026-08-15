@@ -16,58 +16,20 @@ ${instructions.trim()}
 
 export class SkillRegistry {
   private app: App;
-  private pluginDir: string;
   private skills: Map<string, Skill> = new Map();
   private enabledSet: Set<string> = new Set();
   private watcherRefs: EventRef[] = [];
   private watcherTimer: number | null = null;
 
-  constructor(app: App, pluginDir: string) {
+  constructor(app: App) {
     this.app = app;
-    this.pluginDir = pluginDir;
   }
 
   async discover(): Promise<void> {
     this.skills.clear();
 
-    // 1. Copy built-in skills from plugin dir to .Nexus-LM-data/skills/ if not already there
-    await this.copyBuiltInSkills();
-
-    // 2. Discover all skills from .Nexus-LM-data/skills/ (copied built-ins + user + agent-created)
+    // Discover all skills from .Nexus-LM-data/skills/ (user + agent-created)
     await this.discoverFromDir(normalizePath(SKILLS_DIR), false, false);
-  }
-
-  private async copyBuiltInSkills(): Promise<void> {
-    if (!this.pluginDir) return;
-    const adapter = this.app.vault.adapter;
-    const builtinDir = normalizePath(`${this.pluginDir}/skills`);
-    const builtinExists = await adapter.exists(builtinDir);
-    if (!builtinExists) return;
-
-    try {
-      await adapter.mkdir(normalizePath(SKILLS_DIR));
-      const entries = await adapter.list(builtinDir);
-      const skillDirs = entries.folders.filter(f => f !== builtinDir);
-
-      for (const skillDir of skillDirs) {
-        const skillName = skillDir.split('/').pop() || skillDir.split('\\').pop() || '';
-        if (!skillName) continue;
-
-        const targetDir = normalizePath(`${SKILLS_DIR}/${skillName}`);
-        const targetExists = await adapter.exists(targetDir);
-        if (targetExists) continue;
-
-        const sourceMd = normalizePath(`${skillDir}/SKILL.md`);
-        const sourceMdExists = await adapter.exists(sourceMd);
-        if (!sourceMdExists) continue;
-
-        const content = await adapter.read(sourceMd);
-        await adapter.mkdir(targetDir);
-        await adapter.write(normalizePath(`${targetDir}/SKILL.md`), content);
-      }
-    } catch (err) {
-      console.warn('[SkillRegistry] error copying built-in skills:', err);
-    }
   }
 
   private async discoverFromDir(dir: string, builtin: boolean, installedByAgent: boolean): Promise<void> {

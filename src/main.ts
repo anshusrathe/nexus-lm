@@ -123,7 +123,7 @@ export default class AIPlugin extends Plugin {
         };
         this.webSearchService = new WebSearchService(webSearchConfig);
 
-        this.skillRegistry = new SkillRegistry(this.app, this.manifest?.dir || '');
+        this.skillRegistry = new SkillRegistry(this.app);
         void this.skillRegistry.discover();
         this.skillRegistry.startWatcher();
         if (this.settings.agentSkillsEnabled ?? false) {
