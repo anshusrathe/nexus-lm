@@ -1,0 +1,358 @@
+import { normalizePath, type App, type TAbstractFile, type EventRef } from 'obsidian';
+import type { Skill } from './skillTypes';
+import { parseSkillFile } from './skillParser';
+
+const SKILLS_DIR = '.Nexus-LM-data/skills';
+
+function buildSkillMd(name: string, description: string, instructions: string): string {
+  return `---
+name: ${JSON.stringify(name)}
+description: ${JSON.stringify(description)}
+---
+
+${instructions.trim()}
+`;
+}
+
+export class SkillRegistry {
+  private app: App;
+  private skills: Map<string, Skill> = new Map();
+  private enabledSet: Set<string> = new Set();
+  private watcherRefs: EventRef[] = [];
+  private watcherTimer: number | null = null;
+
+  constructor(app: App) {
+    this.app = app;
+  }
+
+  async discover(): Promise<void> {
+    this.skills.clear();
+
+    // Discover all skills from .Nexus-LM-data/skills/ (user + agent-created)
+    await this.discoverFromDir(normalizePath(SKILLS_DIR), false, false);
+  }
+
+  private async discoverFromDir(dir: string, builtin: boolean, installedByAgent: boolean): Promise<void> {
+    try {
+      const adapter = this.app.vault.adapter;
+      const exists = await adapter.exists(dir);
+      if (!exists) return;
+
+      const entries = await adapter.list(dir);
+      const skillDirs = entries.folders.filter(f => f !== dir);
+
+      for (const skillDir of skillDirs) {
+        const skillName = skillDir.split('/').pop() || skillDir.split('\\').pop() || '';
+        if (!skillName) continue;
+
+        const skillMdPath = normalizePath(`${skillDir}/SKILL.md`);
+        const skillMdExists = await adapter.exists(skillMdPath);
+        if (!skillMdExists) continue;
+
+        try {
+          const content = await adapter.read(skillMdPath);
+          const parsed = parseSkillFile(content, skillMdPath);
+
+          if (parsed.errors.length > 0) {
+            for (const err of parsed.errors) {
+              console.warn(`[SkillRegistry] ${err}`);
+            }
+          }
+
+          if (!parsed.metadata.name) {
+            parsed.metadata.name = skillName;
+          }
+
+          if (!/^[a-z0-9-]+$/.test(parsed.metadata.name) || parsed.metadata.name.length > 64 || !parsed.metadata.description || parsed.metadata.description.length > 1024) {
+            console.warn(`[SkillRegistry] skipping invalid skill at ${skillDir}`);
+            continue;
+          }
+
+          const refsDir = normalizePath(`${skillDir}/references`);
+          const scriptsDir = normalizePath(`${skillDir}/scripts`);
+          const assetsDir = normalizePath(`${skillDir}/assets`);
+
+          const hasRefs = await adapter.exists(refsDir);
+          const hasScripts = await adapter.exists(scriptsDir);
+          const hasAssets = await adapter.exists(assetsDir);
+
+          const skill: Skill = {
+            metadata: parsed.metadata,
+            directory: skillDir,
+            enabled: this.enabledSet.has(parsed.metadata.name) || false,
+            builtin,
+            installedByAgent,
+            installedAt: Date.now(),
+            instructions: undefined,
+            hasScripts,
+            hasReferences: hasRefs,
+            hasAssets,
+          };
+
+          // User skills override built-in skills with the same name
+          const existing = this.skills.get(skill.metadata.name);
+          if (!existing || !existing.builtin || builtin === false) {
+            this.skills.set(skill.metadata.name, skill);
+          }
+        } catch (err) {
+          console.warn(`[SkillRegistry] error reading skill at ${skillDir}:`, err);
+        }
+      }
+    } catch {
+      // Directory doesn't exist yet, that's fine
+    }
+  }
+
+  getAll(): Skill[] {
+    return Array.from(this.skills.values());
+  }
+
+  getEnabled(): Skill[] {
+    return this.getAll().filter(s => s.enabled);
+  }
+
+  get(name: string): Skill | undefined {
+    return this.skills.get(name);
+  }
+
+  enable(name: string): void {
+    const skill = this.skills.get(name);
+    if (skill) {
+      skill.enabled = true;
+      this.enabledSet.add(name);
+    }
+  }
+
+  disable(name: string): void {
+    const skill = this.skills.get(name);
+    if (skill) {
+      skill.enabled = false;
+      this.enabledSet.delete(name);
+    }
+  }
+
+  isEnabled(name: string): boolean {
+    const skill = this.skills.get(name);
+    return skill ? skill.enabled : false;
+  }
+
+  setEnabledList(names: string[]): void {
+    this.enabledSet = new Set(names);
+    for (const skill of this.skills.values()) {
+      skill.enabled = this.enabledSet.has(skill.metadata.name);
+    }
+  }
+
+  async loadInstructions(name: string): Promise<string | null> {
+    const skill = this.skills.get(name);
+    if (!skill) return null;
+
+    if (skill.instructions !== undefined) {
+      return skill.instructions;
+    }
+
+    try {
+      const adapter = this.app.vault.adapter;
+      const skillMdPath = normalizePath(`${skill.directory}/SKILL.md`);
+      const exists = await adapter.exists(skillMdPath);
+      if (!exists) return null;
+
+      const content = await adapter.read(skillMdPath);
+      const parsed = parseSkillFile(content, skillMdPath);
+      skill.instructions = parsed.instructions || '';
+      return skill.instructions;
+    } catch {
+      return null;
+    }
+  }
+
+  async useSkill(name: string): Promise<string | null> {
+    const skill = this.skills.get(name);
+    if (!skill?.enabled) return null;
+    return this.loadInstructions(name);
+  }
+
+  getAvailableSkillsSummary(): string {
+    const enabled = this.getEnabled();
+    if (enabled.length === 0) return '';
+
+    return enabled
+      .map(s => `- ${s.metadata.name}: ${s.metadata.description}`)
+      .join('\n');
+  }
+
+  async createSkillFromAgent(
+    name: string,
+    description: string,
+    instructions: string,
+    scripts?: Record<string, string>
+  ): Promise<Skill> {
+    if (!name || !/^[a-z0-9-]+$/.test(name) || name.length > 64) {
+      throw new Error(`Invalid skill name "${name}". Must be lowercase alphanumeric with hyphens, max 64 chars.`);
+    }
+    if (!description || description.length > 1024) {
+      throw new Error(`Invalid skill description. Must be 1-1024 characters.`);
+    }
+    if (!instructions.trim()) {
+      throw new Error('Skill instructions must not be empty.');
+    }
+
+    const adapter = this.app.vault.adapter;
+    const skillDir = normalizePath(`${SKILLS_DIR}/${name}`);
+
+    const dirExists = await adapter.exists(skillDir);
+    if (dirExists) {
+      throw new Error(`Skill "${name}" already exists at ${skillDir}. Delete it first or choose a different name.`);
+    }
+
+    await adapter.mkdir(normalizePath(SKILLS_DIR));
+    await adapter.mkdir(skillDir);
+
+    await adapter.write(normalizePath(`${skillDir}/SKILL.md`), buildSkillMd(name, description, instructions));
+
+    if (scripts) {
+      const scriptsDir = normalizePath(`${skillDir}/scripts`);
+      await adapter.mkdir(scriptsDir);
+      for (const [filename, code] of Object.entries(scripts)) {
+        await adapter.write(normalizePath(`${scriptsDir}/${filename}`), code);
+      }
+    }
+
+    await this.discover();
+
+    const created = this.skills.get(name);
+    if (created) {
+      created.installedByAgent = true;
+      created.enabled = true;
+      this.enabledSet.add(name);
+    }
+
+    return created || this.skills.get(name)!;
+  }
+
+  async updateSkill(name: string, updates: { description?: string; instructions?: string }): Promise<Skill> {
+    const skill = this.skills.get(name);
+    if (!skill) {
+      throw new Error(`Skill "${name}" not found. Use get_available_skills to list existing skills.`);
+    }
+    if (!/^[a-z0-9-]+$/.test(name) || name.length > 64) {
+      throw new Error(`Invalid skill name "${name}". Must be lowercase alphanumeric with hyphens, max 64 chars.`);
+    }
+
+    const description = updates.description !== undefined && updates.description !== null
+      ? updates.description
+      : skill.metadata.description;
+    const existingInstructions = skill.instructions !== undefined
+      ? skill.instructions
+      : (await this.loadInstructions(name)) ?? '';
+    const instructions = updates.instructions !== undefined && updates.instructions !== null
+      ? updates.instructions
+      : existingInstructions;
+
+    if (!description || description.length > 1024) {
+      throw new Error('Invalid skill description. Must be 1-1024 characters.');
+    }
+    if (!instructions.trim()) {
+      throw new Error('Skill instructions must not be empty.');
+    }
+
+    const adapter = this.app.vault.adapter;
+    const skillMdPath = normalizePath(`${skill.directory}/SKILL.md`);
+    await adapter.write(skillMdPath, buildSkillMd(name, description, instructions));
+
+    skill.metadata.description = description;
+    skill.instructions = undefined;
+
+    return skill;
+  }
+
+  async readSkill(name: string): Promise<{
+    name: string;
+    description: string;
+    instructions: string;
+    path: string;
+    files: Array<{ path: string; type: 'file' | 'folder' }>;
+  } | null> {
+    const skill = this.skills.get(name);
+    if (!skill) return null;
+
+    const adapter = this.app.vault.adapter;
+    const instructions = (await this.loadInstructions(name)) ?? '';
+    const files: Array<{ path: string; type: 'file' | 'folder' }> = [];
+
+    const collect = async (dir: string): Promise<void> => {
+      if (!(await adapter.exists(dir))) return;
+      const entries = await adapter.list(dir);
+      for (const folder of entries.folders) {
+        files.push({ path: folder, type: 'folder' });
+        await collect(folder);
+      }
+      for (const file of entries.files) {
+        files.push({ path: file, type: 'file' });
+      }
+    };
+    await collect(skill.directory);
+
+    return {
+      name: skill.metadata.name,
+      description: skill.metadata.description,
+      instructions,
+      path: skill.directory,
+      files,
+    };
+  }
+
+  async deleteSkill(name: string): Promise<void> {
+    const skill = this.skills.get(name);
+    if (!skill) {
+      throw new Error(`Skill "${name}" not found.`);
+    }
+    if (skill.builtin) {
+      throw new Error(`Skill "${name}" is a built-in skill and cannot be deleted.`);
+    }
+
+    const adapter = this.app.vault.adapter;
+    await adapter.remove(skill.directory);
+
+    this.skills.delete(name);
+    this.enabledSet.delete(name);
+  }
+
+  startWatcher(): void {
+    if (this.watcherRefs.length > 0) return;
+
+    const handler = (file: TAbstractFile): void => {
+      if (file.path.startsWith(`${SKILLS_DIR}/`)) {
+        this.scheduleDiscover();
+      }
+    };
+
+    this.watcherRefs.push(this.app.vault.on('create', handler));
+    this.watcherRefs.push(this.app.vault.on('modify', handler));
+    this.watcherRefs.push(this.app.vault.on('delete', handler));
+  }
+
+  stopWatcher(): void {
+    for (const ref of this.watcherRefs) {
+      this.app.vault.offref(ref);
+    }
+    this.watcherRefs = [];
+    if (this.watcherTimer !== null) {
+      window.clearTimeout(this.watcherTimer);
+      this.watcherTimer = null;
+    }
+  }
+
+  private scheduleDiscover(): void {
+    if (this.watcherTimer !== null) {
+      window.clearTimeout(this.watcherTimer);
+    }
+    this.watcherTimer = window.setTimeout(() => {
+      this.watcherTimer = null;
+      const enabled = Array.from(this.enabledSet);
+      void this.discover().then(() => {
+        this.setEnabledList(enabled);
+      });
+    }, 400);
+  }
+}

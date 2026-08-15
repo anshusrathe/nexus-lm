@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+      "target": "ES2021",
+      "module": "ESNext",
+      "moduleResolution": "Node",
+      "strict": true,
+      "jsx": "react",
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "resolveJsonModule": true,
+      "outDir": "dist",
+      "verbatimModuleSyntax": false,
+      "types": ["svelte", "node"]
+    },
+    "include": ["src", "server.js", "**/*.svelte"]
+  }
